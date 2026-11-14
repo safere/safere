@@ -198,6 +198,12 @@ state and regex result have been finalized.
 Events contain neither regex text nor input text. They are immutable and safe for a listener to
 retain, although retaining every event can itself create substantial memory and cardinality costs.
 
+When `Matcher.find()` proves only existence and defers selection, its event has
+`boundaryStrategy() == NONE`; DFA participation remains auxiliary. Reading bounds or captures
+later performs exact selection, and subsequent searches retain that bounds demand. Getter work
+performed after the `FIND` event is outside that completed operation's summary. If selection occurs
+inside a replacement operation, its exact engine supplies that operation's boundary strategy.
+
 ### Interpreting strategies
 
 One operation can involve more than one engine. Do not describe an event using only the first
