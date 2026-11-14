@@ -136,6 +136,35 @@ build directory. Subsequent runs can use the default disconnected setting.
   required alternate, extend and validate the schema first; do not add a
   conversion helper in a harness.
 
+### Compilation and first-use measurements
+
+Changes to initialization follow the
+[architecture policy](../docs/ARCHITECTURE.md#compilation-and-initialization-policy).
+Classify each artifact by the APIs, representations, flags, and engine paths that can reach it.
+Check both callers that avoid construction and callers that need the deferred artifact, including
+mixed-feature patterns and fallback after unsuccessful construction.
+
+Keep these measurements separate:
+
+- **Cold initialization:** use fresh JVM forks and record whether the timer includes compilation
+  alone or compilation plus first execution. The `--first-compile` mode excludes process launch.
+- **Warm compilation plus first use of a fresh pattern:** compile inside each timed invocation,
+  then perform the affected operation. Existing `compileAndFind` and `compileAndMatches`
+  declarations cover common cases. Include capture/bounds access inside timing when it triggers
+  additional preparation. A pattern compiled and validated during JMH setup has already lost
+  these first-use costs.
+- **Steady-state execution:** prepare the pattern and exercise the affected path during setup,
+  then measure repeated execution with the same pattern and the same Matcher lifecycle in both
+  revisions. Include both successful and unsuccessful cached construction when applicable.
+
+Use the project runners and their measurement settings. A compile-only improvement or a warmed
+matching result does not establish compile-plus-first-use or first-request latency. Report
+first-use and tail-latency tradeoffs explicitly; do not infer them from mean throughput or hide
+them in an aggregate. Verify safe publication and shared construction under concurrent first use
+with focused tests. The review and follow-up measurements in
+[#982](https://github.com/safere/safere/pull/982) and
+[#1011](https://github.com/safere/safere/pull/1011) provide concrete precedents.
+
 ### Summary Statistics
 
 When updating `BENCHMARKS.md`, include the full benchmarked Git SHA and that
