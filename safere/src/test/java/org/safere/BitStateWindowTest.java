@@ -186,7 +186,81 @@ class BitStateWindowTest {
   }
 
   @Test
-  void shortNullableLoopMatchInLargeInputUsesBitState() {
+  void booleanWitnessDoesNotClaimDeferredMatchBounds() {
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      for (String regex : List.of("((a)?b?)*c", "(a.*z)")) {
+        String text =
+            regex.equals("(a.*z)")
+                ? "az" + "x".repeat(4096) + "z"
+                : "abbc abbc" + "x".repeat(100_000);
+        for (boolean utf8 : List.of(false, true)) {
+          Pattern pattern = Pattern.compile(regex);
+          Matcher matcher =
+              utf8
+                  ? new Matcher(pattern, new Utf8InputScanner(text.getBytes(UTF_8)))
+                  : pattern.matcher(text);
+          operations.clear();
+          assertThat(matcher.find()).isTrue();
+          assertThat(operations)
+              .singleElement()
+              .satisfies(
+                  operation -> {
+                    assertThat(operation.boundaryStrategy()).isEqualTo(MatchStrategy.NONE);
+                    assertThat(operation.auxiliaryStrategies())
+                        .contains(
+                            new StrategyParticipation(
+                                MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER));
+                  });
+          java.util.regex.Matcher expected = java.util.regex.Pattern.compile(regex).matcher(text);
+          assertThat(expected.find()).isTrue();
+          assertThat(matcher.start()).isEqualTo(expected.start());
+          assertThat(matcher.end()).isEqualTo(expected.end());
+          if (!regex.equals("(a.*z)")) {
+            operations.clear();
+            assertThat(matcher.find()).isTrue();
+            assertThat(operations)
+                .singleElement()
+                .satisfies(
+                    operation ->
+                        assertThat(operation.boundaryStrategy())
+                            .isEqualTo(MatchStrategy.BIT_STATE));
+            assertThat(expected.find()).isTrue();
+            assertThat(matcher.start()).isEqualTo(expected.start());
+            assertThat(matcher.end()).isEqualTo(expected.end());
+          }
+        }
+      }
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @Test
+  void nullableLoopReplacementReportsExactWindowSelection() {
+    Pattern pattern = Pattern.compile("((a)?b?)*c");
+    String text = "abbc" + "x".repeat(100_000);
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      assertThat(pattern.matcher(text).replaceFirst("X")).isEqualTo("X" + "x".repeat(100_000));
+      assertThat(operations)
+          .singleElement()
+          .satisfies(
+              operation -> {
+                assertThat(operation.operation()).isEqualTo(MatchOperation.REPLACE_FIRST);
+                assertThat(operation.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+              });
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @Test
+  void shortNullableLoopMatchInLargeInputUsesBitStateAfterBoundsDemand() {
     Pattern pattern = Pattern.compile("((a)?b?)*c");
     String text = "abbc" + "x".repeat(100_000);
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
@@ -199,8 +273,14 @@ class BitStateWindowTest {
           }
         });
     try {
-      assertThat(pattern.matcher(text).find()).isTrue();
-      assertThat(pattern.matcher(Utf8Input.trusted(text.getBytes(UTF_8))).find()).isTrue();
+      Matcher stringMatcher = boundsConsumingMatcher(pattern.matcher(text));
+      Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.trusted(text.getBytes(UTF_8)));
+      assertThat(utf8Matcher.find()).isTrue();
+      assertThat(utf8Matcher.start()).isZero();
+      utf8Matcher.reset();
+      operations.clear();
+      assertThat(stringMatcher.find()).isTrue();
+      assertThat(utf8Matcher.find()).isTrue();
       assertThat(operations).hasSize(2);
       for (OperationDiagnostics operation : operations) {
         assertThat(operation.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
@@ -272,8 +352,8 @@ class BitStateWindowTest {
         String longMatch = "[" + "a".repeat(400) + "](customProtocol://<doc_1>) ";
         String text =
             longMatch.repeat(2) + ("[" + label + "](customProtocol://<doc_1>) ").repeat(3000);
-        List<Matcher> actual = matchers(pattern, text);
-        List<Matcher> expected = matchers(exact, text);
+        List<Matcher> actual = boundsConsumingMatchers(pattern, text);
+        List<Matcher> expected = boundsConsumingMatchers(exact, text);
         for (int representation = 0; representation < actual.size(); representation++) {
           Matcher matcher = actual.get(representation);
           Matcher oracle = expected.get(representation);
@@ -315,7 +395,7 @@ class BitStateWindowTest {
     List<OperationDiagnostics> operations = new ArrayList<>();
     Pattern.setDiagnostics(recordOperations(operations));
     try {
-      for (Matcher matcher : matchers(pattern, text)) {
+      for (Matcher matcher : boundsConsumingMatchers(pattern, text)) {
         List<Integer> failures = new ArrayList<>();
         for (int i = 0; i < 2000; i++) {
           operations.clear();
@@ -367,7 +447,7 @@ class BitStateWindowTest {
     for (boolean utf8 : List.of(false, true)) {
       long previous = -1;
       for (int size : List.of(64, 128, 256)) {
-        Matcher matcher = matchers(pattern, block.repeat(size)).get(utf8 ? 1 : 0);
+        Matcher matcher = boundsConsumingMatchers(pattern, block.repeat(size)).get(utf8 ? 1 : 0);
         long work =
             WorkCounter.countForTesting(
                 () -> {
@@ -394,7 +474,7 @@ class BitStateWindowTest {
     Pattern.setDiagnostics(recordOperations(operations));
     try {
       for (String change : List.of("reset", "region", "pattern")) {
-        for (Matcher matcher : matchers(pattern, text)) {
+        for (Matcher matcher : boundsConsumingMatchers(pattern, text)) {
           for (int i = 0; i < 3; i++) {
             operations.clear();
             assertThat(matcher.find()).isTrue();
@@ -426,7 +506,7 @@ class BitStateWindowTest {
     List<OperationDiagnostics> operations = new ArrayList<>();
     Pattern.setDiagnostics(recordOperations(operations));
     try {
-      for (Matcher matcher : matchers(pattern, text)) {
+      for (Matcher matcher : boundsConsumingMatchers(pattern, text)) {
         operations.clear();
         for (int i = 0; i < 3; i++) {
           assertThat(matcher.find()).isTrue();
@@ -459,7 +539,7 @@ class BitStateWindowTest {
     List<OperationDiagnostics> operations = new ArrayList<>();
     Pattern.setDiagnostics(recordOperations(operations));
     try {
-      for (Matcher matcher : matchers(pattern, text)) {
+      for (Matcher matcher : boundsConsumingMatchers(pattern, text)) {
         operations.clear();
         for (int i = 0; i < 5; i++) {
           assertThat(matcher.find()).isTrue();
@@ -480,7 +560,7 @@ class BitStateWindowTest {
     Pattern pattern = Pattern.compile(PROTOCOL_LINK_REGEX);
     String longText = ("[" + "a".repeat(400) + "](customProtocol://<doc_1>) ").repeat(100);
     String shortText = "[aa](customProtocol://<doc_1>) " + "x".repeat(40_000);
-    Matcher matcher = pattern.matcher(longText);
+    Matcher matcher = boundsConsumingMatcher(pattern.matcher(longText));
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
     List<OperationDiagnostics> operations = new ArrayList<>();
     Pattern.setDiagnostics(recordOperations(operations));
@@ -523,10 +603,21 @@ class BitStateWindowTest {
         MatchStrategy.BIT_STATE, StrategyDisposition.BYPASSED, StrategyReason.SPECULATIVE_BACKOFF);
   }
 
-  private static List<Matcher> matchers(Pattern pattern, String text) {
+  private static List<Matcher> boundsConsumingMatchers(Pattern pattern, String text) {
     return List.of(
-        pattern.matcher(text),
-        new Matcher(pattern, ((ArrayUtf8Input) Utf8Input.trusted(text.getBytes(UTF_8))).scanner()));
+        boundsConsumingMatcher(pattern.matcher(text)),
+        boundsConsumingMatcher(
+            new Matcher(
+                pattern, ((ArrayUtf8Input) Utf8Input.trusted(text.getBytes(UTF_8))).scanner())));
+  }
+
+  private static Matcher boundsConsumingMatcher(Matcher matcher) {
+    // These policy tests model the span-consuming workload from #965 and #1139. Observe bounds
+    // through the default API rather than disabling laziness; reset clears speculation backoff
+    // while retaining the matcher's bounds demand for the measured search sequence.
+    assertThat(matcher.find()).isTrue();
+    matcher.start();
+    return matcher.reset();
   }
 
   private static BitState window(Prog prog, InputScanner input, int end) {

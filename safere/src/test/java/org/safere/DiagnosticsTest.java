@@ -865,7 +865,8 @@ class DiagnosticsTest {
 
     Matcher booleanMatcher = pattern.matcher("aaaaX");
     assertThat(booleanMatcher.find()).isTrue();
-    assertThat(operationsFor(pattern).getLast().boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+    // A successful Boolean witness leaves preferred bounds to a later exact selection.
+    assertThat(operationsFor(pattern).getLast().boundaryStrategy()).isEqualTo(MatchStrategy.NONE);
     assertThat(booleanMatcher.group(1)).isEqualTo("a");
 
     // After capture demand, an already-required exact search still records its fallback reason.

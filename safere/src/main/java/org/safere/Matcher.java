@@ -2310,7 +2310,8 @@ public final class Matcher implements MatchResult {
         // Removing unnecessary empty iterations preserves existence, including assertions,
         // but does not select the same prioritized path. Retain the original lower bound and
         // full input end; the witness endpoint must not constrain exact selection later.
-        diagnosticBoundary(MatchStrategy.DFA);
+        // This proves existence, not preferred bounds. The DFA remains auxiliary until an
+        // exact selection engine can claim boundary authority.
         applyDeferredMatchResult(
             effectiveStart, scanner.length(), prog.numCaptures(), false, false);
         capturesResolved = false;
@@ -2392,7 +2393,8 @@ public final class Matcher implements MatchResult {
         diagnosticDfaBudget(probe);
       }
       if (probe != null && probe.matched()) {
-        diagnosticBoundary(MatchStrategy.DFA);
+        // This proves existence, not preferred bounds. The DFA remains auxiliary until an
+        // exact selection engine can claim boundary authority.
         applyDeferredMatchResult(
             effectiveStart, scanner.length(), prog.numCaptures(), false, false);
         capturesResolved = false;
