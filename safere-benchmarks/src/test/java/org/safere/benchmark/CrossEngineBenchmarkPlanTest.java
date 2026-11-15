@@ -27,6 +27,7 @@ import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.openjdk.jmh.infra.Blackhole;
 
 class CrossEngineBenchmarkPlanTest {
@@ -833,16 +834,30 @@ class CrossEngineBenchmarkPlanTest {
     assertThat(cursor.groupParticipated(2)).isFalse();
   }
 
-  @Test
-  void coldStartPreparationDefersCompilationUntilTheMeasuredTask() {
+  @ParameterizedTest
+  @EnumSource(
+      value = BenchmarkOperation.class,
+      names = {
+        "COMPILE",
+        "COMPILE_AND_FIND",
+        "COMPILE_AND_MATCHES",
+        "COMPILE_AND_FIND_GROUP",
+        "COMPILE_AND_REPLACE_ALL"
+      })
+  void coldStartPreparationDefersCompilationUntilTheMeasuredTask(BenchmarkOperation operation) {
     CrossEngineWorkload workload =
         new CrossEngineWorkload(
             "Synthetic.coldCompile",
-            BenchmarkOperation.COMPILE,
+            operation,
             List.of("("),
-            List.of(),
-            new int[0],
-            null,
+            operation == BenchmarkOperation.COMPILE
+                ? List.of()
+                : CrossEngineBenchmarkPlan.load()
+                    .resolve("RegexBenchmark.literalMatch@safere-string")
+                    .workload()
+                    .inputKeys(),
+            new int[] {0},
+            "$0",
             null,
             0,
             DeclarativeBenchmarkPlan.MatcherLifecycle.NONE,
@@ -863,10 +878,16 @@ class CrossEngineBenchmarkPlanTest {
             "Today's password is swordfish. I understand instantiating Blackholes directly is"
                 + " dangerous.");
 
-    try (CrossEngineTrialRunner runner =
+    CrossEngineTrialRunner runner =
         CrossEngineTrialRunner.prepareColdStart(
-            BenchmarkData.get(), trial, CrossEngineWorkload.TimingGroup.MILLISECONDS)) {
-      assertThatThrownBy(() -> runner.run(blackhole)).isInstanceOf(IllegalArgumentException.class);
+            BenchmarkData.get(), trial, CrossEngineWorkload.TimingGroup.MILLISECONDS);
+    assertThatThrownBy(() -> runner.run(blackhole)).isInstanceOf(IllegalArgumentException.class);
+    if (operation == BenchmarkOperation.COMPILE) {
+      runner.close();
+    } else {
+      // Cold compound operations also validate after timing; they must not warm compilation in
+      // setup.
+      assertThatThrownBy(runner::close).isInstanceOf(IllegalArgumentException.class);
     }
   }
 

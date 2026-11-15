@@ -29,7 +29,7 @@ public class CrossEngineColdStartBenchmark {
 
   private CrossEngineTrialRunner runner;
 
-  /** Resolves the declaration without performing the measured compile operation. */
+  /** Resolves the declaration without compiling or executing the measured regex operation. */
   @Setup
   public void setup() {
     runner =
@@ -37,7 +37,7 @@ public class CrossEngineColdStartBenchmark {
             crossEngineColdStartTrial, CrossEngineWorkload.TimingGroup.MILLISECONDS);
   }
 
-  /** Releases resources retained by the selected execution variant. */
+  /** Validates compile-plus-operation results after timing and releases retained resources. */
   @TearDown
   public void tearDown() {
     runner.close();

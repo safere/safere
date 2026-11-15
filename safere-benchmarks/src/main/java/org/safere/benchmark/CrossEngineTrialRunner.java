@@ -14,11 +14,15 @@ final class CrossEngineTrialRunner implements AutoCloseable {
 
   private final List<RegexEngineVariant.CompiledRegex> patterns;
   private final BenchmarkOperation.BenchmarkTask task;
+  private final Runnable deferredValidation;
 
   private CrossEngineTrialRunner(
-      List<RegexEngineVariant.CompiledRegex> patterns, BenchmarkOperation.BenchmarkTask task) {
+      List<RegexEngineVariant.CompiledRegex> patterns,
+      BenchmarkOperation.BenchmarkTask task,
+      Runnable deferredValidation) {
     this.patterns = patterns;
     this.task = task;
+    this.deferredValidation = deferredValidation;
   }
 
   static CrossEngineTrialRunner prepare(
@@ -39,9 +43,9 @@ final class CrossEngineTrialRunner implements AutoCloseable {
       BenchmarkData data,
       CrossEngineBenchmarkPlan.Trial trial,
       CrossEngineWorkload.TimingGroup expectedTimingGroup) {
-    if (trial.workload().operation() != BenchmarkOperation.COMPILE) {
+    if (!trial.workload().operation().compilesDuringMeasurement()) {
       throw new IllegalArgumentException(
-          trial.id() + " cold-start execution requires the compile operation");
+          trial.id() + " cold-start execution requires an operation that includes compilation");
     }
     return prepare(data, trial, expectedTimingGroup, false);
   }
@@ -66,29 +70,31 @@ final class CrossEngineTrialRunner implements AutoCloseable {
     List<String> patternSources = workload.patterns();
     List<RegexEngineVariant.CompiledRegex> patterns = new ArrayList<>();
     try {
-      if (workload.operation() != BenchmarkOperation.COMPILE) {
+      if (!workload.operation().compilesDuringMeasurement()) {
         for (String pattern : patternSources) {
           patterns.add(trial.variant().compile(pattern));
         }
       }
+      Runnable validation =
+          () ->
+              trial.validate(
+                  workload
+                      .operation()
+                      .execute(
+                          trial.variant(),
+                          patternSources,
+                          patterns,
+                          inputs,
+                          workload.groups(),
+                          replacement,
+                          workload.limit(),
+                          workload.lifecycle(),
+                          workload.flagSet(),
+                          workload.seed(),
+                          workload.count(),
+                          workload.mode()));
       if (validateBeforeMeasurement) {
-        Object actual =
-            workload
-                .operation()
-                .execute(
-                    trial.variant(),
-                    patternSources,
-                    patterns,
-                    inputs,
-                    workload.groups(),
-                    replacement,
-                    workload.limit(),
-                    workload.lifecycle(),
-                    workload.flagSet(),
-                    workload.seed(),
-                    workload.count(),
-                    workload.mode());
-        trial.validate(actual);
+        validation.run();
       }
       BenchmarkOperation.BenchmarkTask task =
           workload
@@ -106,7 +112,12 @@ final class CrossEngineTrialRunner implements AutoCloseable {
                   workload.seed(),
                   workload.count(),
                   workload.mode());
-      return new CrossEngineTrialRunner(List.copyOf(patterns), task);
+      return new CrossEngineTrialRunner(
+          List.copyOf(patterns),
+          task,
+          !validateBeforeMeasurement && workload.operation() != BenchmarkOperation.COMPILE
+              ? validation
+              : null);
     } catch (RuntimeException | Error exception) {
       close(patterns);
       throw exception;
@@ -119,7 +130,13 @@ final class CrossEngineTrialRunner implements AutoCloseable {
 
   @Override
   public void close() {
-    close(patterns);
+    try {
+      if (deferredValidation != null) {
+        deferredValidation.run();
+      }
+    } finally {
+      close(patterns);
+    }
   }
 
   private static void close(List<RegexEngineVariant.CompiledRegex> patterns) {

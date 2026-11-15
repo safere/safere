@@ -149,6 +149,18 @@ final class Nfa {
   private boolean endmatch;
   private EngineContext context;
 
+  // One bounded decode per position, shared by queue admission and the scalar search loop.
+  private int queueDecodePos = Integer.MIN_VALUE;
+  private long queueDecoded;
+
+  private long decodeForQueue(InputScanner text, int pos) {
+    if (queueDecodePos != pos) {
+      queueDecoded = decodeAtConsumeBoundary(text, pos);
+      queueDecodePos = pos;
+    }
+    return queueDecoded;
+  }
+
   private boolean matched;
   private int[] bestMatch;
   private final AddToThreadqStack addToThreadqStack = new AddToThreadqStack();
@@ -193,6 +205,7 @@ final class Nfa {
     this.longest = longest;
     this.endmatch = endmatch;
     this.context = context;
+    queueDecodePos = Integer.MIN_VALUE;
     this.bestMatch = new int[ncapture];
     Arrays.fill(bestMatch, -1);
   }
@@ -227,6 +240,7 @@ final class Nfa {
     this.longest = longest;
     this.endmatch = endmatch;
     this.context = context;
+    queueDecodePos = Integer.MIN_VALUE;
     this.matched = false;
     if (this.bestMatch.length < ncapture) {
       this.bestMatch = new int[ncapture];
@@ -544,11 +558,11 @@ final class Nfa {
     QueueState nextq = allocQueueState();
 
     int[] initialCap = new int[threadArraySize];
+    boolean flatProgram = prog.didFlatten();
 
     int pos = startPos;
     while (true) {
-      long decoded = decodeAtConsumeBoundary(text, pos);
-      int cp = InputScanner.codePoint(decoded);
+      long decoded = decodeForQueue(text, pos);
       int nextPos = InputScanner.position(decoded);
 
       // Start a new thread if there have not been any matches
@@ -561,7 +575,11 @@ final class Nfa {
         // Always use prog.start() (anchored start). Unanchored matching is achieved
         // by starting a new thread at each position. The startUnanchored() entry point
         // (which includes a .*? prefix) is only for the DFA engine.
-        addToThreadq(runq, prog.start(), text, pos, initialCap, false);
+        if (flatProgram) {
+          addToFlatThreadq(runq, prog.start(), text, pos, initialCap, false);
+        } else {
+          addToThreadq(runq, prog.start(), text, pos, initialCap, false);
+        }
       }
 
       // If all threads have died, stop if anchored or we already have a match.
@@ -579,7 +597,10 @@ final class Nfa {
         continue;
       }
 
-      boolean done = stepCodePoint(runq, nextq, cp, text, pos, nextPos);
+      boolean done =
+          flatProgram
+              ? stepFlatCodePoint(runq, nextq, text, pos, nextPos)
+              : stepCodePoint(runq, nextq, text, pos, nextPos);
 
       QueueState tmp = runq;
       runq = nextq;
@@ -842,6 +863,11 @@ final class Nfa {
     stack.clear();
 
     int cachedFlags = -1;
+    // The delayed grapheme path retains its original admission and consumption rules.
+    int queueCp =
+        prog.hasGraphemeClusterInstruction()
+            ? Integer.MIN_VALUE
+            : InputScanner.codePoint(decodeForQueue(text, pos));
 
     // Follow the next instruction directly. Only deferred alternatives and unwind actions need
     // stack frames; their LIFO order still determines branch priority and register restoration.
@@ -1005,8 +1031,116 @@ final class Nfa {
             InstOp.OP_CHAR_CLASS,
             InstOp.OP_GRAPHEME_CLUSTER,
             InstOp.OP_MATCH -> {
+          // A consumer that cannot match this scalar cannot contribute any accepting path.
+          // Keep its visited mark, but avoid materializing capture state and a queue entry.
+          if (queueCp != Integer.MIN_VALUE
+              && ((ip.opCode == InstOp.OP_CHAR_RANGE && (queueCp < 0 || !ip.matchesChar(queueCp)))
+                  || (ip.opCode == InstOp.OP_CHAR_CLASS
+                      && (queueCp < 0 || !ip.matchesCharClass(queueCp))))) {
+            break;
+          }
           addThread(q, instructionId, t0, ip.op == InstOp.GRAPHEME_CLUSTER ? pos : -1);
         }
+      }
+    }
+  }
+
+  /** Expands ordered instruction lists without interpreting explicit alternative nodes. */
+  private void addToFlatThreadq(
+      QueueState q, int id, InputScanner text, int pos, int[] captures, boolean consumedInput) {
+    AddToThreadqStack stack = addToThreadqStack;
+    stack.clear();
+    int cp = InputScanner.codePoint(decodeForQueue(text, pos));
+    int cachedFlags = -1;
+    while (id != 0 || !stack.isEmpty()) {
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record();
+      }
+      if (id == 0) {
+        long frame = stack.pop();
+        int restoreIndex = (int) (frame >> 32);
+        if (restoreIndex >= 0) {
+          captures[restoreIndex] = (int) frame;
+          continue;
+        }
+        id = (int) frame >>> 1;
+        consumedInput = (frame & 1) != 0;
+        if (id == 0) {
+          continue;
+        }
+      }
+      int instructionId = id;
+      id = 0;
+      // A previous expansion visited this instruction and the rest of its list with higher
+      // priority. Captures do not affect recognition, and this program has no progress registers.
+      if (q.visitedInst[instructionId] == q.visitedGeneration) {
+        continue;
+      }
+      q.visitedInst[instructionId] = q.visitedGeneration;
+      Inst ip = prog.inst(instructionId);
+      int next = ip.last ? 0 : instructionId + 1;
+      switch (ip.opCode) {
+        case InstOp.OP_NOP -> {
+          if (next != 0) {
+            stack.pushInstruction(next, consumedInput);
+          }
+          id = ip.out;
+        }
+        case InstOp.OP_CAPTURE -> {
+          // Explore the continuation before the next alternative. Restore the capture before
+          // that alternative runs so losing paths cannot publish their register writes.
+          if (next != 0) {
+            stack.pushInstruction(next, consumedInput);
+          }
+          if (ip.arg < ncapture) {
+            stack.pushRestore(ip.arg, captures[ip.arg]);
+            captures[ip.arg] = pos;
+          }
+          id = ip.out;
+        }
+        case InstOp.OP_EMPTY_WIDTH -> {
+          if (next != 0) {
+            stack.pushInstruction(next, consumedInput);
+          }
+          if (cachedFlags == -1) {
+            cachedFlags =
+                emptyFlags(
+                    text,
+                    pos,
+                    false,
+                    context.graphemeContext(),
+                    captures[0],
+                    context.boundaryRegionStart(),
+                    consumedInput,
+                    context.emptyAnchorStartPos(),
+                    context.emptyAnchorEndPos(),
+                    context.boundaryEndPos(),
+                    context.boundaryEndPos(),
+                    prog.hasWordBoundary(),
+                    prog.hasTextAnchor());
+          }
+          if ((ip.arg & ~cachedFlags) == 0) {
+            id = ip.out;
+          }
+        }
+        case InstOp.OP_CHAR_RANGE -> {
+          if (cp >= 0 && ip.matchesChar(cp)) {
+            addThread(q, instructionId, captures, -1);
+          }
+          id = next;
+        }
+        case InstOp.OP_CHAR_CLASS -> {
+          if (cp >= 0 && ip.matchesCharClass(cp)) {
+            addThread(q, instructionId, captures, -1);
+          }
+          id = next;
+        }
+        case InstOp.OP_MATCH -> {
+          addThread(q, instructionId, captures, -1);
+          id = next;
+        }
+        case InstOp.OP_FAIL -> id = next;
+        default -> throw new IllegalStateException("Unsupported flattened NFA opcode: " + ip.op);
       }
     }
   }
@@ -1141,7 +1275,7 @@ final class Nfa {
   }
 
   private boolean stepCodePoint(
-      QueueState rq, QueueState nq, int cp, InputScanner text, int matchPos, int nextPos) {
+      QueueState rq, QueueState nq, InputScanner text, int matchPos, int nextPos) {
     nq.clear();
 
     for (int threadIndex = 0; threadIndex < rq.size; threadIndex++) {
@@ -1162,16 +1296,9 @@ final class Nfa {
 
       Inst ip = prog.inst(id);
       switch (ip.opCode) {
-        case InstOp.OP_CHAR_RANGE -> {
-          if (cp >= 0 && ip.matchesChar(cp)) {
-            addToThreadq(nq, ip.out, text, nextPos, capture, true);
-          }
-        }
-
-        case InstOp.OP_CHAR_CLASS -> {
-          if (cp >= 0 && ip.matchesCharClass(cp)) {
-            addToThreadq(nq, ip.out, text, nextPos, capture, true);
-          }
+        case InstOp.OP_CHAR_RANGE, InstOp.OP_CHAR_CLASS -> {
+          // Ordinary scalar consumers were checked when admitted at this input position.
+          addToThreadq(nq, ip.out, text, nextPos, capture, true);
         }
 
         case InstOp.OP_MATCH -> {
@@ -1191,6 +1318,40 @@ final class Nfa {
         }
 
         default -> {}
+      }
+    }
+    rq.clear();
+    return false;
+  }
+
+  /** Steps a scalar list program; its queue contains only admitted consumers and MATCH. */
+  private boolean stepFlatCodePoint(
+      QueueState rq, QueueState nq, InputScanner text, int matchPos, int nextPos) {
+    nq.clear();
+    for (int threadIndex = 0; threadIndex < rq.size; threadIndex++) {
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record();
+      }
+      NfaThread t = rq.threads[threadIndex];
+      int[] capture = t.capture;
+      if (longest
+          && matched
+          && bestMatch[0] != -1
+          && capture[0] != -1
+          && bestMatch[0] < capture[0]) {
+        continue;
+      }
+      Inst ip = prog.inst(t.id);
+      if (ip.opCode == InstOp.OP_MATCH) {
+        if (acceptMatch(capture, matchPos) && !longest) {
+          rq.clear();
+          return false;
+        }
+      } else {
+        // Admission has already checked the scalar. The eligibility gate excludes other
+        // consumers and ALT_MATCH, so every remaining queued instruction advances one scalar.
+        assert ip.opCode == InstOp.OP_CHAR_RANGE || ip.opCode == InstOp.OP_CHAR_CLASS;
+        addToFlatThreadq(nq, ip.out, text, nextPos, capture, true);
       }
     }
     rq.clear();
