@@ -150,7 +150,7 @@ final class Nfa {
   private EngineContext context;
 
   // One bounded decode per position, shared by queue admission and the scalar search loop.
-  private int queueDecodePos = Integer.MIN_VALUE;
+  private int queueDecodePos;
   private long queueDecoded;
 
   private long decodeForQueue(InputScanner text, int pos) {
