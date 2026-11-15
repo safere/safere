@@ -153,21 +153,16 @@ final class Nfa {
   private int[] bestMatch;
   private final AddToThreadqStack addToThreadqStack = new AddToThreadqStack();
 
-  // NfaThread pool
-  private NfaThread[] threadPool = new NfaThread[16];
-  private int threadPoolSize = 0;
-
   // QueueState pool
   private final List<QueueState> queueStatePool = new ArrayList<>();
 
-  private NfaThread allocThread(int id, int[] captureSource, int graphemeStart) {
-    NfaThread t;
-    if (threadPoolSize > 0) {
-      threadPoolSize--;
-      t = threadPool[threadPoolSize];
-      threadPool[threadPoolSize] = null;
-    } else {
+  private void addThread(QueueState q, int id, int[] captureSource, int graphemeStart) {
+    // Each queue owns its inactive slots as well as its live threads. Refill slots in priority
+    // order instead of returning every thread to a separate pool at every input position.
+    NfaThread t = q.threads[q.size];
+    if (t == null) {
       t = new NfaThread(threadArraySize);
+      q.threads[q.size] = t;
     }
     t.id = id;
     if (captureSource != null) {
@@ -176,23 +171,7 @@ final class Nfa {
       Arrays.fill(t.capture, -1);
     }
     t.graphemeStart = graphemeStart;
-    return t;
-  }
-
-  private void freeThread(NfaThread t) {
-    if (threadPool.length <= threadPoolSize) {
-      threadPool = Arrays.copyOf(threadPool, threadPool.length * 2);
-    }
-    threadPool[threadPoolSize] = t;
-    threadPoolSize++;
-  }
-
-  private void freeQueue(QueueState q) {
-    for (int i = 0; i < q.size; i++) {
-      freeThread(q.threads[i]);
-      q.threads[i] = null;
-    }
-    q.clear();
+    q.size++;
   }
 
   private QueueState allocQueueState() {
@@ -203,7 +182,7 @@ final class Nfa {
   }
 
   private void freeQueueState(QueueState q) {
-    freeQueue(q);
+    q.clear();
     queueStatePool.add(q);
   }
 
@@ -595,7 +574,7 @@ final class Nfa {
         if (pos >= endPos) {
           break;
         }
-        freeQueue(runq);
+        runq.clear();
         pos = nextPos;
         continue;
       }
@@ -605,7 +584,7 @@ final class Nfa {
       QueueState tmp = runq;
       runq = nextq;
       nextq = tmp;
-      freeQueue(nextq);
+      nextq.clear();
 
       if (done) {
         break;
@@ -674,7 +653,7 @@ final class Nfa {
         step(runq, delayedBuffer, delayedGrapheme, cp, text, pos, nextPos);
         nextBoundaryPos = nextPos;
       } else {
-        freeQueue(runq);
+        runq.clear();
         if (isUtf8 && pos < endPos) {
           long decoded = text.decodeForward(pos);
           nextBoundaryPos = Math.max(pos + 1, InputScanner.position(decoded));
@@ -754,12 +733,12 @@ final class Nfa {
         visited = destination.visitedInst[t.id] == destination.visitedGeneration;
         destination.visitedInst[t.id] = destination.visitedGeneration;
       }
-      if (visited) {
-        freeThread(t);
-      } else {
+      if (!visited) {
+        // Transfer the live thread without copying its registers. Exchange the inactive slot so
+        // each record still belongs to exactly one queue, including after the source is cleared.
+        source.threads[i] = destination.threads[destination.size];
         destination.threads[destination.size++] = t;
       }
-      source.threads[i] = null;
     }
     source.size = 0;
   }
@@ -926,23 +905,23 @@ final class Nfa {
         }
       }
 
-      switch (ip.op) {
-        case FAIL -> {}
+      switch (ip.opCode) {
+        case InstOp.OP_FAIL -> {}
 
-        case ALT -> {
+        case InstOp.OP_ALT -> {
           stack.pushInstruction(ip.out1, consumedInput);
           id = ip.out;
         }
 
-        case ALT_MATCH -> {
-          q.threads[q.size++] = allocThread(instructionId, t0, -1);
+        case InstOp.OP_ALT_MATCH -> {
+          addThread(q, instructionId, t0, -1);
           stack.pushInstruction(ip.out, consumedInput);
           id = ip.out1;
         }
 
-        case NOP -> id = ip.out;
+        case InstOp.OP_NOP -> id = ip.out;
 
-        case CAPTURE -> {
+        case InstOp.OP_CAPTURE -> {
           if (ip.arg < ncapture) {
             int opos = t0[ip.arg];
             t0[ip.arg] = pos;
@@ -951,7 +930,7 @@ final class Nfa {
           id = ip.out;
         }
 
-        case EMPTY_WIDTH -> {
+        case InstOp.OP_EMPTY_WIDTH -> {
           if (cachedFlags == -1) {
             cachedFlags =
                 emptyFlags(
@@ -980,7 +959,7 @@ final class Nfa {
           }
         }
 
-        case LOOP_ENTER -> {
+        case InstOp.OP_LOOP_ENTER -> {
           // A fresh entry whose earlier expansion at this position has completed can reach only
           // what that expansion reached, at lower priority: every enclosing loop register is
           // either an earlier position (the same behavior) or this position (the enclosing body
@@ -999,7 +978,7 @@ final class Nfa {
           id = ip.out;
         }
 
-        case PROGRESS_CHECK -> {
+        case InstOp.OP_PROGRESS_CHECK -> {
           int reg = ip.arg;
           int regIdx = ncapture + reg;
           int saved = t0[regIdx];
@@ -1022,9 +1001,11 @@ final class Nfa {
           }
         }
 
-        case CHAR_RANGE, CHAR_CLASS, GRAPHEME_CLUSTER, MATCH -> {
-          q.threads[q.size++] =
-              allocThread(instructionId, t0, ip.op == InstOp.GRAPHEME_CLUSTER ? pos : -1);
+        case InstOp.OP_CHAR_RANGE,
+            InstOp.OP_CHAR_CLASS,
+            InstOp.OP_GRAPHEME_CLUSTER,
+            InstOp.OP_MATCH -> {
+          addThread(q, instructionId, t0, ip.op == InstOp.GRAPHEME_CLUSTER ? pos : -1);
         }
       }
     }
@@ -1078,8 +1059,8 @@ final class Nfa {
       }
 
       Inst ip = prog.inst(id);
-      switch (ip.op) {
-        case CHAR_RANGE -> {
+      switch (ip.opCode) {
+        case InstOp.OP_CHAR_RANGE -> {
           if (cp >= 0 && ip.matchesChar(cp)) {
             QueueState destination =
                 prog.hasGraphemeSemantics()
@@ -1091,7 +1072,7 @@ final class Nfa {
           }
         }
 
-        case CHAR_CLASS -> {
+        case InstOp.OP_CHAR_CLASS -> {
           if (cp >= 0 && ip.matchesCharClass(cp)) {
             QueueState destination =
                 prog.hasGraphemeSemantics()
@@ -1103,7 +1084,7 @@ final class Nfa {
           }
         }
 
-        case GRAPHEME_CLUSTER -> {
+        case InstOp.OP_GRAPHEME_CLUSTER -> {
           if (matchPos < context.endPos()) {
             int graphemeStart =
                 Math.max(
@@ -1129,22 +1110,22 @@ final class Nfa {
                   destination.visitedInst[id] = destination.visitedGeneration;
                 }
                 if (!visited) {
-                  destination.threads[destination.size++] = allocThread(id, capture, graphemeStart);
+                  addThread(destination, id, capture, graphemeStart);
                 }
               }
             }
           }
         }
 
-        case MATCH -> {
+        case InstOp.OP_MATCH -> {
           if (acceptMatch(capture, matchPos) && !longest) {
             // Discard lower-priority threads here; previously queued successors still run.
-            freeQueue(rq);
+            rq.clear();
             return false;
           }
         }
 
-        case ALT_MATCH -> {
+        case InstOp.OP_ALT_MATCH -> {
           // Optimization: if this is the first thread and we want the match, take it.
           if (longest || threadIndex == 0) {
             System.arraycopy(capture, 0, bestMatch, 0, ncapture);
@@ -1155,7 +1136,7 @@ final class Nfa {
         default -> {}
       }
     }
-    freeQueue(rq);
+    rq.clear();
     return false;
   }
 
@@ -1180,28 +1161,28 @@ final class Nfa {
       }
 
       Inst ip = prog.inst(id);
-      switch (ip.op) {
-        case CHAR_RANGE -> {
+      switch (ip.opCode) {
+        case InstOp.OP_CHAR_RANGE -> {
           if (cp >= 0 && ip.matchesChar(cp)) {
             addToThreadq(nq, ip.out, text, nextPos, capture, true);
           }
         }
 
-        case CHAR_CLASS -> {
+        case InstOp.OP_CHAR_CLASS -> {
           if (cp >= 0 && ip.matchesCharClass(cp)) {
             addToThreadq(nq, ip.out, text, nextPos, capture, true);
           }
         }
 
-        case MATCH -> {
+        case InstOp.OP_MATCH -> {
           if (acceptMatch(capture, matchPos) && !longest) {
             // Discard lower-priority threads here; previously queued successors still run.
-            freeQueue(rq);
+            rq.clear();
             return false;
           }
         }
 
-        case ALT_MATCH -> {
+        case InstOp.OP_ALT_MATCH -> {
           // Optimization: if this is the first thread and we want the match, take it.
           if (longest || threadIndex == 0) {
             System.arraycopy(capture, 0, bestMatch, 0, ncapture);
@@ -1212,7 +1193,7 @@ final class Nfa {
         default -> {}
       }
     }
-    freeQueue(rq);
+    rq.clear();
     return false;
   }
 
