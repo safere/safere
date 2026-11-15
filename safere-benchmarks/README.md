@@ -40,6 +40,34 @@ It compares SafeRE and `java.util.regex` on compatible workloads adapted from
 OpenJDK's regex microbenchmarks. That suite is GPL-2.0-only, so its source is
 not vendored here or included in the `safere-benchmarks` Maven module.
 
+### Cold compilation and first-use latency
+
+Regular `singleShotColdStart` declarations run in fresh JVM forks with no warmup and one measured
+invocation. They cover compilation, compile-plus-first-use, and first-use after untimed compilation.
+The cold runner never executes the measured operation for validation during setup. It retains the
+actual measured first-use result and validates it after timing, without replaying the operation;
+protocol tests also check the fixtures and preparation boundary separately. A second invocation in
+the same fork is rejected. Inputs are materialized and encoded before timing, and process launch
+is excluded.
+
+`InitializationLatencyBenchmark.firstFind.*` compiles during setup, then measures Matcher creation,
+the first `find()`, and capture participation. `InitializationLatencyBenchmark.compileAndFirstFind.*`
+includes compilation in that same timed operation. Both read capture group 1 through the matcher
+API, including for UTF-8; they do not use matcher-free Boolean search. Initial cases cover ASCII
+word classes, Unicode word/property classes, and ASCII classes combined with grapheme consumption
+or grapheme boundaries. These workloads are part of the regular collection plan.
+
+```bash
+./run-java-benchmarks.sh --fastbuild --first-compile CrossEngineColdStartBenchmark.run -- \
+  -p crossEngineColdStartTrial=InitializationLatencyBenchmark.firstFind.graphemeCluster@safere-string
+```
+
+Run the paired `compileAndFirstFind` trial separately. Use `singleShotColdStart` only for supported
+single-operation workloads. Native cold-start runners currently cover compilation alone; their
+execution plans explicitly exclude these first-use timing boundaries. Fresh-process first-use
+latency and warmed compilation-plus-first-use measure different JVM states and must be reported
+separately.
+
 ### Investigative benchmarks
 
 Preserved diagnostic experiments live under [investigations/](investigations/README.md).

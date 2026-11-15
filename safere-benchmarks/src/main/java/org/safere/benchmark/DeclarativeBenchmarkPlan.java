@@ -1620,6 +1620,8 @@ final class DeclarativeBenchmarkPlan {
     SPLIT_LENGTH_SUM("splitLengthSum", false, true, Feature.SPLIT),
     COMPILE("compile", false, false),
     COMPILE_AND_FIND("compileAndFind", false, true, Feature.FIND),
+    COMPILE_AND_FIND_GROUP_PRESENT(
+        "compileAndFindGroupPresent", false, true, Feature.FIND, Feature.CAPTURE_PARTICIPATION),
     COMPILE_AND_MATCHES("compileAndMatches", false, true, Feature.MATCHES),
     FIND_ROTATING_UTF16("findRotatingUtf16", false, false, Feature.FIND),
     COMPILE_AND_FIND_ROTATING_UTF16("compileAndFindRotatingUtf16", false, false, Feature.FIND),
@@ -1747,6 +1749,7 @@ final class DeclarativeBenchmarkPlan {
             FIND_GROUP_PRESENT,
             FIND_SAMPLED_GROUP,
             COMPILE_AND_FIND,
+            COMPILE_AND_FIND_GROUP_PRESENT,
             COMPILE_AND_MATCHES,
             FIND_ROTATING_UTF16,
             COMPILE_AND_FIND_ROTATING_UTF16,
@@ -1805,7 +1808,8 @@ final class DeclarativeBenchmarkPlan {
                 RecipeValueType.INTEGER,
                 "mode",
                 RecipeValueType.STRING);
-        case FIND_GROUP_PRESENT, FIND_GROUP -> Map.of("group", RecipeValueType.INTEGER);
+        case FIND_GROUP_PRESENT, FIND_GROUP, COMPILE_AND_FIND_GROUP_PRESENT ->
+            Map.of("group", RecipeValueType.INTEGER);
         case REPLACE_FIRST,
             REPLACE_ALL,
             REPLACE_ALL_LENGTH_SUM,
@@ -1839,7 +1843,7 @@ final class DeclarativeBenchmarkPlan {
             Set.of("groups");
         case UTF8_CAPTURE_BOUNDS -> Set.of("groups", "expectedBounds");
         case FIND_SAMPLED_GROUP -> Set.of("group", "count", "mode");
-        case FIND_GROUP_PRESENT, FIND_GROUP -> Set.of("group");
+        case FIND_GROUP_PRESENT, FIND_GROUP, COMPILE_AND_FIND_GROUP_PRESENT -> Set.of("group");
         case REPLACE_FIRST,
             REPLACE_ALL,
             REPLACE_ALL_LENGTH_SUM,

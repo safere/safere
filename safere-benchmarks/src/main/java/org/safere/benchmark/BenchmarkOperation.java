@@ -28,6 +28,8 @@ enum BenchmarkOperation {
   SPLIT_LENGTH_SUM(EngineCapability.SPLIT),
   COMPILE(EngineCapability.COMPILE),
   COMPILE_AND_FIND(EngineCapability.COMPILE, EngineCapability.FIND),
+  COMPILE_AND_FIND_GROUP_PRESENT(
+      EngineCapability.COMPILE, EngineCapability.FIND, EngineCapability.GROUP_PARTICIPATION),
   COMPILE_AND_MATCHES(EngineCapability.COMPILE, EngineCapability.MATCHES),
   FIND_ROTATING_UTF16(EngineCapability.FIND),
   COMPILE_AND_FIND_ROTATING_UTF16(EngineCapability.COMPILE, EngineCapability.FIND),
@@ -67,6 +69,7 @@ enum BenchmarkOperation {
       case SPLIT_LENGTH_SUM -> SPLIT_LENGTH_SUM;
       case COMPILE -> COMPILE;
       case COMPILE_AND_FIND -> COMPILE_AND_FIND;
+      case COMPILE_AND_FIND_GROUP_PRESENT -> COMPILE_AND_FIND_GROUP_PRESENT;
       case COMPILE_AND_MATCHES -> COMPILE_AND_MATCHES;
       case FIND_ROTATING_UTF16 -> FIND_ROTATING_UTF16;
       case COMPILE_AND_FIND_ROTATING_UTF16 -> COMPILE_AND_FIND_ROTATING_UTF16;
@@ -85,6 +88,35 @@ enum BenchmarkOperation {
 
   boolean isSupportedBy(RegexEngineVariant variant) {
     return variant.capabilities().containsAll(requiredCapabilities);
+  }
+
+  boolean compilesDuringMeasurement() {
+    return switch (this) {
+      case COMPILE,
+          COMPILE_AND_FIND,
+          COMPILE_AND_FIND_GROUP_PRESENT,
+          COMPILE_AND_MATCHES,
+          COMPILE_AND_FIND_ROTATING_UTF16 ->
+          true;
+      default -> false;
+    };
+  }
+
+  boolean supportsColdStart() {
+    return switch (this) {
+      case COMPILE,
+          COMPILE_AND_FIND,
+          COMPILE_AND_FIND_GROUP_PRESENT,
+          COMPILE_AND_MATCHES,
+          FIND,
+          MATCHES,
+          LOOKING_AT,
+          FIND_GROUP,
+          FIND_GROUP_PRESENT,
+          CAPTURE_GROUPS ->
+          true;
+      default -> false;
+    };
   }
 
   BenchmarkTask bind(
@@ -112,6 +144,11 @@ enum BenchmarkOperation {
           seed,
           count,
           this == COMPILE_AND_FIND_ROTATING_UTF16);
+    }
+    if (compilesDuringMeasurement()) {
+      return blackhole ->
+          blackhole.consume(
+              compileAndExecute(variant, patternSources.getFirst(), inputs.getFirst(), groups));
     }
     RegexEngineVariant.CompiledRegex pattern = patterns.getFirst();
     RegexEngineVariant.RegexInput input = inputs.getFirst();
@@ -141,20 +178,6 @@ enum BenchmarkOperation {
           blackhole -> pattern.manualReplaceAll(input, replacement).consume(blackhole);
       case SPLIT_LENGTH_SUM ->
           blackhole -> blackhole.consume(splitLengthSum(pattern.split(input, limit)));
-      case COMPILE_AND_FIND ->
-          blackhole -> {
-            try (RegexEngineVariant.CompiledRegex compiled =
-                variant.compile(patternSources.getFirst())) {
-              blackhole.consume(compiled.find(input));
-            }
-          };
-      case COMPILE_AND_MATCHES ->
-          blackhole -> {
-            try (RegexEngineVariant.CompiledRegex compiled =
-                variant.compile(patternSources.getFirst())) {
-              blackhole.consume(compiled.matches(input));
-            }
-          };
       case MATCHER_RESET_FIND -> {
         RegexEngineVariant.MatchCursor retainedMatcher =
             lifecycle.matcher() == DeclarativeBenchmarkPlan.MatcherReuse.RETAINED
@@ -228,7 +251,8 @@ enum BenchmarkOperation {
           blackhole -> blackhole.consume(findGroupPresent(pattern.matcher(input), groups[0]));
       case FIND_GROUP ->
           blackhole -> blackhole.consume(findGroup(pattern.matcher(input), groups[0]));
-      case COMPILE -> throw new AssertionError();
+      case COMPILE, COMPILE_AND_FIND, COMPILE_AND_FIND_GROUP_PRESENT, COMPILE_AND_MATCHES ->
+          throw new AssertionError();
       case FIND_ROTATING_UTF16, COMPILE_AND_FIND_ROTATING_UTF16 -> throw new AssertionError();
     };
   }
@@ -258,6 +282,9 @@ enum BenchmarkOperation {
         return compiled.find(new RegexEngineVariant.StringRegexInput(input));
       }
     }
+    if (compilesDuringMeasurement()) {
+      return compileAndExecute(variant, patternSources.getFirst(), inputs.getFirst(), groups);
+    }
     RegexEngineVariant.CompiledRegex pattern = patterns.getFirst();
     RegexEngineVariant.RegexInput input = inputs.getFirst();
     return switch (this) {
@@ -278,18 +305,6 @@ enum BenchmarkOperation {
       case REPLACE_ALL_LENGTH_SUM -> replaceAllLengthSum(patterns, input, replacement);
       case MANUAL_REPLACE_ALL -> pattern.manualReplaceAll(input, replacement).validationValue();
       case SPLIT_LENGTH_SUM -> splitLengthSum(pattern.split(input, limit));
-      case COMPILE_AND_FIND -> {
-        try (RegexEngineVariant.CompiledRegex compiled =
-            variant.compile(patternSources.getFirst())) {
-          yield compiled.find(input);
-        }
-      }
-      case COMPILE_AND_MATCHES -> {
-        try (RegexEngineVariant.CompiledRegex compiled =
-            variant.compile(patternSources.getFirst())) {
-          yield compiled.matches(input);
-        }
-      }
       case MATCHER_RESET_FIND -> {
         RegexEngineVariant.MatchCursor matcher = pattern.matcher(input);
         matcher.reset();
@@ -314,9 +329,25 @@ enum BenchmarkOperation {
       }
       case FIND_GROUP_PRESENT -> findGroupPresent(pattern.matcher(input), groups[0]);
       case FIND_GROUP -> findGroup(pattern.matcher(input), groups[0]);
-      case COMPILE -> throw new AssertionError();
+      case COMPILE, COMPILE_AND_FIND, COMPILE_AND_FIND_GROUP_PRESENT, COMPILE_AND_MATCHES ->
+          throw new AssertionError();
       case FIND_ROTATING_UTF16, COMPILE_AND_FIND_ROTATING_UTF16 -> throw new AssertionError();
     };
+  }
+
+  private boolean compileAndExecute(
+      RegexEngineVariant variant,
+      String source,
+      RegexEngineVariant.RegexInput input,
+      int[] groups) {
+    try (RegexEngineVariant.CompiledRegex compiled = variant.compile(source)) {
+      return switch (this) {
+        case COMPILE_AND_FIND -> compiled.find(input);
+        case COMPILE_AND_MATCHES -> compiled.matches(input);
+        case COMPILE_AND_FIND_GROUP_PRESENT -> findGroupPresent(compiled.matcher(input), groups[0]);
+        default -> throw new AssertionError(this);
+      };
+    }
   }
 
   private static int tokenize(RegexEngineVariant.MatchCursor matcher, int length, String mode) {

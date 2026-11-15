@@ -4738,6 +4738,13 @@
         "length": "{size}"
       },
       "shared": true
+    },
+    {
+      "id": "initialization.firstUse.text",
+      "recipe": {
+        "kind": "literal",
+        "text": "aé"
+      }
     }
   ],
   "workloads": [
@@ -21402,6 +21409,166 @@
         "timingUnit": "nanoseconds",
         "constraints": [
           "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "InitializationLatencyBenchmark.firstFind.{regex}",
+      "operation": "findGroupPresent",
+      "patterns": [
+        "{regex}"
+      ],
+      "inputs": [
+        "initialization.firstUse.text"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "axes": {
+        "regex": [
+          {
+            "id": "asciiWord",
+            "value": "(\\w+)"
+          },
+          {
+            "id": "unicodeWord",
+            "value": {
+              "java": "(?U)(\\w+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java Unicode-character-class mode"
+                }
+              }
+            }
+          },
+          {
+            "id": "unicodeProperty",
+            "value": "(\\p{L}+)"
+          },
+          {
+            "id": "graphemeCluster",
+            "value": {
+              "java": "(\\w+)\\X",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme cluster matching"
+                }
+              }
+            }
+          },
+          {
+            "id": "graphemeBoundary",
+            "value": {
+              "java": "(\\w+)\\b{g}",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme boundaries"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "InitializationLatencyBenchmark.compileAndFirstFind.{regex}",
+      "operation": "compileAndFindGroupPresent",
+      "patterns": [
+        "{regex}"
+      ],
+      "inputs": [
+        "initialization.firstUse.text"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "axes": {
+        "regex": [
+          {
+            "id": "asciiWord",
+            "value": "(\\w+)"
+          },
+          {
+            "id": "unicodeWord",
+            "value": {
+              "java": "(?U)(\\w+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java Unicode-character-class mode"
+                }
+              }
+            }
+          },
+          {
+            "id": "unicodeProperty",
+            "value": "(\\p{L}+)"
+          },
+          {
+            "id": "graphemeCluster",
+            "value": {
+              "java": "(\\w+)\\X",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme cluster matching"
+                }
+              }
+            }
+          },
+          {
+            "id": "graphemeBoundary",
+            "value": {
+              "java": "(\\w+)\\b{g}",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme boundaries"
+                }
+              }
+            }
+          }
         ]
       }
     }
