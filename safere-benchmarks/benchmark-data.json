@@ -21635,11 +21635,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "boolean",
       "measurement": {
         "mode": "averageTime",
@@ -21648,25 +21643,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "expected": {
         "type": "boolean",
         "value": true
@@ -21712,11 +21688,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "boolean",
       "measurement": {
         "mode": "averageTime",
@@ -21725,25 +21696,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "arguments": {
         "group": 0
       },
@@ -21792,11 +21744,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "boolean",
       "measurement": {
         "mode": "averageTime",
@@ -21805,25 +21752,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "arguments": {
         "group": 1
       },
@@ -21872,11 +21800,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -21885,25 +21808,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "arguments": {
         "group": 1
       },
@@ -21952,11 +21856,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -21965,25 +21864,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "arguments": {
         "replacement": {
           "java": "$1",
@@ -22043,11 +21923,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -22056,25 +21931,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "arguments": {
         "replacement": {
           "java": "${retained}",
@@ -22134,11 +21990,6 @@
       "inputs": [
         "quantifiedCapture.{family}.match.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -22147,25 +21998,6 @@
           "prematerializedInput"
         ]
       },
-      "trialExclusions": [
-        {
-          "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        }
-      ],
       "arguments": {
         "group": 1
       },
@@ -22214,11 +22046,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "boolean",
       "measurement": {
         "mode": "averageTime",
@@ -22230,23 +22057,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22255,9 +22065,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "expected": {
@@ -22305,11 +22129,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "boolean",
       "measurement": {
         "mode": "averageTime",
@@ -22321,23 +22140,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22346,9 +22148,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "arguments": {
@@ -22399,11 +22215,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "boolean",
       "measurement": {
         "mode": "averageTime",
@@ -22415,23 +22226,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22440,9 +22234,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "arguments": {
@@ -22493,11 +22301,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -22509,23 +22312,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22534,9 +22320,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "arguments": {
@@ -22583,11 +22383,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -22599,23 +22394,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22624,9 +22402,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "arguments": {
@@ -22684,11 +22476,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -22700,23 +22487,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22725,9 +22495,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "arguments": {
@@ -22785,11 +22569,6 @@
       "inputs": [
         "quantifiedCapture.{family}.reject.{size}"
       ],
-      "inputRepresentations": [
-        "javaString",
-        "preexistingUtf8"
-      ],
-      "inputRepresentationReason": "Compare pre-existing Java String and native UTF-8 text; exclude conversion during matching.",
       "resultConsumption": "string",
       "measurement": {
         "mode": "averageTime",
@@ -22801,23 +22580,6 @@
       "trialExclusions": [
         {
           "engineIds": [
-            "safere-utf8",
-            "safere-utf8-vector"
-          ],
-          "reason": "This comparison uses SafeRE Java String APIs, including captured text and functional replacement."
-        },
-        {
-          "engineIds": [
-            "re2j-string",
-            "re2-ffm-string-conversion",
-            "pcre2_jit",
-            "go_regexp",
-            "dotnet_nonbacktracking"
-          ],
-          "reason": "Focused comparison selects SafeRE, the JDK capture oracle, C++ RE2, and Rust regex; other engines are outside this assessment."
-        },
-        {
-          "engineIds": [
             "jdk-string"
           ],
           "when": {
@@ -22826,9 +22588,23 @@
               2048,
               8192,
               32768
+            ],
+            "family": [
+              {
+                "id": "nestedGreedy",
+                "value": ".*x(?:(?<retained>a){1,}){2}y"
+              },
+              {
+                "id": "boundedGreedy",
+                "value": ".*x(?:(?<retained>a){1,2})*y"
+              },
+              {
+                "id": "boundedLazy",
+                "value": ".*x(?:(?<retained>a){1,2})*?y"
+              }
             ]
           },
-          "reason": "Keep the JDK rejection reference on short subjects; the large rejected sweep is a comparison of linear-time engines, avoiding unanchored backtracking rejection costs."
+          "reason": "JDK unanchored backtracking rejection is expensive on these long missing-suffix subjects; keep the reference at the short size."
         }
       ],
       "arguments": {

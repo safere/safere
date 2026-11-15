@@ -81,25 +81,26 @@ class CrossEngineBenchmarkPlanTest {
           assertThat(observations.stream().map(CrossEngineWorkload::inputKeys).distinct())
               .hasSize(1);
           for (CrossEngineWorkload workload : observations) {
-            List<String> expectedVariants =
-                outcome.equals("reject") && size > 128
-                    ? List.of("safere-string")
-                    : List.of("safere-string", "jdk-string");
+            List<String> expectedVariants = new ArrayList<>(List.of("safere-string"));
+            String observation =
+                workload.id().substring(prefix.length(), workload.id().length() - suffix.length());
+            if (!observation.equals("text") && !observation.equals("function")) {
+              expectedVariants.addAll(List.of("safere-utf8", "safere-utf8-vector"));
+            }
+            if (!outcome.equals("reject") || size == 128 || family.startsWith("optional")) {
+              expectedVariants.add("jdk-string");
+            }
+            if (!observation.equals("function")) {
+              expectedVariants.add("re2j-string");
+            }
+            if (!observation.equals("function") && !observation.equals("named")) {
+              expectedVariants.add("re2-ffm-string-conversion");
+            }
             assertThat(
                     plan.trials(CrossEngineWorkload.TimingGroup.NANOSECONDS).stream()
                         .filter(trial -> trial.workload().id().equals(workload.id()))
                         .map(trial -> trial.variant().id()))
                 .containsExactlyInAnyOrderElementsOf(expectedVariants);
-            assertThat(
-                    plan.exclusions().stream()
-                        .filter(
-                            entry ->
-                                entry.workloadId().equals(workload.id())
-                                    && entry.engineId().equals("re2j-string")))
-                .singleElement()
-                .satisfies(
-                    entry ->
-                        assertThat(entry.exclusion().reason()).contains("outside this assessment"));
           }
         }
       }
@@ -117,7 +118,9 @@ class CrossEngineBenchmarkPlanTest {
         CrossEngineBenchmarkPlan.load().trials(CrossEngineWorkload.TimingGroup.NANOSECONDS);
     for (var trial : trials) {
       CrossEngineWorkload workload = trial.workload();
-      if (!workload.id().startsWith("QuantifiedCaptureBenchmark.")) {
+      // Vector-provider trials run in their dedicated JVM configuration; this pass uses default.
+      if (!workload.id().startsWith("QuantifiedCaptureBenchmark.")
+          || trial.variant() == RegexEngineVariant.SAFERE_UTF8_VECTOR) {
         continue;
       }
       String input = data.getInputString(workload.inputKeys().getFirst());
@@ -129,8 +132,10 @@ class CrossEngineBenchmarkPlanTest {
         if (matched) {
           assertThat(matcher.start(0)).as(trial.id()).isZero();
           assertThat(matcher.end(0)).as(trial.id()).isEqualTo(input.length());
-          assertThat(matcher.group(0)).as(trial.id()).isEqualTo(input);
-          assertThat(matcher.group(1)).as(trial.id()).isEqualTo("a");
+          if (trial.variant().capabilities().contains(EngineCapability.GROUP_TEXT)) {
+            assertThat(matcher.group(0)).as(trial.id()).isEqualTo(input);
+            assertThat(matcher.group(1)).as(trial.id()).isEqualTo("a");
+          }
           int captureStart = input.lastIndexOf('a');
           // Nested repeats intentionally differ from the JDK's earlier-copy bounds (#1079).
           // The captured text is identical on these subjects; pin each engine's actual policy.
@@ -165,9 +170,24 @@ class CrossEngineBenchmarkPlanTest {
               default -> throw new AssertionError(workload.operation());
             };
         assertThat(actual).as(trial.id()).isEqualTo(expected);
-      }
-      try (var runner = CrossEngineTrialRunner.prepare(trial.id(), workload.timingGroup())) {
-        runner.run(blackhole);
+        // Reuse the expanded plan and compiled pattern while checking every bound operation.
+        // Runner preparation itself is covered by the representative entry-point tests below.
+        workload
+            .operation()
+            .bind(
+                trial.variant(),
+                workload.patterns(),
+                List.of(compiled),
+                inputs,
+                workload.groups(),
+                trial.variant().prepareReplacement(workload.replacement()),
+                workload.limit(),
+                workload.lifecycle(),
+                workload.flagSet(),
+                workload.seed(),
+                workload.count(),
+                workload.mode())
+            .run(blackhole);
       }
     }
   }

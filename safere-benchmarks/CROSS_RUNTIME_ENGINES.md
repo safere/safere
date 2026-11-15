@@ -12,9 +12,11 @@ C++ RE2 and PCRE2 JIT compile the same C++ harness. Unless filters are
 supplied, each executable runs every native workload it can support. PCRE2
 does not run `PathologicalBenchmark` workloads because their declarations
 require `linearTime`, which a backtracking engine cannot provide. It also
-omits timed replacement workloads because PCRE2's substitution API performs
-interpreted matching rather than JIT matching; reporting those measurements
-under the `pcre2_jit` engine ID would be misleading. Filters are forwarded
+omits timed replacement workloads under the existing adapter registry policy.
+PCRE2's substitution API can dispatch through JIT matching; the restriction is
+not a lack of replacement support. Enabling that coverage across the replacement
+corpus requires a JIT-dispatch and substitution-semantics audit, tracked in
+[#1207](https://github.com/safere/safere/issues/1207). Filters are forwarded
 unchanged to the selected engines.
 
 Go `regexp`, Rust `regex`, and .NET non-backtracking run every entry declared

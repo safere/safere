@@ -46,7 +46,9 @@ not vendored here or included in the `safere-benchmarks` Maven module.
 Boolean search, group-zero bounds, inner-capture participation, inner-capture
 text, and numbered, named, and functional replacement. All observation modes
 use identical patterns and prematerialized inputs. Matching measurements exclude
-compilation and input preparation; each invocation creates a fresh matcher.
+compilation and input materialization. Java String cases create fresh matchers;
+native variants retain their existing API and ownership boundaries. The RE2-FFM
+variant explicitly includes its API-time UTF-8 conversion.
 
 The families include the nested unbounded repeat from the retained-repeat repair
 regression (`.*x(?:(a){1,}){2}y`), bounded inner repetition with greedy/lazy outer
@@ -58,21 +60,35 @@ includes short inputs and successful/rejected controls. Group zero observes
 `start(0)` participation rather than copying the whole match; inner text copies
 `group(1)`. This distinguishes capture extraction from text materialization.
 
-The comparison selects SafeRE String, the JDK as a reference, C++ RE2,
-and Rust regex. Nested families follow SafeRE's current accepted-path policy;
-the JDK can return an earlier capture boundary (the approved
+Workload eligibility follows adapter capabilities and concrete capture semantics;
+focused measurement runs select engines through runner filters. Choosing a smaller
+comparison cohort does not exclude other adapters from the shared corpus.
+Nested families follow SafeRE's current accepted-path policy; the JDK can return
+an earlier capture boundary (the approved
 [earlier-capture divergence](../INTENTIONAL_DIVERGENCES.md#earlier-captures-in-nested-repetitions)).
-The benchmark subjects deliberately produce the same captured text under either
-boundary policy. JDK bounds are pinned separately rather than treated as an
-unconditional oracle. Large rejected subjects compare the linear-time engines;
-the JDK rejection reference is restricted to the short subject to avoid spending
-the comparison on unanchored backtracking rejection. C++ RE2 has no named-template or functional replacement API;
-those rows remain explicitly excluded. Numbered RE2 replacement syntax is declared
-in the data. Expected successful captures and replacements are checked before
-timing; the Java harness tests also check exact bounds and rejected outputs.
-Native smoke validation must establish agreement for these concrete subjects
-before capture-observing timing rows are compared. Agreement on this corpus does
-not establish equivalent quantified-capture semantics for all patterns.
+The subjects produce the same captured text under either boundary policy. JDK
+bounds are pinned separately rather than treated as an unconditional oracle.
+The long unanchored missing-suffix cases omit the expensive JDK backtracking
+rejection reference; anchored controls remain eligible at every size.
+
+C++ RE2 lacks named-template and callback replacement APIs. RE2-FFM's wrapper
+supports numbered replacement but does not expose named or callback replacement.
+Go's replacement callback exposes only the whole matched text, while this operation
+requires inner captures. PCRE2 JIT matching is eligible; its replacement rows retain
+the suite-wide registry restriction pending the broader audit in
+[#1207](https://github.com/safere/safere/issues/1207). PCRE2 itself supports
+substitution with JIT dispatch. See
+[cross-runtime coverage](CROSS_RUNTIME_ENGINES.md#workload-coverage).
+Native capture-aware functional replacement is implemented for SafeRE String,
+JDK String, Rust, and .NET. RE2/J and SafeRE UTF-8 support named replacement;
+direct capture-text observation remains excluded from byte-native variants.
+
+Numbered RE2 replacement syntax is declared in the data. Expected successful
+captures and replacements are checked before timing; Java harness tests also check
+exact bounds and rejected outputs. Native smoke validation must establish agreement
+for the concrete subjects before capture-observing rows are compared. Agreement on
+this corpus does not establish equivalent quantified-capture semantics for all
+patterns.
 
 These workloads assess current capture costs and scaling. They do not assume
 historical NFA routing or simulate an older implementation by disabling engines.

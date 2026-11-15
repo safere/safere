@@ -34,13 +34,50 @@ class ResolvedBenchmarkPlanTest {
     String prefix = "QuantifiedCaptureBenchmark.nestedGreedy.";
     for (String observation :
         List.of("boolean", "groupZero", "participation", "text", "numbered")) {
-      for (String engine : List.of("safere-string", "jdk-string", "re2_cpp", "rust_regex")) {
+      for (String engine :
+          List.of(
+              "safere-string",
+              "safere-utf8",
+              "safere-utf8-vector",
+              "jdk-string",
+              "re2j-string",
+              "re2-ffm-string-conversion",
+              "re2_cpp",
+              "pcre2_jit",
+              "go_regexp",
+              "rust_regex",
+              "dotnet_nonbacktracking")) {
+        if ((observation.equals("text")
+                && (engine.equals("safere-utf8") || engine.equals("safere-utf8-vector")))
+            || (observation.equals("numbered") && engine.equals("pcre2_jit"))) {
+          continue;
+        }
         assertThat(
                 entry(plan, prefix + observation + ".match.128@" + engine)
                     .get("status")
                     .getAsString())
             .isEqualTo("runnable");
       }
+    }
+    for (String engine :
+        List.of(
+            "safere-utf8",
+            "safere-utf8-vector",
+            "re2j-string",
+            "go_regexp",
+            "dotnet_nonbacktracking")) {
+      assertThat(entry(plan, prefix + "named.match.128@" + engine).get("status").getAsString())
+          .isEqualTo("runnable");
+    }
+    assertThat(
+            entry(plan, prefix + "function.match.128@dotnet_nonbacktracking")
+                .get("status")
+                .getAsString())
+        .isEqualTo("runnable");
+    for (String engine :
+        List.of("re2j-string", "re2-ffm-string-conversion", "go_regexp", "pcre2_jit")) {
+      assertThat(entry(plan, prefix + "function.match.128@" + engine).get("status").getAsString())
+          .isEqualTo("excluded");
     }
     assertThat(
             entry(plan, prefix + "numbered.match.128@re2_cpp")

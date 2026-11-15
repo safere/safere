@@ -198,11 +198,13 @@ final class ResolvedBenchmarkPlan {
 
     EnumSet<DeclarativeBenchmarkPlan.Feature> dotnetFeatures = portableFeatures(false, true, false);
     dotnetFeatures.remove(DeclarativeBenchmarkPlan.Feature.UTF8_INPUT);
+    dotnetFeatures.add(DeclarativeBenchmarkPlan.Feature.FUNCTIONAL_REPLACEMENT);
     dotnetFeatures.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
     dotnetFeatures.add(DeclarativeBenchmarkPlan.Feature.JAVA_CHARACTER_CLASS);
     EnumSet<DeclarativeBenchmarkPlan.Operation> dotnetOperations =
         EnumSet.copyOf(PORTABLE_OPERATIONS);
     dotnetOperations.remove(DeclarativeBenchmarkPlan.Operation.UTF8_CAPTURE_BOUNDS);
+    dotnetOperations.add(DeclarativeBenchmarkPlan.Operation.REPLACE_ALL_FUNCTION);
     dotnetOperations.add(DeclarativeBenchmarkPlan.Operation.FIND_ROTATING_UTF16);
     dotnetOperations.add(DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND_ROTATING_UTF16);
     result.add(

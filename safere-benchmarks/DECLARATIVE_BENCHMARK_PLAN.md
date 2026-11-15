@@ -273,9 +273,11 @@ Operation-specific data uses a strict `arguments` object rather than
 workload-family fields. Group-consuming operations use `group` or `groups`;
 template replacement operations require `replacement`; `replaceAllFunction`
 requires `group` and invokes the native function replacement API, returning that
-group's literal text (or empty text for a nonparticipating group). The Java callback is
-bound outside timing; Rust uses a closure over the prepared group metadata. This operation is supported by SafeRE String, JDK String, and Rust
-regex; engines without a native callback API are excluded. Split operations accept `limit`;
+group's literal text (or empty text for a nonparticipating group). The Java and
+.NET callbacks are bound outside timing; Rust uses a closure over the prepared
+group metadata. This operation is supported by SafeRE String, JDK String, Rust
+regex, and .NET; adapters without a capture-aware callback operation are excluded.
+Split operations accept `limit`;
 PatternSet operations require `anchor` with `anchored` or `unanchored` and may
 declare `patternCount`; flagged compilation uses `flagSet`; rotating UTF-16
 operations use `seed` and `count`. Arguments may reference declared axes.
