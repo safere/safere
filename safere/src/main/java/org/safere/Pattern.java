@@ -517,6 +517,12 @@ public final class Pattern implements Serializable {
         compiled.hasGraphemeSemantics() && startsWithGraphemeClusterBoundary(metadataAst);
     boolean hasInternalGcb =
         compiled.hasGraphemeSemantics() && hasInternalExplicitGraphemeBoundary(re);
+    if (compiled.hasGraphemeSemantics()) {
+      // Ordinary search and capture recovery reach these tables for grapheme programs in both
+      // representations. Keep that initialization out of first execution, even when the other
+      // character classes are ASCII-only. Eliminated grapheme operands need no preparation.
+      GraphemeSupport.prepareTables();
+    }
     // The constructor eagerly prepares the applicable engine analysis and setup.
     return new Pattern(
         regex,

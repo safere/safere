@@ -12,6 +12,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -66,6 +67,46 @@ class CompileInitializationTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
+        "\\X", "(\\w+)\\X", "(\\d+)\\X", "(?:word|\\X)",
+        "\\b{g}", "(\\w+)\\b{g}", "a\\b{g}", "(?U)(\\w+)\\X"
+      })
+  void graphemeProgramsPrepareTablesDuringCompilation(String regex)
+      throws IOException, InterruptedException, URISyntaxException {
+    assertThat(runFreshProcess(regex))
+        .as("common search data preparation for %s", regex)
+        .contains("Initializing 'org/safere/UnicodeGeneratedTables'")
+        .contains("Initializing 'org/safere/GraphemeSupport'");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"\\Q\\X\\E", "\\Q\\b{g}\\E", "(?:\\X){0}", "(?:\\b{g}){0}"})
+  void programsWithoutGraphemeInstructionsDoNotPrepareGraphemeTables(String regex)
+      throws IOException, InterruptedException, URISyntaxException {
+    assertThat(runFreshProcess(regex))
+        .as("irrelevant grapheme preparation for %s", regex)
+        .doesNotContain("Initializing 'org/safere/UnicodeGeneratedTables'")
+        .doesNotContain("Initializing 'org/safere/GraphemeSupport'");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"(\\w+)\\X", "(\\w+)\\b{g}"})
+  void concurrentCompilationsAndFirstCapturesShareGraphemeTables(String regex)
+      throws IOException, InterruptedException, URISyntaxException {
+    String output = runFreshProcess(regex, "", "concurrent");
+    for (String className : List.of("UnicodeGeneratedTables", "GraphemeSupport")) {
+      assertThat(
+              output
+                  .lines()
+                  .filter(line -> line.contains("Initializing 'org/safere/" + className + "'"))
+                  .count())
+          .as("shared initialization for %s", className)
+          .isEqualTo(1);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
         "[h-j]+",
         "[0-9]+",
         "[Kk]",
@@ -103,6 +144,11 @@ class CompileInitializationTest {
 
   private static String runFreshProcess(String regex, String locale)
       throws IOException, InterruptedException, URISyntaxException {
+    return runFreshProcess(regex, locale, "compile");
+  }
+
+  private static String runFreshProcess(String regex, String locale, String mode)
+      throws IOException, InterruptedException, URISyntaxException {
     String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
     String pathSeparator = System.getProperty("path.separator");
     String classPath =
@@ -125,7 +171,8 @@ class CompileInitializationTest {
                 "-cp",
                 classPath,
                 PROBE_CLASS_NAME,
-                encodedRegex)
+                encodedRegex,
+                mode)
             .redirectErrorStream(true);
     if (!locale.isEmpty()) {
       processBuilder.environment().put("LC_ALL", locale);

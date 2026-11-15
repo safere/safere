@@ -27,6 +27,12 @@ final class GraphemeSupport {
   private static final int[][] INCB_CONSONANT = graphemeTable("InCB_Consonant");
   private static final int[][] INCB_EXTEND = graphemeTable("InCB_Extend");
 
+  /** Initializes the shared segmentation tables for a grapheme-capable compiled program. */
+  static void prepareTables() {
+    // Invoking this static method completes class initialization before compilation returns.
+    // Per-input segmentation context remains owned by the matching operation.
+  }
+
   private static final int VISIT_KEY_VARIANT_BITS = 5;
   private static final int LOW_SURROGATE_PAIR_VISIBLE = 1;
   private static final int EXTENDED_PICTOGRAPHIC_VISIBLE = 1 << 1;
