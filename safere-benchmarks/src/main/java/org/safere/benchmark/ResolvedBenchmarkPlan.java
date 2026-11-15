@@ -72,7 +72,8 @@ final class ResolvedBenchmarkPlan {
     DeclarativeBenchmarkPlan plan = DeclarativeBenchmarkPlan.parse(planData);
     PatternProfiles patternProfiles =
         PatternProfiles.parse(normalizedBenchmarkData.get("patternProfiles"))
-            .withFallback("re2-cpp", "re2");
+            .withFallback("re2-cpp", "re2")
+            .withFallback("go-regexp", "re2");
     PatternProfiles replacementProfiles =
         PatternProfiles.parse(normalizedBenchmarkData.get("replacementProfiles"));
 
@@ -172,7 +173,7 @@ final class ResolvedBenchmarkPlan {
             "go_regexp",
             "go_regexp",
             "go",
-            "re2",
+            "go-regexp",
             "go-regexp",
             true,
             true,

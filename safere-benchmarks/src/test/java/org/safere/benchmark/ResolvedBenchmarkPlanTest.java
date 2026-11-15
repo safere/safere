@@ -21,6 +21,51 @@ import org.junit.jupiter.api.Test;
 class ResolvedBenchmarkPlanTest {
 
   @Test
+  void quantifiedCapturePatternsUseGoBaselineNamedGroupSyntax() throws IOException {
+    Path source =
+        Files.exists(Path.of("benchmark-data.json"))
+            ? Path.of("benchmark-data.json")
+            : Path.of("safere-benchmarks/benchmark-data.json");
+    JsonObject plan =
+        ResolvedBenchmarkPlan.create(
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(Files.readString(source)).getAsJsonObject()));
+    assertThat(
+            entry(plan, "Utf8MatchingBenchmark.captureBounds.named@go_regexp")
+                .getAsJsonArray("patterns")
+                .get(0)
+                .getAsString())
+        .isEqualTo("(?P<key>[A-Za-z]+)=(?P<value>[^&]+)");
+    List<JsonObject> goRows =
+        plan.getAsJsonArray("entries").asList().stream()
+            .map(JsonObject.class::cast)
+            .filter(row -> row.get("engineId").getAsString().equals("go_regexp"))
+            .filter(row -> row.get("status").getAsString().equals("runnable"))
+            .filter(
+                row ->
+                    row.get("workloadId").getAsString().startsWith("QuantifiedCaptureBenchmark."))
+            .toList();
+    assertThat(goRows).isNotEmpty();
+    for (JsonObject row : goRows) {
+      String workload = row.get("workloadId").getAsString();
+      String canonical =
+          entry(plan, workload + "@safere-string").getAsJsonArray("patterns").get(0).getAsString();
+      // Go 1.21 accepts (?P<name>...), while (?<name>...) requires a newer Go release.
+      assertThat(row.getAsJsonArray("patterns").get(0).getAsString())
+          .as(workload)
+          .isEqualTo(canonical.replace("(?<retained>", "(?P<retained>"));
+      for (String engine : List.of("re2_cpp", "rust_regex")) {
+        JsonObject comparison = entry(plan, workload + "@" + engine);
+        if (comparison.get("status").getAsString().equals("runnable")) {
+          assertThat(comparison.getAsJsonArray("patterns").get(0).getAsString())
+              .as("%s %s", workload, engine)
+              .isEqualTo(canonical);
+        }
+      }
+    }
+  }
+
+  @Test
   void quantifiedCapturesHaveNativeComparisonsAndReplacementCapabilityExclusions()
       throws Exception {
     Path source =

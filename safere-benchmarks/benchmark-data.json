@@ -21596,28 +21596,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.boolean.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.boolean.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21630,10 +21670,10 @@
       },
       "operation": "find",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "boolean",
       "measurement": {
@@ -21649,28 +21689,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.groupZero.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.groupZero.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21683,10 +21763,10 @@
       },
       "operation": "findGroupPresent",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "boolean",
       "measurement": {
@@ -21705,28 +21785,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.participation.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.participation.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21739,10 +21859,10 @@
       },
       "operation": "findGroupPresent",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "boolean",
       "measurement": {
@@ -21761,28 +21881,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.text.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.text.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21795,10 +21955,10 @@
       },
       "operation": "findGroup",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -21817,28 +21977,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.numbered.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.numbered.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21851,10 +22051,10 @@
       },
       "operation": "replaceAll",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -21884,28 +22084,68 @@
       ]
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.named.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.named.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21918,10 +22158,10 @@
       },
       "operation": "replaceAll",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -21951,28 +22191,68 @@
       ]
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.function.match.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.function.match.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -21985,10 +22265,10 @@
       },
       "operation": "replaceAllFunction",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.match.{size}"
+        "quantifiedCapture.{familyPattern}.match.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -22007,28 +22287,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.boolean.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.boolean.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22041,10 +22361,10 @@
       },
       "operation": "find",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "boolean",
       "measurement": {
@@ -22066,18 +22386,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
@@ -22090,28 +22434,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.groupZero.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.groupZero.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22124,10 +22508,10 @@
       },
       "operation": "findGroupPresent",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "boolean",
       "measurement": {
@@ -22149,18 +22533,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
@@ -22176,28 +22584,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.participation.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.participation.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22210,10 +22658,10 @@
       },
       "operation": "findGroupPresent",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "boolean",
       "measurement": {
@@ -22235,18 +22683,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
@@ -22262,28 +22734,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.text.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.text.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22296,10 +22808,10 @@
       },
       "operation": "findGroup",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -22321,18 +22833,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
@@ -22344,28 +22880,68 @@
       }
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.numbered.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.numbered.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22378,10 +22954,10 @@
       },
       "operation": "replaceAll",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -22403,18 +22979,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
@@ -22437,28 +23037,68 @@
       ]
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.named.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.named.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22471,10 +23111,10 @@
       },
       "operation": "replaceAll",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -22496,18 +23136,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
@@ -22530,28 +23194,68 @@
       ]
     },
     {
-      "id": "QuantifiedCaptureBenchmark.{family}.function.reject.{size}",
+      "id": "QuantifiedCaptureBenchmark.{familyPattern}.function.reject.{size}",
       "axes": {
-        "family": [
+        "familyPattern": [
           {
             "id": "nestedGreedy",
-            "value": ".*x(?:(?<retained>a){1,}){2}y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,}){2}y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedGreedy",
-            "value": ".*x(?:(?<retained>a){1,2})*y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "boundedLazy",
-            "value": ".*x(?:(?<retained>a){1,2})*?y"
+            "value": {
+              "java": ".*x(?:(?<retained>a){1,2})*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalGreedy",
-            "value": "^b*x(?:(?<retained>a)?b)*y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           },
           {
             "id": "optionalLazy",
-            "value": "^b*x(?:(?<retained>a)?b)*?y"
+            "value": {
+              "java": "^b*x(?:(?<retained>a)?b)*?y",
+              "alternates": {
+                "go-regexp": {
+                  "pattern": "^b*x(?:(?P<retained>a)?b)*?y",
+                  "reason": "Go 1.21 requires Python-style named capture groups"
+                }
+              }
+            }
           }
         ],
         "size": [
@@ -22564,10 +23268,10 @@
       },
       "operation": "replaceAllFunction",
       "patterns": [
-        "{family}"
+        "{familyPattern}"
       ],
       "inputs": [
-        "quantifiedCapture.{family}.reject.{size}"
+        "quantifiedCapture.{familyPattern}.reject.{size}"
       ],
       "resultConsumption": "string",
       "measurement": {
@@ -22589,18 +23293,42 @@
               8192,
               32768
             ],
-            "family": [
+            "familyPattern": [
               {
                 "id": "nestedGreedy",
-                "value": ".*x(?:(?<retained>a){1,}){2}y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,}){2}y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,}){2}y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedGreedy",
-                "value": ".*x(?:(?<retained>a){1,2})*y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               },
               {
                 "id": "boundedLazy",
-                "value": ".*x(?:(?<retained>a){1,2})*?y"
+                "value": {
+                  "java": ".*x(?:(?<retained>a){1,2})*?y",
+                  "alternates": {
+                    "go-regexp": {
+                      "pattern": ".*x(?:(?P<retained>a){1,2})*?y",
+                      "reason": "Go 1.21 requires Python-style named capture groups"
+                    }
+                  }
+                }
               }
             ]
           },
