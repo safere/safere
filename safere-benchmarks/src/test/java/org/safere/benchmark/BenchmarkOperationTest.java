@@ -18,6 +18,37 @@ class BenchmarkOperationTest {
   @ParameterizedTest
   @EnumSource(
       value = RegexEngineVariant.class,
+      names = {"SAFERE_STRING", "JDK_STRING"})
+  void functionalReplacementConsumesLiteralCaptureTextAndHandlesNonparticipation(
+      RegexEngineVariant variant) {
+    for (String regex : List.of("(.)", "(x)?y")) {
+      String inputText = regex.equals("(.)") ? "$\\" : "y";
+      String expected = regex.equals("(.)") ? inputText : "";
+      var input = new RegexEngineVariant.StringRegexInput(inputText);
+      try (var compiled = variant.compile(regex)) {
+        Object actual =
+            BenchmarkOperation.REPLACE_ALL_FUNCTION.execute(
+                variant,
+                List.of(regex),
+                List.of(compiled),
+                List.of(input),
+                new int[] {1},
+                null,
+                0,
+                new DeclarativeBenchmarkPlan.MatcherLifecycle(
+                    DeclarativeBenchmarkPlan.MatcherReuse.NONE, List.of()),
+                null,
+                0,
+                0,
+                null);
+        assertThat(actual).isEqualTo(expected);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RegexEngineVariant.class,
       names = {"SAFERE_STRING", "SAFERE_UTF8", "JDK_STRING"})
   void tokenizerAdvancesInNativeCoordinatesAndCanReuseItsMatcher(RegexEngineVariant variant) {
     RegexEngineVariant.RegexInput input =

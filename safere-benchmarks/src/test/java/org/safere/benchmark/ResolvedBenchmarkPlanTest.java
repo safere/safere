@@ -21,6 +21,46 @@ import org.junit.jupiter.api.Test;
 class ResolvedBenchmarkPlanTest {
 
   @Test
+  void quantifiedCapturesHaveNativeComparisonsAndReplacementCapabilityExclusions()
+      throws Exception {
+    Path source =
+        Files.exists(Path.of("benchmark-data.json"))
+            ? Path.of("benchmark-data.json")
+            : Path.of("safere-benchmarks/benchmark-data.json");
+    JsonObject plan =
+        ResolvedBenchmarkPlan.create(
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(Files.readString(source)).getAsJsonObject()));
+    String prefix = "QuantifiedCaptureBenchmark.nestedGreedy.";
+    for (String observation :
+        List.of("boolean", "groupZero", "participation", "text", "numbered")) {
+      for (String engine : List.of("safere-string", "jdk-string", "re2_cpp", "rust_regex")) {
+        assertThat(
+                entry(plan, prefix + observation + ".match.128@" + engine)
+                    .get("status")
+                    .getAsString())
+            .isEqualTo("runnable");
+      }
+    }
+    assertThat(
+            entry(plan, prefix + "numbered.match.128@re2_cpp")
+                .getAsJsonObject("arguments")
+                .get("replacement")
+                .getAsString())
+        .isEqualTo("\\1");
+    for (String observation : List.of("named", "function")) {
+      assertThat(
+              entry(plan, prefix + observation + ".match.128@re2_cpp").get("status").getAsString())
+          .isEqualTo("excluded");
+      assertThat(
+              entry(plan, prefix + observation + ".match.128@rust_regex")
+                  .get("status")
+                  .getAsString())
+          .isEqualTo("runnable");
+    }
+  }
+
+  @Test
   void ffmMatcherOperationsPreserveConversionTimingAndUnsupportedExclusions() throws IOException {
     Path source =
         Files.exists(Path.of("benchmark-data.json"))

@@ -341,6 +341,19 @@ fn execute(prepared: &Prepared) -> Value {
                     .replace_all(text, prepared.replacement.as_str())
             )
         }
+        "replaceAllFunction" => {
+            json!(
+                regex
+                    .unwrap()
+                    .replace_all(text, |captures: &regex::Captures<'_>| {
+                        captures
+                            .get(prepared.group)
+                            .map(|found| found.as_str())
+                            .unwrap_or_default()
+                            .to_owned()
+                    })
+            )
+        }
         "replaceAllLengthSum" => {
             json!(
                 regexes
@@ -361,6 +374,9 @@ fn execute(prepared: &Prepared) -> Value {
                 }
             }
             json!(parts.len() + parts.iter().map(|part| part.len()).sum::<usize>())
+        }
+        "findGroupPresent" if prepared.group == 0 => {
+            json!(regex.unwrap().find(text).is_some())
         }
         "findGroupPresent" => {
             json!(
@@ -646,6 +662,26 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn functional_replacement_consumes_literal_captures_and_handles_nonparticipation() {
+        for (pattern, input, expected) in [("(.)", r"$\", r"$\"), ("(x)?y", "y", "")] {
+            let prepared = Prepared {
+                operation: "replaceAllFunction".to_owned(),
+                regexes: vec![compile(pattern)],
+                full_regex: None,
+                inputs: vec![input.to_owned()],
+                patterns: vec![pattern.to_owned()],
+                groups: vec![],
+                group: 1,
+                include_end: true,
+                replacement: String::new(),
+                limit: 0,
+                entry: json!({}),
+            };
+            assert_eq!(execute(&prepared), json!(expected));
+        }
+    }
 
     #[test]
     fn full_match_is_not_weakened_by_multiline_mode() {

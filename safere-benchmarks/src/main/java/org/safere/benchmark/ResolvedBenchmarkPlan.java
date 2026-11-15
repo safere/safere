@@ -179,6 +179,9 @@ final class ResolvedBenchmarkPlan {
             true,
             PORTABLE_OPERATIONS,
             PORTABLE_MODES));
+    EnumSet<DeclarativeBenchmarkPlan.Operation> rustOperations =
+        EnumSet.copyOf(PORTABLE_OPERATIONS);
+    rustOperations.add(DeclarativeBenchmarkPlan.Operation.REPLACE_ALL_FUNCTION);
     result.add(
         portableEngine(
             "rust_regex",
@@ -189,8 +192,9 @@ final class ResolvedBenchmarkPlan {
             true,
             true,
             true,
-            PORTABLE_OPERATIONS,
-            PORTABLE_MODES));
+            rustOperations,
+            PORTABLE_MODES,
+            DeclarativeBenchmarkPlan.Feature.FUNCTIONAL_REPLACEMENT));
 
     EnumSet<DeclarativeBenchmarkPlan.Feature> dotnetFeatures = portableFeatures(false, true, false);
     dotnetFeatures.remove(DeclarativeBenchmarkPlan.Feature.UTF8_INPUT);
@@ -237,7 +241,11 @@ final class ResolvedBenchmarkPlan {
       boolean replacement,
       boolean retainedHeap,
       EnumSet<DeclarativeBenchmarkPlan.Operation> operations,
-      EnumSet<DeclarativeBenchmarkPlan.MeasurementMode> modes) {
+      EnumSet<DeclarativeBenchmarkPlan.MeasurementMode> modes,
+      DeclarativeBenchmarkPlan.Feature... additionalFeatures) {
+    EnumSet<DeclarativeBenchmarkPlan.Feature> features =
+        portableFeatures(linearTime, replacement, retainedHeap);
+    Collections.addAll(features, additionalFeatures);
     return new Engine(
         id,
         reportEngine,
@@ -247,7 +255,7 @@ final class ResolvedBenchmarkPlan {
         new DeclarativeBenchmarkPlan.EngineDeclaration(
             id,
             DeclarativeBenchmarkPlan.InputRepresentation.PREEXISTING_UTF8,
-            portableFeatures(linearTime, replacement, retainedHeap),
+            features,
             EnumSet.noneOf(DeclarativeBenchmarkPlan.Flag.class),
             true),
         operations,
