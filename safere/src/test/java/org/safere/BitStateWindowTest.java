@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** Priority, context, and work bounds for speculative BitState searches. */
 @DisabledForCrosscheck("uses package-private engine paths and search windows")
@@ -602,6 +604,46 @@ class BitStateWindowTest {
         assertThat(matcher.end()).isEqualTo(4_097);
         assertThat(operations.getFirst().strategyDecisions()).contains(windowFailure());
         assertThat(operations.getFirst().boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+      }
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @ParameterizedTest(name = "prefix repeats {0}, expected speculative window {1}")
+  @CsvSource({"1023, 2048", "4096, 256"})
+  void failedSpeculationChargesOnlyWorkForTheAllowedWindow(int repeats, int windowSize) {
+    String prefix = "ab".repeat(repeats) + "bc";
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      for (int tailLength : List.of(20_000, 40_000)) {
+        String text = prefix + "q".repeat(tailLength);
+        for (InputScanner scanner : scanners(text)) {
+          Pattern pattern = Pattern.compile("(?:(b?)*?(c|)+)*c");
+          // The hint fits the bitmap, including when it exceeds the separate hint limit.
+          assertThat(BitState.maxTextSize(pattern.prog()))
+              .isBetween(prefix.length(), scanner.length() - 1);
+          Pattern.ThreadCache cache = pattern.getOrCreateThreadCache();
+          Matcher matcher =
+              scanner instanceof Utf8InputScanner utf8
+                  ? new Matcher(pattern, utf8)
+                  : pattern.matcher(text);
+          operations.clear();
+          assertThat(matcher.find()).isTrue();
+          assertThat(operations.getFirst().strategyDecisions()).contains(windowFailure());
+          assertThat(operations.getFirst().boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+
+          // The NFA restart leaves the failed attempt in the cache with its own step count.
+          BitState attempt = cache.bitState;
+          assertThat(attempt).isNotNull();
+          long allowedWork = window(pattern.prog(), scanner, windowSize).stepBudgetForTesting();
+          assertThat(attempt.stepCountForTesting()).isBetween(1L, allowedWork);
+          assertThat(attempt.stepBudgetForTesting()).isEqualTo(allowedWork);
+          assertThat(matcher.start()).isEqualTo(prefix.length() - 3);
+          assertThat(matcher.end()).isEqualTo(prefix.length());
+        }
       }
     } finally {
       Pattern.setDiagnostics(previous);

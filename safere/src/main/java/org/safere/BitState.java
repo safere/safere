@@ -1049,6 +1049,11 @@ final class BitState {
     return stepBudget;
   }
 
+  /** Returns the logical instruction charges from the last search. */
+  long stepCountForTesting() {
+    return stepCount;
+  }
+
   /**
    * Returns whether this BitState can be reused for the given parameters. Reuse is possible when
    * the program is the same and the search buffers are large enough for the requested range.
