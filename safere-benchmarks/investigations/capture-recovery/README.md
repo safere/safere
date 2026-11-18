@@ -1,6 +1,6 @@
 # Capture recovery and anchored eligibility
 
-This is the follow-up to [issue #1075](https://github.com/eaftan/safere/issues/1075).
+This is the follow-up to [issue #1075](https://github.com/safere/safere/issues/1075).
 It asks whether cheaper capture replay changes the tradeoff behind the 512-native-unit
 capture-demand eligibility limit for `matches()`, `lookingAt()`, and start-anchored `find()`.
 It is an opt-in investigation, excluded from release collections.
@@ -57,13 +57,13 @@ mvn -pl safere-benchmarks -am -Dbenchmark.investigation=capture-recovery \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-The regular corpus adds only `CaptureRecoveryBenchmark`: first-frame text extraction
-(ASCII and a multibyte filename),
-one-in-four participation queries, primed scheme rejection, and anchored text extraction
-at 511/512/513 units. Existing `ApplicationBenchmark.stackTraceExtract` retains the full
-multi-frame extraction case. The mixed standing case queries capture participation rather
-than materializing text; the opt-in protocol measures mixed capture text. Neither promotes
-the previous full synthetic policy matrix into the release suite.
+The regular corpus adds `CaptureRecoveryBenchmark` cases for first-frame text
+extraction in ASCII and with a multibyte filename, one-in-four participation
+queries, primed scheme rejection, and anchored text extraction at 511/512/513
+units. The existing `ApplicationBenchmark.stackTraceExtract` reads class names
+and line numbers across the four-frame document from the investigation. The
+UTF-8 capture-text adapter makes that standing case available on SafeRE UTF-8.
+The opt-in protocol separately measures mixed capture-text consumption.
 
 The driver records exact sources, commands, source limit, expected membership, and raw results:
 
@@ -73,8 +73,9 @@ python3 safere-benchmarks/investigations/capture-recovery/run.py \
   --profiles text mixed rare reject
 ```
 
-Each output directory must be new. Source snapshots in `sources.tar.gz` include the selected
-corpus and harness; `command.json` identifies every archived source by SHA-256. A successful
+Each output directory must be new. The driver creates a local `sources.tar.gz`
+for new runs. The preserved cohorts provide compact patches and source hashes
+in the [results](results/README.md#reproduction-and-scope). A successful
 process is also checked for complete, unique result membership. A separate JVM runs
 `CaptureCutoffPaths` after timing and saves public operation diagnostics in `paths.json`;
 no timing JVM installs a diagnostics listener. Add `--jfr` for a diagnostic profile

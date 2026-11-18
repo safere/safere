@@ -6,8 +6,8 @@ Its library changes apply to the measured baseline
 `4ead777e87f9209c2d9dc06fb958a23bd01349be` and to the refreshed stack base; runtime
 adoption is proposed in the following layer.
 
-Use the capture-time source archives in `../results/` for exact historical
-reproduction, including their benchmark-source overlays. For a new local comparison
+Use the [capture-time source patches](../results/README.md#reproduction-and-scope)
+for exact historical reproduction. For a new local comparison
 using this benchmark layer, create isolated checkouts with identical harnesses and
 apply the patch only to the candidate checkout:
 

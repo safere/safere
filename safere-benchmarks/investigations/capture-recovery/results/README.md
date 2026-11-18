@@ -1,21 +1,22 @@
 # Capture-recovery follow-up to #1075
 
-The local candidate reduces time on the selected recovery workloads by about
-3.4% overall (equal-weight geometric mean). The larger gain is stack-document
-extraction: roughly 14–15% less time on String and 15–17% less on UTF-8 across the
-complete long run and its reversed-order confirmation. Successful UTF-8 scheme
-extraction and its rejection control cost about 4% more in the confirmation.
-That tradeoff is part of the candidate's assessment.
+Stack-document extraction takes roughly 14–15% less time on String and 15–17%
+less on UTF-8 with the candidate. The gain holds across both the complete long
+run and its reversed-order confirmation. Successful UTF-8 scheme extraction
+and rejection take about 4% longer in the confirmation on this system. The
+[reviewer's JDK 27 measurements](https://github.com/safere/safere/pull/1175#issuecomment-6952661824)
+found essentially flat rejection results on a separate x86 host. The size of
+the scheme cost across runtimes and architectures remains uncertain.
 
 At 512 units, early capture production uses roughly
 36–47% less time when every hit consumes text, but rejection takes
 4.7–5.0× as long as disabled preference.
 
-Keep the existing 512-unit capture-demand limit for this change. Frequent extraction
-and rejection favor opposite choices, with no universal size break-even established.
-Extending eligibility carries the rejection cost into larger inputs; disabling it
-sacrifices the frequent-extraction benefit. The measurements do not establish that
-512 is optimal. Choosing another default needs a defensible workload weighting.
+Keep the 512-unit capture-demand limit to bound rejected-search work and the
+BitState bitmap. The extended-versus-disabled ratios at 512 and 1024 units are
+similar for each consumption profile. Hit rate and capture consumption drive
+the tradeoff in this range. Any more selective policy would need a signal for
+those conditions and representative workload weighting.
 
 ## What changed
 
@@ -35,10 +36,13 @@ include inlining effects, and are not precise wall-time attribution.
 
 The benchmark adapter now decodes requested UTF-8 capture ranges during timing,
 retaining native byte bounds and borrowed-view offsets. This enables UTF-8 variants
-of existing capture-text declarations. Ten new standing cases cover ASCII and
+of existing capture-text declarations. The standing additions cover ASCII and
 multibyte extraction, primed rejection, mixed participation queries, and anchored
-extraction at 511/512/513 units. Existing declarations are unchanged. The larger
-cutoff protocol remains opt-in, separate from release collections.
+extraction at 511/512/513 units. The existing
+`ApplicationBenchmark.stackTraceExtract` covers the same four-frame document,
+reading the class name and line number at each match. The adapter change enables
+that workload on pre-encoded SafeRE UTF-8 as well as String. The larger cutoff
+protocol remains opt-in, separate from release collections.
 
 ## Recovery results against pinned main
 
@@ -60,9 +64,10 @@ The `greedy-*` artifact filenames refer to character-loop fusion.
 The full long cohort has 16 equally weighted rows: eight scenarios in each native
 representation. Its geometric mean is 0.966×, nearest-rank P90 is
 1.046×, and largest observed ratio is 1.061×. These are
-fixture summaries, not estimates of application traffic. Standard and long results
-are reported separately. The additional reversed-order pair confirms the stack
-gain and the UTF-8 scheme cost; it is not pooled into the complete cohort.
+fixture summaries. The small aggregate shift is within the variation of controls
+that changed little or reversed direction across runs. Standard and long results
+are reported separately. The reversed-order pair confirms the stack gain and
+the UTF-8 scheme cost on this host and remains a separate cohort.
 
 The two patterns come from the existing stack-trace and custom-scheme extraction
 benchmarks. Inputs are constructed ASCII prose, valid/invalid frames or links,
@@ -82,11 +87,12 @@ requested UTF-8 capture decoding is inside timing.
 
 ## Cutoff experiments and assessment
 
-The counterfactual source snapshots differ only in
-`Matcher.CAPTURE_DEMAND_TEXT_LIMIT`: 0 disables early capture preference on these
-nonempty inputs; 2048 extends it; 512 is the current limit. Other capacity and
-eligibility guards remain. Fast paths such as OnePass still apply. Both
-counterfactuals include the same character-loop optimization.
+The counterfactual executable sources differ only in
+`Matcher.CAPTURE_DEMAND_TEXT_LIMIT`. A value of 0 disables early capture
+preference on these nonempty inputs. A value of 2048 extends it beyond the
+current 512-unit limit. Other capacity and eligibility guards remain. Fast
+paths such as OnePass still apply. Both counterfactuals include the same
+character-loop optimization.
 
 The cutoff fixtures use a start-anchored stack parser and a deterministic
 whitespace/key/integer parser. End anchors are omitted so end-anchored reverse
@@ -146,31 +152,36 @@ Recovery times are per 1,536-document cycle; cutoff times are per 16-document ba
 Boundary tables divide batch scores by 16. Smoke and JFR timings are excluded
 from comparison evidence.
 
-To reproduce a cutoff snapshot, start from the pinned baseline and overlay its
-archived main sources and the matching benchmark-test support archive before
-invoking the archived runner into a new output directory. Maven compiles those
-tests even when timing builds skip executing them. Run these commands from this
-evidence directory inside the repository:
+To reconstruct a cutoff snapshot, apply the shared overlay to the pinned
+baseline. It includes the measured harness, data and matching benchmark-test
+sources. The shared overlay uses the 512 limit. For the 0 and 2048 cohorts,
+apply the corresponding second patch to restore the exact capture-time sources.
+Each second patch changes the limit and restores that cohort's archived README
+and plan. Before running, compare the resulting files with `sourceSha256` in the
+cohort's `command.json` and the entries in `benchmark-test-support.json`. Run
+these commands from this evidence directory:
 
 ```bash
-git worktree add --detach /tmp/capture-cutoff-repro 4ead777e87f9209c2d9dc06fb958a23bd01349be
-tar -xzf cutoff-0-stack-screen/sources.tar.gz -C /tmp/capture-cutoff-repro
-tar -xzf benchmark-test-support.tar.gz -C /tmp/capture-cutoff-repro
-python3 /tmp/capture-cutoff-repro/safere-benchmarks/investigations/capture-recovery/run.py /tmp/capture-cutoff-rerun --family stack --sizes 512 1024 --profiles text mixed rare reject
+repro_dir=/tmp/capture-cutoff-repro
+git worktree add --detach "$repro_dir" 4ead777e87f9209c2d9dc06fb958a23bd01349be
+git -C "$repro_dir" apply "$PWD/cutoff-sources.patch"
+git -C "$repro_dir" apply "$PWD/cutoff-0.patch"
+cd "$repro_dir"
+python3 safere-benchmarks/investigations/capture-recovery/run.py /tmp/capture-cutoff-rerun --family stack --sizes 512 1024 --profiles text mixed rare reject
 ```
 
-Each completed cohort preserves commands, source identities, raw JSON/logs and exit
-statuses. Cutoff cohorts also archive exact selected sources and separate path
-audits. `tools/analyze.py` regenerates the principal tables; source-hash checks
-verify the intended comparison differences. Only completed measurement cohorts are
-archived here; incomplete collection output remains local and is excluded. Historical policy-study artifacts are unchanged.
-`SHA256SUMS` protects the final evidence set.
+Each completed cohort preserves commands, source identities, raw JSON/logs and
+exit statuses. Cutoff cohorts also preserve separate path audits.
+`tools/analyze.py --check` verifies the generated tables against the raw data.
+Sampling summaries retain the profile findings. Raw recordings live outside the
+repository. `SHA256SUMS` covers the checked-in evidence.
 
-Library, deterministic work-bound, benchmark-protocol, UTF-8 adapter, schema and
-standing-execution checks passed. Default counter-free artifacts were restored;
-the regular benchmark JAR excludes opt-in investigation classes. This is a focused,
-single-thread study with warm Patterns and mostly constructed inputs. The external
-OpenJDK-derived checkout was unavailable; no corpus-wide performance claim follows.
+The Maven `benchmark-investigation` profile adds investigation sources only
+when `-Dbenchmark.investigation=capture-recovery` is set. To verify the regular
+JAR boundary, build without that property, list the archive with `jar tf`, and
+check that it contains neither `CaptureCutoffBenchmark` nor `CaptureCutoffPaths`.
+This is a focused single-thread study with warm Patterns and mostly constructed
+inputs. The external OpenJDK-derived checkout was unavailable.
 This investigation layer preserves the candidate as a prototype patch. Runtime
 adoption is proposed in the next PR; the 512-unit limit is unchanged in both layers.
 
