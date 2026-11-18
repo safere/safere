@@ -909,7 +909,8 @@ final class BitState {
   /**
    * Executes a greedy ALT/consumer cycle without redispatching each instruction. The entry ALT has
    * already been charged. Keep every deferred exit and visitation in the original order, and charge
-   * each logical instruction so pruning activation and the work limit remain unchanged.
+   * each logical instruction so pruning activation and the work limit remain unchanged. Keep the
+   * helper small because HotSpot can inline it into the main interpreter loop when it is hot.
    */
   private void runGreedyLoop(int id, Inst alt, Inst rune, int pos) {
     while (true) {

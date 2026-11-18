@@ -446,7 +446,10 @@ final class Prog {
     return bitStateAnalysis().captureProgressChecks;
   }
 
-  /** Returns consuming bodies of simple greedy loops, or null when none exist. */
+  /**
+   * Returns consuming bodies of simple greedy loops, or null when none exist. Each body is the
+   * ALT's preferred branch and consumes one rune before jumping directly back to that ALT.
+   */
   Inst[] greedyRunes() {
     return bitStateAnalysis().greedyRunes;
   }
