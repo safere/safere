@@ -23,8 +23,8 @@ abstract class ByteSwarScan {
   /**
    * Input sizes at which the SWAR candidate filter overtakes the skip loop. The filter always
    * advances eight positions per step, while the skip loop can advance as far as the literal
-   * length, so the filter needs an input large enough to outweigh that per-step advantage. Both
-   * bounds were measured; see {@link #indexOfFiltered}.
+   * length. These cutoffs come from measurements of the original candidate filter and should be
+   * rechecked when changing its verification costs.
    */
   static final int MIN_FILTER_LENGTH = 64;
 
@@ -530,8 +530,8 @@ abstract class ByteSwarScan {
         }
         mask &= mask - 1;
       } while (mask != 0);
-      // Account once per candidate word, leaving both the scan and verification loops free of
-      // bookkeeping. At most one word of verification can overshoot the linear work budget.
+      // Charge verification once per candidate word. Scanned words without candidates are free
+      // of budget charges because their scans are disjoint. One word can overshoot the budget.
       work = WorkLimit.addCandidateWork(work, candidateCount, literal.length);
       if (WorkLimit.isExhausted(work, workLimit)) {
         return -2;

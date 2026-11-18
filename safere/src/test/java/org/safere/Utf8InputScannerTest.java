@@ -408,8 +408,19 @@ class Utf8InputScannerTest {
       int offset = random.nextInt(16);
       byte[] storage = new byte[offset + length + 16];
       byte[] needle = new byte[2 + random.nextInt(64)];
-      random.nextBytes(storage);
-      random.nextBytes(needle);
+      if ((trial & 1) == 0) {
+        random.nextBytes(storage);
+        random.nextBytes(needle);
+      } else {
+        // Adjacent byte values around 0x60 exercise borrow bits as well as dense candidates.
+        int alphabetSize = 1 + random.nextInt(4);
+        for (int i = 0; i < storage.length; i++) {
+          storage[i] = (byte) (0x60 + random.nextInt(alphabetSize));
+        }
+        for (int i = 0; i < needle.length; i++) {
+          needle[i] = (byte) (0x60 + random.nextInt(alphabetSize));
+        }
+      }
       if (length >= needle.length && random.nextBoolean()) {
         int match = random.nextInt(length - needle.length + 1);
         System.arraycopy(needle, 0, storage, offset + match, needle.length);
