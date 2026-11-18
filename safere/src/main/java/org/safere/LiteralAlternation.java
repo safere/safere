@@ -219,71 +219,38 @@ final class LiteralAlternation {
     if (from != 0) {
       return FALLBACK;
     }
-    if (utf8FirstByteScan == null) {
-      return VectorScanProviders.vectorProviderAvailable() ? FALLBACK : findSparseInitials(text);
-    }
+    boolean scanRange = utf8FirstByteScan == null;
+    int length = text.length();
     byte[] bytes = text.bytes();
     int offset = text.offset();
-    int length = text.length();
-    int spanStart = 0;
-    int candidates = 0;
-    for (int position = 0; ; position++) {
-      int candidate = utf8FirstByteScan.findCandidate(text, position);
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.record((candidate < 0 ? length : candidate + 1) - position);
+    if (scanRange) {
+      if (VectorScanProviders.vectorProviderAvailable()
+          || length < WINDOW_LENGTH
+          || firstHigh - firstLow > 31) {
+        return FALLBACK;
       }
-      if (candidate < 0) {
-        return NO_MATCH;
-      }
-      long match = matchAt(bytes, offset, length, candidate);
-      if (match >= 0) {
-        return match;
-      }
-      position = candidate;
-      if (++candidates == DENSE_CANDIDATES) {
-        if (position - spanStart < DENSE_CANDIDATE_SPAN) {
-          return searchFrom(text, position + 1);
+      // A candidate at byte zero already triggers the early fallback. Skip the range scan.
+      int first = bytes[offset] & 0xFF;
+      if (first >= firstLow && first <= firstHigh) {
+        if (WorkCounterConfig.ENABLED) {
+          WorkCounter.record();
         }
-        candidates = 0;
-        spanStart = position;
+        return FALLBACK;
       }
     }
-  }
 
-  /**
-   * Uses a conservative first-byte range only after a substantial initial gap. Dense early
-   * candidates retain the DFA, which can recognize nearby matches without per-literal probes. A
-   * fallback repeats at most WINDOW_LENGTH input bytes; otherwise all candidate starts advance.
-   */
-  private long findSparseInitials(Utf8InputScanner text) {
-    if (text.length() < WINDOW_LENGTH || firstHigh - firstLow > 31) {
-      return FALLBACK;
-    }
-    byte[] bytes = text.bytes();
-    int offset = text.offset();
-    int length = text.length();
-    // Membership at byte zero already proves an early candidate. Avoid launching the word scan
-    // merely to discover that the dense-input fallback applies.
-    int first = bytes[offset] & 0xFF;
-    if (first >= firstLow && first <= firstHigh) {
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.record();
-      }
-      return FALLBACK;
-    }
-    int candidate = ByteSwarScan.indexOfByteRange(bytes, offset, length, firstLow, firstHigh, 0);
-    if (WorkCounterConfig.ENABLED) {
-      WorkCounter.record(candidate < 0 ? length : candidate + 1);
-    }
+    int candidate = findUtf8Candidate(text, 0);
     if (candidate < 0) {
       return NO_MATCH;
     }
-    if (candidate < WINDOW_LENGTH) {
+    if (scanRange && candidate < WINDOW_LENGTH) {
       return FALLBACK;
     }
-    int spanStart = candidate;
+
+    // The accepted initial gap is outside the range scan's first density window.
+    int spanStart = scanRange ? candidate : 0;
     int candidates = 0;
-    while (true) {
+    do {
       long match = matchAt(bytes, offset, length, candidate);
       if (match >= 0) {
         return match;
@@ -296,15 +263,22 @@ final class LiteralAlternation {
         candidates = 0;
         spanStart = candidate;
       }
-      candidate =
-          ByteSwarScan.indexOfByteRange(bytes, offset, length, firstLow, firstHigh, position);
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.record((candidate < 0 ? length : candidate + 1) - position);
-      }
-      if (candidate < 0) {
-        return NO_MATCH;
-      }
+      candidate = findUtf8Candidate(text, position);
+    } while (candidate >= 0);
+    return NO_MATCH;
+  }
+
+  private int findUtf8Candidate(Utf8InputScanner text, int position) {
+    Utf8StartAccelerator.CharClass firstByteScan = utf8FirstByteScan;
+    int candidate =
+        firstByteScan != null
+            ? firstByteScan.findCandidate(text, position)
+            : ByteSwarScan.indexOfByteRange(
+                text.bytes(), text.offset(), text.length(), firstLow, firstHigh, position);
+    if (WorkCounterConfig.ENABLED) {
+      WorkCounter.record((candidate < 0 ? text.length() : candidate + 1) - position);
     }
+    return candidate;
   }
 
   /** Returns the bounds of the highest-priority literal starting at {@code position}, or -1. */
