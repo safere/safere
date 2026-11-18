@@ -216,7 +216,10 @@ public final class Pattern implements Serializable {
   private transient volatile Prog flatReverseProg;
   private transient volatile Prog flatReverseDfaProg;
 
-  /** Published before the reverse program; its paths require no input-dependent assertions. */
+  /**
+   * Set before publishing the volatile reverse DFA program. Readers that have not acquired the
+   * program may observe false and conservatively use forward verification.
+   */
   private transient boolean contextFreeReverseLanguage;
 
   /** DFA setup built once alongside the final {@link #flatReverseDfaProg}. */
@@ -1161,10 +1164,13 @@ public final class Pattern implements Serializable {
    * verification. The reverse program's volatile publication makes its language proof visible.
    */
   boolean endAnchoredStartHasExactEnd(InputScanner scanner) {
-    return contextFreeReverseLanguage
-        && (!prog.dollarAnchorEnd()
-            || scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), scanner.length())
-                < 0);
+    return contextFreeReverseLanguage && hasUniqueEndAnchoredEndpoint(scanner);
+  }
+
+  /** Terminal dollar-style anchors may also accept before the final line terminator. */
+  boolean hasUniqueEndAnchoredEndpoint(InputScanner scanner) {
+    return !prog.dollarAnchorEnd()
+        || scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), scanner.length()) < 0;
   }
 
   /** Keeps short unproved candidates on BitState and avoids NFA work on longer ones. */

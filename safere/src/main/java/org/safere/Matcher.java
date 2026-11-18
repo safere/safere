@@ -1975,10 +1975,11 @@ public final class Matcher implements MatchResult {
       diagnosticBoundary(MatchStrategy.DFA);
       return applyDeferredMatchResult(start, scanner.length(), prog.numCaptures(), true, false);
     }
-    // Share the forward-verification gate with matcher-free Boolean searches.
+    // With two legal ends, only the exact engine can select the end required by match priority.
     if (parentPattern.shouldUseDfaEndVerification(scanner.length() - start)
         && canUseForwardDfa()
-        && parentPattern.dfaGroupZeroReliable()) {
+        && parentPattern.dfaGroupZeroReliable()
+        && parentPattern.hasUniqueEndAnchoredEndpoint(scanner)) {
       diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
       Dfa.SearchResult result = searchForwardDfa(dfa(false), scanner, start, true, false);
       if (result != null) {
