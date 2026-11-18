@@ -9,7 +9,17 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import java.util.Arrays;
 
-/** Complete, ordered literal alternatives for a bounded String and UTF-8 search fast path. */
+/**
+ * Complete, ordered literal alternatives for a bounded String and UTF-8 search fast path.
+ *
+ * <p>String searches with up to three distinct initial characters use per-literal windows. With
+ * more initials, whole-input searches hop between candidates after the first window and return to
+ * windowed search for dense candidates. Region searches always use per-literal windows.
+ *
+ * <p>UTF-8 searches use an exact first-byte accelerator when one is available. The default provider
+ * can also scan a compact enclosing range after a long initial gap. Other cases use the existing
+ * Vector Teddy or DFA search.
+ */
 final class LiteralAlternation {
   static final long NO_MATCH = -1;
   static final long FALLBACK = -2;
