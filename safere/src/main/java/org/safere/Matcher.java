@@ -2914,7 +2914,9 @@ public final class Matcher implements MatchResult {
     // budget is exceeded, restart once with the NFA and the original bounds. A forward DFA end
     // hint from the nullable-loop fallback may enlarge the window. It must come from the same
     // input, start and bounds. Both the separate hint limit and the bitmap limit apply to the
-    // window, in UTF-16 units or UTF-8 bytes. There is no sequence of growing-window retries.
+    // window, in UTF-16 code units or UTF-8 bytes. Each BMP CJK ideograph takes one UTF-16
+    // code unit and three UTF-8 bytes, so the same label can fit the String window and exceed
+    // the UTF-8 window. There is no sequence of growing-window retries.
     // Two consecutive failures start an exponentially increasing, capped retry delay. Count only
     // eligible searches; a successful window or a reset/pattern/region change clears the delay.
     int maxBitStateLen = BitState.maxTextSize(prog);
