@@ -2894,6 +2894,13 @@ public final class Matcher implements MatchResult {
         -1);
   }
 
+  /**
+   * Runs the exact search, with a bounded BitState attempt when eligible.
+   *
+   * @param matchEndHint the forward DFA end from the exact fallback in {@code doFindCore}, used to
+   *     size speculative windows for nullable loops. The DFA search must use the same input, start
+   *     position, and region bounds. Pass {@code -1} when there is no hint.
+   */
   @SuppressWarnings("ReferenceEquality")
   private int[] searchWithBitStateOrNfa(
       Prog prog,
@@ -2911,12 +2918,11 @@ public final class Matcher implements MatchResult {
     // Use BitState on a bounded search range. Nullable-loop patterns on long inputs can try one
     // bounded window before the NFA: their progress checks prevent authoritative DFA bounds even
     // when the selected match is short. If any preferred path reaches the window edge, or the work
-    // budget is exceeded, restart once with the NFA and the original bounds. A forward DFA end
-    // hint from the nullable-loop fallback may enlarge the window. It must come from the same
-    // input, start and bounds. Both the separate hint limit and the bitmap limit apply to the
-    // window, in UTF-16 code units or UTF-8 bytes. Each BMP CJK ideograph takes one UTF-16
-    // code unit and three UTF-8 bytes, so the same label can fit the String window and exceed
-    // the UTF-8 window. There is no sequence of growing-window retries.
+    // budget is exceeded, restart once with the NFA and the original bounds. Both the hint
+    // limit and the bitmap limit apply to the window, in UTF-16 code units or UTF-8 bytes. Each
+    // BMP CJK ideograph takes one UTF-16 code unit and three UTF-8 bytes, so the same label can
+    // fit the String window and exceed the UTF-8 window. There is no sequence of growing-window
+    // retries.
     // Two consecutive failures start an exponentially increasing, capped retry delay. Count only
     // eligible searches; a successful window or a reset/pattern/region change clears the delay.
     int maxBitStateLen = BitState.maxTextSize(prog);
