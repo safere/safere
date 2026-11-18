@@ -562,6 +562,53 @@ class BitStateWindowTest {
   }
 
   @Test
+  @Tag("work-counter")
+  void lazyRuneLoopsChargeOnlyRequestedCaptureRestoresAndCountDecodes() {
+    Prog prog = Pattern.compile("x(.*?)z").prog();
+    for (int ncap : new int[] {2, 4}) {
+      for (boolean utf8 : List.of(false, true)) {
+        long shortWork = lazyRuneLoopWork(prog, 100, ncap, utf8);
+        long longWork = lazyRuneLoopWork(prog, 300, ncap, utf8);
+        // Each extra ASCII rune tries ALT, capture, literal and body. Captures add a restore
+        // only when requested. The failed literal and the body each decode one UTF-8 byte.
+        int workPerRune = 4 + (ncap == 4 ? 1 : 0) + (utf8 ? 2 : 0);
+        assertThat(longWork - shortWork)
+            .as("ncap=%s, UTF-8=%s", ncap, utf8)
+            .isEqualTo(200L * workPerRune);
+      }
+    }
+  }
+
+  private static long lazyRuneLoopWork(Prog prog, int repeat, int ncap, boolean utf8) {
+    InputScanner scanner = scanners("x" + "a".repeat(repeat) + "z").get(utf8 ? 1 : 0);
+    BitState engine =
+        BitState.getOrCreate(null, prog, scanner, 0, scanner.length(), ncap, false, false);
+    return WorkCounter.countForTesting(
+        () -> assertThat(engine.doSearch(0, 0, true)).startsWith(0, scanner.length()));
+  }
+
+  @Test
+  void oversizedDfaHintsLeaveSpeculativeWorkBounded() {
+    Pattern pattern = Pattern.compile("(a?)*b");
+    String text = "a".repeat(4_096) + "b" + "q".repeat(40_000);
+    assertThat(BitState.maxTextSize(pattern.prog())).isGreaterThan(4_097);
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      for (Matcher matcher : matchers(pattern, text)) {
+        operations.clear();
+        assertThat(matcher.find()).isTrue();
+        assertThat(matcher.end()).isEqualTo(4_097);
+        assertThat(operations.getFirst().strategyDecisions()).contains(windowFailure());
+        assertThat(operations.getFirst().boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+      }
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @Test
   void hintedWindowsPreservePriorityCapturesAndReplacement() {
     for (String regex : List.of("(a?)*b", "(a?|ab)*b", "([ab]?)*z|b", "((a?)*b)+", "(a?)*b\\B")) {
       Pattern pattern = Pattern.compile(regex);

@@ -2912,8 +2912,9 @@ public final class Matcher implements MatchResult {
     // bounded window before the NFA: their progress checks prevent authoritative DFA bounds even
     // when the selected match is short. If any preferred path reaches the window edge, or the work
     // budget is exceeded, restart once with the NFA and the original bounds. A forward DFA end
-    // hint may enlarge the window up to maxBitStateLen; the bitmap and work budgets stay bounded
-    // independently of the total input length. There is no sequence of growing-window retries.
+    // hint from the nullable-loop fallback may enlarge the window. It must come from the same
+    // input, start and bounds. Both the separate hint limit and the bitmap limit apply to the
+    // window, in UTF-16 units or UTF-8 bytes. There is no sequence of growing-window retries.
     // Two consecutive failures start an exponentially increasing, capped retry delay. Count only
     // eligible searches; a successful window or a reset/pattern/region change clears the delay.
     int maxBitStateLen = BitState.maxTextSize(prog);
@@ -2954,12 +2955,12 @@ public final class Matcher implements MatchResult {
       }
       // One bounded attempt per search. Never retry with successively larger windows.
       int windowSize = BitState.SPECULATIVE_WINDOW_SIZE;
-      if (matchEndHint > startPos && matchEndHint - startPos <= maxBitStateLen) {
+      int hintedLength = matchEndHint > startPos ? matchEndHint - startPos : 0;
+      if (speculate && hintedLength <= Math.min(maxBitStateLen, BitState.MAX_HINTED_WINDOW_SIZE)) {
         // A DFA end is only a sizing hint: nullable progress can change the preferred match.
-        // Enlarge only when the hint fits the ordinary bitmap limit. Otherwise retain the small
-        // window, rather than paying for a cap-sized attempt before the possible NFA fallback.
-        // The speculative engine still rejects any preferred path reaching its consumption edge.
-        windowSize = Math.max(windowSize, matchEndHint - startPos);
+        // Keep a fresh matcher's worst-case speculative work bounded even when the bitmap
+        // would allow a much larger window. Oversized hints keep the default window.
+        windowSize = Math.max(windowSize, hintedLength);
       }
       int bitStateEnd = speculate ? startPos + windowSize : endPos;
       BitState bs =

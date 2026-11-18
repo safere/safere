@@ -6,4 +6,4 @@
 package org.safere;
 
 /** A lazy single-consumer loop whose exit starts with captures/NOPs and an ASCII literal. */
-record LazyRuneLoop(Inst rune, int exitChar, int exitSteps) {}
+record LazyRuneLoop(Inst rune, int exitChar, int exitStart) {}

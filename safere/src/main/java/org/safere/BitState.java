@@ -30,6 +30,9 @@ final class BitState {
   /** Default speculative consumption window when no later DFA end hint is available. */
   static final int SPECULATIVE_WINDOW_SIZE = 256;
 
+  /** Maximum consumption window for a speculative search sized by a forward DFA hint. */
+  static final int MAX_HINTED_WINDOW_SIZE = 2_048;
+
   /** Maximum bitmap size in bits. Limits the product of prog size × text length. */
   private static final int MAX_BITMAP_BITS = 256 * 1024;
 
@@ -964,6 +967,7 @@ final class BitState {
   /** Skips only exits that necessarily fail before any assertion or branch can be reached. */
   private int skipFailedLazyExits(LazyRuneLoop loop, int id, int pos) {
     Inst rune = loop.rune();
+    int steps = 0;
     while (pos < endPos) {
       int cp = text.asciiAt(pos);
       if (cp < 0
@@ -973,12 +977,25 @@ final class BitState {
               : rune.matchesCharClass(cp))) {
         break;
       }
-      // The exit's captures have no surviving writes. Consume exactly one ASCII scalar with
-      // no change to captures or progress registers, charging the failed exit and body rune.
-      int steps = loop.exitSteps() + 1;
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.record(steps);
+      if (steps == 0) {
+        // The failed literal and the body each take one step. Walk the compiled exit once
+        // to count its NOPs, captures, and restores of active capture registers.
+        steps = 2;
+        Inst exit = instructions[loop.exitStart()];
+        while (exit.opCode == InstOp.OP_CAPTURE || exit.opCode == InstOp.OP_NOP) {
+          steps++;
+          if (exit.opCode == InstOp.OP_CAPTURE && exit.arg < ncap) {
+            steps++;
+          }
+          exit = instructions[exit.out];
+        }
       }
+      if (WorkCounterConfig.ENABLED) {
+        // The interpreter decodes the byte once for the failed literal and once for the body.
+        WorkCounter.record(steps + (text instanceof Utf8InputScanner ? 2 : 0));
+      }
+      // No tracked ALT intervenes between the two consumers. Check the budget before the
+      // next ALT visit so that it observes the same pruning state as ordinary dispatch.
       stepCount += steps;
       if (stepCount > nextStepThreshold && !onStepThresholdExceeded()) {
         return -1;

@@ -492,12 +492,9 @@ final class Prog {
         continue;
       }
       int exit = alt.out;
-      int cost = 1; // The failing literal itself.
       for (int steps = 0; steps < size(); steps++) {
         Inst next = inst(exit);
         if (next.op == InstOp.CAPTURE || next.op == InstOp.NOP) {
-          // Capture writes would be undone after the failed exit; charge their restores too.
-          cost += next.op == InstOp.CAPTURE ? 2 : 1;
           exit = next.out;
           continue;
         }
@@ -505,7 +502,7 @@ final class Prog {
           if (loops == null) {
             loops = new LazyRuneLoop[size()];
           }
-          loops[i] = new LazyRuneLoop(rune, next.lo, cost);
+          loops[i] = new LazyRuneLoop(rune, next.lo, alt.out);
         }
         break;
       }

@@ -235,7 +235,9 @@ Typical examples include:
 - BitState being bypassed for a large input before NFA matching.
 
 For speculative BitState searches, `SPECULATIVE_WINDOW_EXCEEDED` reports fallback when an attempt
-needed to search beyond its bounded consumption window. `SPECULATIVE_BACKOFF` reports a skipped
+needed to search beyond its bounded consumption window. A DFA hint can enlarge the default
+256-unit window up to 2,048 UTF-16 units or UTF-8 bytes, subject to the normal bitmap limit.
+`SPECULATIVE_BACKOFF` reports a skipped
 attempt after consecutive unsuccessful windows. Backoff lasts until the matcher is reset or its
 pattern or region changes.
 
