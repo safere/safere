@@ -17,8 +17,8 @@ import java.util.Arrays;
  * windowed search for dense candidates. Region searches always use per-literal windows.
  *
  * <p>UTF-8 searches use an exact first-byte accelerator when one is available. The default provider
- * can also scan a compact enclosing range after a long initial gap. Other cases use the existing
- * Vector Teddy or DFA search.
+ * can also scan a compact enclosing range on longer inputs. Dense range candidates near the start
+ * fall back to the DFA. The vector provider can use Vector Teddy.
  */
 final class LiteralAlternation {
   static final long NO_MATCH = -1;
@@ -208,12 +208,11 @@ final class LiteralAlternation {
    * match ASCII bytes, so a match never splits a code point, even in malformed input.
    *
    * <p>Every match starts with one of the literals' first bytes. Reuse the fallback's first-byte
-   * scan when available; otherwise use a compact enclosing range after a substantial initial gap.
-   * Dense early candidates retain the DFA. Check literals in priority order at every candidate.
-   * When the first bytes are common, that stops at almost every word, so after {@link
-   * #DENSE_CANDIDATES} candidates within {@link #DENSE_CANDIDATE_SPAN} bytes it switches to the
-   * String path's strategy of one bounded scan per literal. Those scans start with {@link
-   * #PROBE_LENGTH}-byte windows, long enough for the word-at-a-time literal filter.
+   * scan when available; the default provider can also scan a compact enclosing range. Check
+   * literals in priority order at every candidate. After {@link #DENSE_CANDIDATES} candidates
+   * within {@link #DENSE_CANDIDATE_SPAN} bytes, a dense range near the start falls back to the DFA.
+   * Other dense candidates switch to the String path's strategy of one bounded scan per literal,
+   * starting with {@link #PROBE_LENGTH}-byte windows for the word-at-a-time literal filter.
    */
   long find(Utf8InputScanner text, int from) {
     if (from != 0) {
@@ -223,31 +222,18 @@ final class LiteralAlternation {
     int length = text.length();
     byte[] bytes = text.bytes();
     int offset = text.offset();
-    if (scanRange) {
-      if (VectorScanProviders.vectorProviderAvailable()
-          || length < WINDOW_LENGTH
-          || firstHigh - firstLow > 31) {
-        return FALLBACK;
-      }
-      // A candidate at byte zero already triggers the early fallback. Skip the range scan.
-      int first = bytes[offset] & 0xFF;
-      if (first >= firstLow && first <= firstHigh) {
-        if (WorkCounterConfig.ENABLED) {
-          WorkCounter.record();
-        }
-        return FALLBACK;
-      }
+    if (scanRange
+        && (VectorScanProviders.vectorProviderAvailable()
+            || length < WINDOW_LENGTH
+            || firstHigh - firstLow > 31)) {
+      return FALLBACK;
     }
 
     int candidate = findUtf8Candidate(text, 0);
     if (candidate < 0) {
       return NO_MATCH;
     }
-    if (scanRange && candidate < WINDOW_LENGTH) {
-      return FALLBACK;
-    }
-
-    // The accepted initial gap is outside the range scan's first density window.
+    // Count density from the first candidate when using the enclosing range.
     int spanStart = scanRange ? candidate : 0;
     int candidates = 0;
     do {
@@ -258,6 +244,11 @@ final class LiteralAlternation {
       int position = candidate + 1;
       if (++candidates == DENSE_CANDIDATES) {
         if (candidate - spanStart < DENSE_CANDIDATE_SPAN) {
+          // For a dense range near the start, retry with the DFA. The retried prefix is
+          // bounded by the admission window plus one density span.
+          if (scanRange && spanStart < WINDOW_LENGTH) {
+            return FALLBACK;
+          }
           return searchFrom(text, position);
         }
         candidates = 0;

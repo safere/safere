@@ -139,6 +139,27 @@ class LiteralAlternationUtf8Test {
   }
 
   @Test
+  void sparseRangeSearchVerifiesEarlyCandidatesBeforeContinuing() {
+    Pattern.setDiagnostics(recorder);
+    Pattern pattern = Pattern.compile("apple|banana|cherry|durian|elderberry|fig");
+    for (String header : List.of("a:", "x".repeat(255) + "a:")) {
+      String prefix = header + "日本語".repeat(256);
+      Utf8Input input = Utf8Input.validated((prefix + "cherry").getBytes(UTF_8));
+      operations.clear();
+      Utf8Matcher matcher = pattern.matcher(input);
+      assertThat(matcher.find()).isTrue();
+      int expectedStart = prefix.getBytes(UTF_8).length;
+      assertThat(matcher.start()).isEqualTo(expectedStart);
+      assertThat(matcher.end()).isEqualTo(expectedStart + "cherry".length());
+      if (!VectorScanProviders.vectorProviderAvailable()) {
+        assertThat(operations.getLast().boundaryStrategy())
+            .isEqualTo(MatchStrategy.LITERAL_ALTERNATION);
+        assertThat(operations.getLast().forwardDfaSearchCount()).isZero();
+      }
+    }
+  }
+
+  @Test
   void firstFindOnDenseInputReportsLiteralAlternation() {
     Pattern.setDiagnostics(recorder);
     for (String regex : List.of("apple|banana|cherry", "blossom|sparkling|gardens")) {
