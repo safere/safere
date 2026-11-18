@@ -4819,6 +4819,15 @@
         "length": 8192
       },
       "shared": true
+    },
+    {
+      "id": "reverseDfaFind.prose.32768",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "On the 3rd day, the river_guide said: \"Keep left past the mill, then cross at dusk.\" We did; nobody fell in. Supper came later. ",
+        "length": 32768
+      },
+      "shared": true
     }
   ],
   "workloads": [
@@ -22000,6 +22009,28 @@
             }
           }
         ]
+      }
+    },
+    {
+      "id": "ReverseDfaFindBenchmark.wordProse.32768",
+      "operation": "findAllCount",
+      "patterns": [
+        "\\b\\w+\\b"
+      ],
+      "inputs": [
+        "reverseDfaFind.prose.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 6144
       }
     }
   ]
