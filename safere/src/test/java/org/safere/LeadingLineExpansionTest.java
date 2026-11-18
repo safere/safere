@@ -109,12 +109,14 @@ class LeadingLineExpansionTest {
             String input = prefix + tail;
             boolean expected = jdk.matcher(input).find();
             // A nonzero byte window must retain assertion context relative to the window.
-            byte[] padded = ("before" + input + "after").getBytes(UTF_8);
-            int length = input.getBytes(UTF_8).length;
+            byte[] bytes = input.getBytes(UTF_8);
+            byte[] wordPadded = ("before" + input + "after").getBytes(UTF_8);
+            byte[] linePadded = ("\n" + input + "\n").getBytes(UTF_8);
             for (Utf8Input utf8 :
                 List.of(
-                    Utf8Input.trusted(input.getBytes(UTF_8)),
-                    Utf8Input.trusted(padded, 6, length))) {
+                    Utf8Input.trusted(bytes),
+                    Utf8Input.trusted(wordPadded, 6, bytes.length),
+                    Utf8Input.trusted(linePadded, 1, bytes.length))) {
               assertThat(pattern.find(utf8))
                   .as("/%s/ flags=%s on %s", regex, flags, input)
                   .isEqualTo(expected);

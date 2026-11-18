@@ -912,6 +912,7 @@ public final class Pattern implements Serializable {
       // this candidate verifies the tail and handles later candidates without repeated probes.
       int candidate = le.findInnerCandidate(scanner, 0);
       if (candidate >= 0) {
+        // Leave nearby hits to the forward search, as in wide leading expansion.
         return candidate < MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP ? 0 : candidate;
       }
     } else if (utf8StartAccelerator instanceof Utf8StartAccelerator.LeadingExpansion le
