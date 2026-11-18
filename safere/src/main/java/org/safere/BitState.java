@@ -213,7 +213,7 @@ final class BitState {
       bs = cached;
       bs.reset(text, startPos, textLen, ncap, longest, endMatch);
     } else {
-      bs = new BitState(prog, text, startPos, textLen, ncap, longest, endMatch);
+      bs = new BitState(prog, text, startPos, textLen, ncap, longest, endMatch, prog.greedyRunes());
     }
 
     return bs.doSearch(startPos, searchLimit, anchored, resultBuffer);
@@ -253,7 +253,7 @@ final class BitState {
       cached.reset(text, startPos, endPos, ncap, longest, endMatch);
       return cached;
     }
-    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch);
+    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch, prog.greedyRunes());
   }
 
   /**
@@ -441,14 +441,16 @@ final class BitState {
   private int jobCount;
   private int basePos;
 
-  private BitState(
+  /** Creates a fresh workspace. Passing null greedy-loop metadata uses ordinary ALT dispatch. */
+  BitState(
       Prog prog,
       InputScanner text,
       int startPos,
       int endPos,
       int ncap,
       boolean longest,
-      boolean endMatch) {
+      boolean endMatch,
+      Inst[] greedyRunes) {
     this.prog = prog;
     this.instructions = prog.frozenInstructions();
     this.text = text;
@@ -478,7 +480,7 @@ final class BitState {
     this.captureRunes = prog.captureRunes();
     this.loopEntries = prog.loopEntries();
     this.captureProgressChecks = prog.captureProgressChecks();
-    this.greedyRunes = prog.greedyRunes();
+    this.greedyRunes = greedyRunes;
 
     int totalBits = progSize * textSlots;
     int visitedLen = (totalBits + 63) / 64;
