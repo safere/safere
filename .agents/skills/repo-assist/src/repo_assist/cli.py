@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from repo_assist.activity import collect_activity
-from repo_assist.feedback import collect_feedback, resolve_worktree
+from repo_assist.feedback import WorktreeError, collect_feedback, resolve_worktree
 from repo_assist.github import GitHub
 
 
@@ -252,7 +252,11 @@ def authored_worktree(args: argparse.Namespace) -> int:
   state_path = args.root / "state.json"
   state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
   checkpoint = state.get("authoredPrFeedback", {}).get(str(args.number))
-  result = resolve_worktree(args.checkout.expanduser(), metadata, checkpoint)
+  try:
+    result = resolve_worktree(args.checkout.expanduser(), metadata, checkpoint)
+  except WorktreeError as error:
+    print(error, file=sys.stderr)
+    return 1
   if github.authored_pr_metadata(args.number, login, trusted) != metadata:
     raise RuntimeError("authored PR changed during worktree discovery; retry")
   print(json.dumps(result, indent=2))
