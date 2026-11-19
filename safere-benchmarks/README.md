@@ -59,6 +59,8 @@ repair searched candidate partitions across that prefix. The geometric size swee
 includes short inputs and successful/rejected controls. Group zero observes
 `start(0)` participation rather than copying the whole match; inner text copies
 `group(1)`. This distinguishes capture extraction from text materialization.
+The .NET group-zero adapter uses `Regex.Match()`, which also extracts captures
+and can add more work than the bounds-only Go and Rust APIs.
 
 Workload eligibility follows adapter capabilities and concrete capture semantics;
 focused measurement runs select engines through runner filters. Choosing a smaller
@@ -80,8 +82,10 @@ the suite-wide registry restriction pending the broader audit in
 substitution with JIT dispatch. See
 [cross-runtime coverage](CROSS_RUNTIME_ENGINES.md#workload-coverage).
 Native capture-aware functional replacement is implemented for SafeRE String,
-JDK String, Rust, and .NET. RE2/J and SafeRE UTF-8 support named replacement;
-direct capture-text observation remains excluded from byte-native variants.
+JDK String, Rust, and .NET. The SafeRE and JDK String callbacks quote captured
+text because the Java APIs interpret callback results as replacement templates.
+RE2/J and SafeRE UTF-8 support named replacement. Direct capture-text observation
+remains excluded from byte-native variants.
 
 Numbered RE2 replacement syntax is declared in the data. Expected successful
 captures and replacements are checked before timing; Java harness tests also check
