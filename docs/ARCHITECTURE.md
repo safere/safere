@@ -82,12 +82,18 @@ reach it:
   is one such path even though it is reached through `find()`. Explain which callers avoid the work
   and which callers incur it later; the presence of an eligible engine does not mean every caller
   uses it.
-- Build shared pattern-specific artifacts once per `Pattern`, including concurrent first callers,
-  and publish them safely. Cache an unsuccessful eligibility or construction result when retrying
-  cannot change the outcome. Preserve the selected fallback and its eligibility for other APIs.
-- Eliminate redundant or provably irrelevant preparation. Shared tables and optional metadata need
-  initialization only when they are needed. Check mixed-feature patterns too: a table unused by an
-  ASCII character class may still be needed by another feature in the same pattern's first search.
+- Build expensive pattern-specific artifacts once per `Pattern`, including for concurrent first
+  callers, and publish them safely. Cheap immutable values may use a single check of a safely
+  published field when concurrent callers can harmlessly construct equivalent values. Cache an
+  unsuccessful eligibility or construction result when retrying cannot change the outcome.
+  Preserve the selected fallback and its eligibility for other APIs.
+- Eliminate redundant or provably irrelevant preparation. Initialize optional metadata and shared
+  tables only when needed. Check mixed-feature patterns too. A table unused by
+  an ASCII character class may be needed by another feature in the same pattern's first search.
+- A static holder class can initialize and safely publish an immutable table once per defining class
+  loader. The first caller pays for initialization. If it fails, later initialization attempts in
+  that loader fail with `NoClassDefFoundError`. Keep static initialization dependencies acyclic to
+  prevent deadlock during concurrent first use.
 - Account for intermediate preparation rebuilt after compilation, synchronization, cache reads,
   and wrapper delegation. Building an automaton only once does not prove that laziness adds no
   work. Preserve steady-state execution and measure compilation together with the first affected
@@ -96,6 +102,7 @@ reach it:
 
 This policy concerns preparation and initialization. DFA state discovery, per-thread execution
 state, and deferred capture extraction have their own runtime costs and semantic constraints.
+Class loading and linking on a first request can occur even when pattern preparation is eager.
 Describe when an artifact is constructed in code comments rather than making eager or lazy
 construction an unconditional API contract.
 

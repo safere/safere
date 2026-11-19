@@ -146,8 +146,14 @@ mixed-feature patterns and fallback after unsuccessful construction.
 
 Keep these measurements separate:
 
-- **Cold initialization:** use fresh JVM forks and record whether the timer includes compilation
-  alone or compilation plus first execution. The `--first-compile` mode excludes process launch.
+- **Cold initialization:** use fresh JVM forks and state whether timing covers compilation, first
+  execution after untimed compilation, or both. The `--first-compile` mode uses ten single-shot
+  forks and excludes process launch. Report the median and retain per-fork samples alongside the
+  JMH summary. Interleave A/B runs or repeat them in both orders to check drift.
+- **Feature initialization after library loading:** include an ASCII control. To reduce the effect of
+  shared library loading, use a separate fresh-process comparison that first compiles an unrelated
+  ASCII pattern outside timing. Verify that setup leaves the target feature uninitialized. Clearly
+  identify this setup when reporting results because it measures a different first-use boundary.
 - **Warm compilation plus first use of a fresh pattern:** compile inside each timed invocation,
   then perform the affected operation. Existing `compileAndFind` and `compileAndMatches`
   declarations cover common cases. Include capture/bounds access inside timing when it triggers
@@ -161,7 +167,9 @@ Use the project runners and their measurement settings. A compile-only improveme
 matching result does not establish compile-plus-first-use or first-request latency. Report
 first-use and tail-latency tradeoffs explicitly; do not infer them from mean throughput or hide
 them in an aggregate. Verify safe publication and shared construction under concurrent first use
-with focused tests. The review and follow-up measurements in
+with focused tests. For shared static tables, test the affected paths in fresh processes and
+check class-initialization logs for when the tables initialize. Exercise concurrent first use to
+check initialization ordering. The review and follow-up measurements in
 [#982](https://github.com/safere/safere/pull/982) and
 [#1011](https://github.com/safere/safere/pull/1011) provide concrete precedents.
 
