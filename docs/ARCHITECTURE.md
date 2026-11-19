@@ -66,6 +66,72 @@ AST and program traversal use worklists or iterative walkers. Pattern nesting
 must not turn into unbounded Java recursion during parsing, simplification,
 compilation, or analysis.
 
+## Compilation and initialization policy
+
+Initialization balances compilation cost with predictable first execution. Patterns stored in
+`static final` fields can pay preparation costs during application initialization; dynamic or
+short-lived patterns can benefit when unused preparation is avoided. See
+[efficient use](EFFICIENT_USE.md#compile-each-pattern-once) for application guidance.
+
+Decide initialization for each artifact from the operations and engine paths that can actually
+reach it:
+
+- Prepare the common search and capture paths eagerly by default. First `find()` and `group()`
+  latency matter; a lower compile time alone does not justify moving their required work.
+- API- or path-specific artifacts may be built on first relevant use. A conditional reverse search
+  is one such path even though it is reached through `find()`. Explain which callers avoid the work
+  and which callers incur it later; the presence of an eligible engine does not mean every caller
+  uses it.
+- Build expensive pattern-specific artifacts once per `Pattern`, including for concurrent first
+  callers, and publish them safely. Cheap immutable values may use a single check of a safely
+  published field when concurrent callers can harmlessly construct equivalent values. Cache an
+  unsuccessful eligibility or construction result when retrying cannot change the outcome.
+  Preserve the selected fallback and its eligibility for other APIs.
+- Eliminate redundant or provably irrelevant preparation. Initialize optional metadata and shared
+  tables only when needed. Check mixed-feature patterns too. A table unused by
+  an ASCII character class may be needed by another feature in the same pattern's first search.
+- A static holder class can initialize and safely publish an immutable table once per defining class
+  loader. The first caller pays for initialization. If it fails, later initialization attempts in
+  that loader fail with `NoClassDefFoundError`. Keep static initialization dependencies acyclic to
+  prevent deadlock during concurrent first use.
+- Account for intermediate preparation rebuilt after compilation, synchronization, cache reads,
+  and wrapper delegation. Building an automaton only once does not prove that laziness adds no
+  work. Preserve steady-state execution and measure compilation together with the first affected
+  operation, including captures when relevant. See the
+  [measurement requirements](../safere-benchmarks/PERFORMANCE_GUIDE.md#compilation-and-first-use-measurements).
+
+This policy concerns preparation and initialization. DFA state discovery, per-thread execution
+state, and deferred capture extraction have their own runtime costs and semantic constraints.
+Class loading and linking on a first request can occur even when pattern preparation is eager.
+Describe when an artifact is constructed in code comments rather than making eager or lazy
+construction an unconditional API contract.
+
+### Decision history
+
+[PR #545](https://github.com/safere/safere/pull/545) introduced eager preparation to improve first-use
+and initial-request tail latency. [PR #590 was closed](https://github.com/safere/safere/pull/590#issuecomment-5066257148)
+because its compile-time gains shifted that preparation into first use. That decision was later
+refined: the [concrete proposal in #970](https://github.com/safere/safere/issues/970#issuecomment-6015796070)
+was [explicitly accepted](https://github.com/safere/safere/issues/970#issuecomment-6103300201), allowing
+API- and path-specific laziness while retaining the common-search latency priority and requiring
+compile-plus-first-use and steady-state evidence.
+
+Accepted implementations illustrate the boundaries:
+
+| Precedent | Decision and review lesson |
+|---|---|
+| [#973: Unicode case index](https://github.com/safere/safere/pull/973) | Reject provably ineligible accelerator candidates before initializing data they will never use. |
+| [#980: OnePass](https://github.com/safere/safere/pull/980#pullrequestreview-5481185686) | Defer analysis for paths that cannot use it in ordinary search/capture operations; concurrent first callers share construction. |
+| [#982: reverse DFA](https://github.com/safere/safere/pull/982#pullrequestreview-5497761816) | Conditional reverse preparation can be lazy; measure first searches that need it and those that do not. |
+| [#987: literal runners](https://github.com/safere/safere/pull/987#pullrequestreview-5481319501) | Defer forward preparation bypassed by the literal search runner while preserving other operations and concurrency. |
+| [#1011: ShiftDfa](https://github.com/safere/safere/pull/1011#pullrequestreview-5677115296) | Whole-input-only preparation can be lazy; preserve other APIs' fallbacks and check compile-plus-first-`matches()` and repeated `matches()`. |
+
+The [ShiftDfa follow-up](https://github.com/safere/safere/pull/1011#issuecomment-6439548353) removed
+measured steady-state overhead by replacing the lazy runner after resolution, including failed
+construction. These decisions permit selective laziness; they do not authorize a general transfer
+of preparation costs into first execution. Reversing the latency priority needs a separate design
+discussion.
+
 ## Execution strategies
 
 SafeRE selects eligible strategies according to the pattern, operation, input,

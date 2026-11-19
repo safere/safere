@@ -51,11 +51,18 @@ remote for the PR's head repository, and checks branch, HEAD, cleanliness, and a
 operations. A local head different from GitHub is accepted only when it exactly matches a recorded
 unpublished repair for that PR, branch, and worktree, and descends from the current published head.
 
-If the command fails, record the blocker for that PR and continue the sweep. Keep the original
-worktree and user changes intact: missing or ambiguous matches, dirty trees, active operations,
-repository mismatches, and unrecorded local commits require resolution before repairs. Do not
-substitute a newly created review worktree, switch branches, reset, stash, or overwrite local work.
-Feedback can still be assessed and disagreements reported when a repair is blocked.
+If no registered worktree currently has the exact branch checked out, the command checks
+worktree HEAD reflogs for prior checkouts of that branch. It reports those paths with their
+current branch or detached HEAD, along with any checkout at the published PR commit. These
+locations help the maintainer find the checkout. Repair still requires a successful exact-branch
+check.
+
+If the command fails, record the specific blocker, including any reported paths and current
+branches, and continue the sweep. Keep the original worktree and user changes intact. Ambiguous
+matches, dirty trees, active operations, repository mismatches, and unrecorded local commits
+require resolution before repairs. Do not substitute a newly created review worktree, switch
+branches, reset, stash, or overwrite local work. Feedback can still be assessed and disagreements
+reported when a repair is blocked.
 
 Read the matched worktree's `AGENTS.md` and relevant project guidance. Immediately before editing,
 run `authored-worktree` again and compare its branch, path, and local/published heads with the
