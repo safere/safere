@@ -169,7 +169,10 @@ first-use and tail-latency tradeoffs explicitly; do not infer them from mean thr
 them in an aggregate. Verify safe publication and shared construction under concurrent first use
 with focused tests. For shared static tables, test the affected paths in fresh processes and
 check class-initialization logs for when the tables initialize. Exercise concurrent first use to
-check initialization ordering. The review and follow-up measurements in
+check initialization ordering. For an example, see
+[`CompileInitializationTest` in #1203](https://github.com/safere/safere/pull/1203).
+
+The review and follow-up measurements in
 [#982](https://github.com/safere/safere/pull/982) and
 [#1011](https://github.com/safere/safere/pull/1011) provide concrete precedents.
 
