@@ -41,6 +41,39 @@ class NfaProgramPreparationTest {
   }
 
   @Test
+  void flatAndGraphNfaAgreeOnCapturePriorityAndBounds() {
+    for (String regex :
+        List.of("(a|ab)*?", "(?:(a){1,2})*?", "((a)|(ab))+?b?", "(a(b)?)+", "((é)|(éa))+?b")) {
+      Pattern pattern = Pattern.compile(regex);
+      Prog graph = pattern.prog();
+      Prog flat = pattern.nfaProg(graph);
+      assertThat(graph.didFlatten()).as(regex).isFalse();
+      assertThat(flat.didFlatten()).as(regex).isTrue();
+      int groups = graph.numCaptures();
+      for (String input : List.of("", "a", "aa", "aab", "abab", "baabab", "éaéab", "😀aab")) {
+        List<InputScanner> scanners =
+            List.of(new StringInputScanner(input), new Utf8InputScanner(input.getBytes(UTF_8)));
+        for (InputScanner scanner : scanners) {
+          int end = scanner.length();
+          for (Nfa.MatchKind kind : List.of(Nfa.MatchKind.FIRST_MATCH, Nfa.MatchKind.FULL_MATCH)) {
+            int[] expected =
+                Nfa.search(
+                    graph, scanner, 0, end, end, 0, Nfa.Anchor.UNANCHORED, kind, groups, null);
+            int[] actual =
+                Nfa.search(
+                    flat, scanner, 0, end, end, 0, Nfa.Anchor.UNANCHORED, kind, groups, null);
+            assertThat(actual)
+                .as(
+                    "/%s/ on %s via %s (%s)",
+                    regex, input, scanner.getClass().getSimpleName(), kind)
+                .isEqualTo(expected);
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   void bypassPathsDoNotPrepareAnNfaCopy() throws Exception {
     for (String regex : List.of("needle", "apple|banana|cherry")) {
       Pattern pattern = Pattern.compile(regex);
