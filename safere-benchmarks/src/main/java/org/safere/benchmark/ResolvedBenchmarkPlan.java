@@ -447,17 +447,16 @@ final class ResolvedBenchmarkPlan {
       PatternProfiles replacementProfiles,
       String flagSet) {
     JsonObject result = new JsonObject();
-    arguments.forEach(
-        (name, value) -> {
-          JsonElement json = recipeValue(value);
-          if (name.equals("replacement")) {
-            json =
-                new JsonPrimitive(
-                    replacementProfiles.select(
-                        engine.replacementProfile(), json.getAsString(), flagSet));
-          }
-          result.add(name, json);
-        });
+    arguments.forEach((name, value) -> {
+      JsonElement json = recipeValue(value);
+      if (name.equals("replacement")) {
+        json =
+            new JsonPrimitive(
+                replacementProfiles.select(
+                    engine.replacementProfile(), json.getAsString(), flagSet));
+      }
+      result.add(name, json);
+    });
     return result;
   }
 

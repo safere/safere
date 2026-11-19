@@ -65,15 +65,14 @@ public final class CaptureCutoffPaths {
           row.put(
               "paths",
               events.stream()
-                  .map(
-                      event -> {
-                        Map<String, Object> path = new LinkedHashMap<>();
-                        path.put("boundary", event.boundaryStrategy().name());
-                        path.put("outcome", event.outcome().name());
-                        path.put("forwardDfa", event.forwardDfaSearchCount());
-                        path.put("reverseDfa", event.reverseDfaSearchCount());
-                        return path;
-                      })
+                  .map(event -> {
+                    Map<String, Object> path = new LinkedHashMap<>();
+                    path.put("boundary", event.boundaryStrategy().name());
+                    path.put("outcome", event.outcome().name());
+                    path.put("forwardDfa", event.forwardDfaSearchCount());
+                    path.put("reverseDfa", event.reverseDfaSearchCount());
+                    return path;
+                  })
                   .distinct()
                   .toList());
           results.add(row);

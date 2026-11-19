@@ -75,28 +75,24 @@ final class SpecializedBenchmarkPlan {
 
   List<Trial> patternSetTrials() {
     return trials.values().stream()
-        .filter(
-            trial ->
-                trial.workload().operation()
-                    == DeclarativeBenchmarkPlan.Operation.PATTERN_SET_MATCHES)
+        .filter(trial ->
+            trial.workload().operation() == DeclarativeBenchmarkPlan.Operation.PATTERN_SET_MATCHES)
         .toList();
   }
 
   List<Trial> averageTimeTrials() {
     return trials.values().stream()
-        .filter(
-            trial ->
-                trial.workload().measurement().mode()
-                    == DeclarativeBenchmarkPlan.MeasurementMode.AVERAGE_TIME)
+        .filter(trial ->
+            trial.workload().measurement().mode()
+                == DeclarativeBenchmarkPlan.MeasurementMode.AVERAGE_TIME)
         .toList();
   }
 
   List<Trial> retainedMemoryTrials() {
     return trials.values().stream()
-        .filter(
-            trial ->
-                trial.workload().measurement().mode()
-                    == DeclarativeBenchmarkPlan.MeasurementMode.RETAINED_MEMORY)
+        .filter(trial ->
+            trial.workload().measurement().mode()
+                == DeclarativeBenchmarkPlan.MeasurementMode.RETAINED_MEMORY)
         .toList();
   }
 

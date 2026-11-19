@@ -96,10 +96,9 @@ class CrossEngineBenchmarkPlanTest {
     Set<String> accounted = new HashSet<>();
     allTrials.forEach(trial -> assertThat(accounted.add(trial.id())).isTrue());
     plan.exclusions()
-        .forEach(
-            exclusion ->
-                assertThat(accounted.add(exclusion.workloadId() + "@" + exclusion.engineId()))
-                    .isTrue());
+        .forEach(exclusion ->
+            assertThat(accounted.add(exclusion.workloadId() + "@" + exclusion.engineId()))
+                .isTrue());
 
     for (CrossEngineWorkload workload : plan.workloads()) {
       assertThat(
@@ -124,25 +123,22 @@ class CrossEngineBenchmarkPlanTest {
     String previous = System.getProperty(property);
     try {
       System.clearProperty(property);
-      assertThatThrownBy(
-              () ->
-                  CrossEngineTrialRunner.prepare(
-                      "RegexBenchmark.emailFind@safere-utf8-vector",
-                      CrossEngineWorkload.TimingGroup.NANOSECONDS))
+      assertThatThrownBy(() ->
+              CrossEngineTrialRunner.prepare(
+                  "RegexBenchmark.emailFind@safere-utf8-vector",
+                  CrossEngineWorkload.TimingGroup.NANOSECONDS))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("requires -D" + property + "=vector");
-      assertThatThrownBy(
-              () ->
-                  SpecializedTrialRunner.prepare(
-                      "Utf8MatchingBenchmark.captureBounds.numbered@safere-utf8-vector"))
+      assertThatThrownBy(() ->
+              SpecializedTrialRunner.prepare(
+                  "Utf8MatchingBenchmark.captureBounds.numbered@safere-utf8-vector"))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("requires -D" + property + "=vector");
       System.setProperty(property, "vector");
-      assertThatThrownBy(
-              () ->
-                  CrossEngineTrialRunner.prepare(
-                      "RegexBenchmark.emailFind@safere-utf8",
-                      CrossEngineWorkload.TimingGroup.NANOSECONDS))
+      assertThatThrownBy(() ->
+              CrossEngineTrialRunner.prepare(
+                  "RegexBenchmark.emailFind@safere-utf8",
+                  CrossEngineWorkload.TimingGroup.NANOSECONDS))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("requires default provider selection");
     } finally {
@@ -193,18 +189,17 @@ class CrossEngineBenchmarkPlanTest {
     for (boolean smoke : List.of(false, true)) {
       List<BenchmarkCollectionPlan.Runner> groups = plan.executionRunners(false, smoke);
       assertThat(groups)
-          .allSatisfy(
-              group -> {
-                String provider =
-                    RegexEngineVariant.fromId(
-                            group
-                                .trialIds()
-                                .getFirst()
-                                .substring(group.trialIds().getFirst().lastIndexOf('@') + 1))
-                        .scanProvider();
-                assertThat(group.trialIds())
-                    .allMatch(id -> BenchmarkCollectionPlan.matchesScanProvider(id, provider));
-              });
+          .allSatisfy(group -> {
+            String provider =
+                RegexEngineVariant.fromId(
+                        group
+                            .trialIds()
+                            .getFirst()
+                            .substring(group.trialIds().getFirst().lastIndexOf('@') + 1))
+                    .scanProvider();
+            assertThat(group.trialIds())
+                .allMatch(id -> BenchmarkCollectionPlan.matchesScanProvider(id, provider));
+          });
       assertThat(groups.stream().flatMap(group -> group.trialIds().stream()))
           .containsExactlyInAnyOrderElementsOf(
               plan.reportPlan(smoke).trials().stream()
@@ -228,12 +223,11 @@ class CrossEngineBenchmarkPlanTest {
   void longRecitationListsExcludeOnlyJdkTrialsThatOverflowItsStack() {
     List<MaterializedExecutionPlan.Entry> exclusions =
         CrossEngineBenchmarkPlan.load().exclusions().stream()
-            .filter(
-                exclusion ->
-                    exclusion
-                            .workloadId()
-                            .startsWith("RealWorldRegexBenchmark.runBenchmark.recitation.")
-                        && exclusion.engineId().equals("jdk-string"))
+            .filter(exclusion ->
+                exclusion
+                        .workloadId()
+                        .startsWith("RealWorldRegexBenchmark.runBenchmark.recitation.")
+                    && exclusion.engineId().equals("jdk-string"))
             .toList();
 
     assertThat(exclusions)
@@ -244,14 +238,13 @@ class CrossEngineBenchmarkPlanTest {
             "RealWorldRegexBenchmark.runBenchmark.recitation.noMatch.10000@jdk-string",
             "RealWorldRegexBenchmark.runBenchmark.recitation.noMatch.100000@jdk-string");
     assertThat(exclusions)
-        .allSatisfy(
-            exclusion -> {
-              assertThat(exclusion.exclusion().kind()).isEqualTo("explicitTrialExclusion");
-              assertThat(exclusion.exclusion().reason())
-                  .isEqualTo(
-                      "JDK's backtracking matcher throws StackOverflowError for the nested "
-                          + "quantified recitation pattern at these input sizes");
-            });
+        .allSatisfy(exclusion -> {
+          assertThat(exclusion.exclusion().kind()).isEqualTo("explicitTrialExclusion");
+          assertThat(exclusion.exclusion().reason())
+              .isEqualTo(
+                  "JDK's backtracking matcher throws StackOverflowError for the nested "
+                      + "quantified recitation pattern at these input sizes");
+        });
   }
 
   @Test
@@ -456,9 +449,8 @@ class CrossEngineBenchmarkPlanTest {
     assertThat(
             MaterializedExecutionPlan.load().entries().stream()
                 .filter(entry -> entry.engineId().equals("re2j-string") && entry.runnable())
-                .filter(
-                    entry ->
-                        entry.workloadId().startsWith("UnicodeFirstCompileBenchmark.firstCompile."))
+                .filter(entry ->
+                    entry.workloadId().startsWith("UnicodeFirstCompileBenchmark.firstCompile."))
                 .filter(entry -> entry.workloadId().endsWith("." + flagSet)))
         .hasSize(expectedRunnable);
   }
@@ -513,9 +505,8 @@ class CrossEngineBenchmarkPlanTest {
 
   @Test
   void re2jCompileAdapterRejectsUnsupportedFlagIdentities() {
-    assertThatThrownBy(
-            () ->
-                RegexEngineVariant.RE2J_STRING.compileForBenchmark("a", "UNICODE_CHARACTER_CLASS"))
+    assertThatThrownBy(() ->
+            RegexEngineVariant.RE2J_STRING.compileForBenchmark("a", "UNICODE_CHARACTER_CLASS"))
         .isInstanceOf(UnsupportedOperationException.class)
         .hasMessageContaining("UNICODE_CHARACTER_CLASS");
     assertThatThrownBy(() -> RegexEngineVariant.RE2J_STRING.compileForBenchmark("a", "unknown"))
@@ -955,19 +946,17 @@ class CrossEngineBenchmarkPlanTest {
 
     assertThat(first.averageTimeTrials())
         .hasSizeGreaterThanOrEqualTo(MINIMUM_SPECIALIZED_AVERAGE_TIME_TRIALS)
-        .allMatch(
-            trial ->
-                trial.workload().measurement().mode()
-                    == DeclarativeBenchmarkPlan.MeasurementMode.AVERAGE_TIME)
+        .allMatch(trial ->
+            trial.workload().measurement().mode()
+                == DeclarativeBenchmarkPlan.MeasurementMode.AVERAGE_TIME)
         .extracting(SpecializedBenchmarkPlan.Trial::id)
         .containsExactlyElementsOf(
             second.averageTimeTrials().stream().map(SpecializedBenchmarkPlan.Trial::id).toList());
     assertThat(first.retainedMemoryTrials())
         .hasSizeGreaterThanOrEqualTo(MINIMUM_SPECIALIZED_RETAINED_MEMORY_TRIALS)
-        .allMatch(
-            trial ->
-                trial.workload().measurement().mode()
-                    == DeclarativeBenchmarkPlan.MeasurementMode.RETAINED_MEMORY)
+        .allMatch(trial ->
+            trial.workload().measurement().mode()
+                == DeclarativeBenchmarkPlan.MeasurementMode.RETAINED_MEMORY)
         .extracting(SpecializedBenchmarkPlan.Trial::id)
         .containsExactlyElementsOf(
             second.retainedMemoryTrials().stream()
@@ -1217,12 +1206,11 @@ class CrossEngineBenchmarkPlanTest {
 
     assertThat(plan.trials(query))
         .isNotEmpty()
-        .allMatch(
-            trial ->
-                trial.workloadId().startsWith("RegexBenchmark.")
-                    && trial.executionVariant().equals("safere-utf8")
-                    && trial.measurement().timingUnit()
-                        == DeclarativeBenchmarkPlan.TimingUnit.NANOSECONDS);
+        .allMatch(trial ->
+            trial.workloadId().startsWith("RegexBenchmark.")
+                && trial.executionVariant().equals("safere-utf8")
+                && trial.measurement().timingUnit()
+                    == DeclarativeBenchmarkPlan.TimingUnit.NANOSECONDS);
   }
 
   @Test
@@ -1236,14 +1224,13 @@ class CrossEngineBenchmarkPlanTest {
       assertThat(
               files
                   .filter(path -> path.toString().endsWith(".java"))
-                  .filter(
-                      path -> {
-                        try {
-                          return Files.readString(path).contains("@Benchmark");
-                        } catch (Exception exception) {
-                          throw new IllegalStateException(exception);
-                        }
-                      })
+                  .filter(path -> {
+                    try {
+                      return Files.readString(path).contains("@Benchmark");
+                    } catch (Exception exception) {
+                      throw new IllegalStateException(exception);
+                    }
+                  })
                   .map(path -> path.getFileName().toString())
                   .sorted())
           .containsExactly(

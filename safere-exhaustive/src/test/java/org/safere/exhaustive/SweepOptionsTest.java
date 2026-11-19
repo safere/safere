@@ -69,30 +69,24 @@ class SweepOptionsTest {
 
   @Test
   void rejectsInvalidOptions() {
-    assertThatThrownBy(
-            () ->
-                SweepOptions.parse(
-                    new String[] {"--range=10:5"},
-                    tempDir.resolve("out"),
-                    "divergences.jsonl",
-                    123))
+    assertThatThrownBy(() ->
+            SweepOptions.parse(
+                new String[] {"--range=10:5"}, tempDir.resolve("out"), "divergences.jsonl", 123))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("--range end");
 
-    assertThatThrownBy(
-            () ->
-                SweepOptions.parse(
-                    new String[] {"--threads=0"}, tempDir.resolve("out"), "divergences.jsonl", 123))
+    assertThatThrownBy(() ->
+            SweepOptions.parse(
+                new String[] {"--threads=0"}, tempDir.resolve("out"), "divergences.jsonl", 123))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("--threads");
 
-    assertThatThrownBy(
-            () ->
-                SweepOptions.parse(
-                    new String[] {"--replay-file=" + tempDir.resolve("missing.jsonl")},
-                    tempDir.resolve("out"),
-                    "divergences.jsonl",
-                    123))
+    assertThatThrownBy(() ->
+            SweepOptions.parse(
+                new String[] {"--replay-file=" + tempDir.resolve("missing.jsonl")},
+                tempDir.resolve("out"),
+                "divergences.jsonl",
+                123))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("--replay-file");
   }

@@ -25,24 +25,22 @@ class AnchoredDfaCachingTest {
   @Test
   void stringAnchorsKeepOrdinaryDfaTransitionsCached() {
     Pattern pattern = Pattern.compile(FRUIT_MARKUP_PATTERN);
-    assertCachedTransitionWork(
-        size -> {
-          String input = nonMatchingInput(size);
-          assertThat(pattern.matcher(input).replaceAll("$1")).isEqualTo(input);
-        });
+    assertCachedTransitionWork(size -> {
+      String input = nonMatchingInput(size);
+      assertThat(pattern.matcher(input).replaceAll("$1")).isEqualTo(input);
+    });
   }
 
   @Test
   void utf8AnchorsKeepOrdinaryDfaTransitionsCached() {
     Prog prog = Compiler.compile(Parser.parse(FRUIT_MARKUP_PATTERN, FLAGS));
     Dfa dfa = new Dfa(prog, 10_000, Dfa.buildSetup(prog), false);
-    assertCachedTransitionWork(
-        size -> {
-          byte[] input = nonMatchingInput(size).getBytes(UTF_8);
-          Dfa.SearchResult result = dfa.doSearch(new Utf8InputScanner(input), true, false);
-          assertThat(result).isNotNull();
-          assertThat(result.matched()).isFalse();
-        });
+    assertCachedTransitionWork(size -> {
+      byte[] input = nonMatchingInput(size).getBytes(UTF_8);
+      Dfa.SearchResult result = dfa.doSearch(new Utf8InputScanner(input), true, false);
+      assertThat(result).isNotNull();
+      assertThat(result.matched()).isFalse();
+    });
   }
 
   @Test
@@ -56,13 +54,12 @@ class AnchoredDfaCachingTest {
   void multilineBeginningAnchorKeepsUtf8TransitionsCached() {
     Prog prog = Compiler.compile(Parser.parse(MULTILINE_LINE_PATTERN, FLAGS));
     Dfa dfa = new Dfa(prog, 10_000, Dfa.buildSetup(prog), false);
-    assertCachedTransitionWork(
-        size -> {
-          byte[] input = multilineNonMatchingInput(size).getBytes(UTF_8);
-          Dfa.SearchResult result = dfa.doSearch(new Utf8InputScanner(input), false, false);
-          assertThat(result).isNotNull();
-          assertThat(result.matched()).isFalse();
-        });
+    assertCachedTransitionWork(size -> {
+      byte[] input = multilineNonMatchingInput(size).getBytes(UTF_8);
+      Dfa.SearchResult result = dfa.doSearch(new Utf8InputScanner(input), false, false);
+      assertThat(result).isNotNull();
+      assertThat(result.matched()).isFalse();
+    });
   }
 
   @Test
@@ -78,13 +75,12 @@ class AnchoredDfaCachingTest {
   void multilineEndingAnchorKeepsUtf8LineFeedTransitionsCached() {
     Prog prog = Compiler.compile(Parser.parse("(?m)(?:x+$)y", FLAGS));
     Dfa dfa = new Dfa(prog, 10_000, Dfa.buildSetup(prog), false);
-    assertCachedTransitionWork(
-        size -> {
-          byte[] input = "xxx\n".repeat(size).getBytes(UTF_8);
-          Dfa.SearchResult result = dfa.doSearch(new Utf8InputScanner(input), false, false);
-          assertThat(result).isNotNull();
-          assertThat(result.matched()).isFalse();
-        });
+    assertCachedTransitionWork(size -> {
+      byte[] input = "xxx\n".repeat(size).getBytes(UTF_8);
+      Dfa.SearchResult result = dfa.doSearch(new Utf8InputScanner(input), false, false);
+      assertThat(result).isNotNull();
+      assertThat(result.matched()).isFalse();
+    });
   }
 
   private static void assertCachedTransitionWork(IntConsumer operation) {

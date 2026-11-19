@@ -120,28 +120,24 @@ class LineAnchorRegionTest {
     regions.add(new InputRegion("abc", 1, 2));
     regions.add(new InputRegion("abc", 1, 1));
     return regions.stream()
-        .flatMap(
-            region ->
-                Stream.of("", "(.)?", "([\\s\\S])?", "([\\s\\S])*?", "([\\s\\S])")
-                    .flatMap(
-                        prefix ->
-                            Stream.of(
-                                    "^",
-                                    "(?m:^)",
-                                    "(?dm:^)",
-                                    "$",
-                                    "\\Z",
-                                    "\\z",
-                                    "(?m:$)",
-                                    "(?dm:$)",
-                                    "(?d:$)",
-                                    "(?d:\\Z)",
-                                    "(?d:(?-d:$))")
-                                .flatMap(
-                                    anchor ->
-                                        operations.stream()
-                                            .map(
-                                                op -> Arguments.of(region, prefix + anchor, op)))));
+        .flatMap(region ->
+            Stream.of("", "(.)?", "([\\s\\S])?", "([\\s\\S])*?", "([\\s\\S])")
+                .flatMap(prefix ->
+                    Stream.of(
+                            "^",
+                            "(?m:^)",
+                            "(?dm:^)",
+                            "$",
+                            "\\Z",
+                            "\\z",
+                            "(?m:$)",
+                            "(?dm:$)",
+                            "(?d:$)",
+                            "(?d:\\Z)",
+                            "(?d:(?-d:$))")
+                        .flatMap(anchor ->
+                            operations.stream()
+                                .map(op -> Arguments.of(region, prefix + anchor, op)))));
   }
 
   private static Matcher configure(
@@ -240,16 +236,14 @@ class LineAnchorRegionTest {
 
   private static List<List<Capture>> utf8Trace(String input, List<List<Capture>> trace) {
     return trace.stream()
-        .map(
-            match ->
-                match.stream()
-                    .map(
-                        capture ->
-                            new Capture(
-                                byteOffset(input, capture.start()),
-                                byteOffset(input, capture.end()),
-                                capture.text()))
-                    .toList())
+        .map(match ->
+            match.stream()
+                .map(capture ->
+                    new Capture(
+                        byteOffset(input, capture.start()),
+                        byteOffset(input, capture.end()),
+                        capture.text()))
+                .toList())
         .toList();
   }
 

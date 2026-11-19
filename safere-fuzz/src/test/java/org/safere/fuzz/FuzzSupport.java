@@ -27,12 +27,11 @@ final class FuzzSupport {
   private static final String JDK_ORACLE_TIMEOUT_PROPERTY = "safere.fuzz.jdkOracleTimeoutMillis";
   private static final long DEFAULT_JDK_ORACLE_TIMEOUT_MILLIS = 250;
   private static final ExecutorService JDK_ORACLE_EXECUTOR =
-      Executors.newCachedThreadPool(
-          runnable -> {
-            Thread thread = new Thread(runnable, "safere-jdk-regex-oracle");
-            thread.setDaemon(true);
-            return thread;
-          });
+      Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "safere-jdk-regex-oracle");
+        thread.setDaemon(true);
+        return thread;
+      });
 
   private static final int[] FLAGS = {
     org.safere.Pattern.UNIX_LINES,

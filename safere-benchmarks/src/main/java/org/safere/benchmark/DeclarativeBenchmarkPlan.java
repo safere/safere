@@ -928,9 +928,8 @@ final class DeclarativeBenchmarkPlan {
     TrialExclusion {
       engineIds = List.copyOf(engineIds);
       Map<String, Set<ParameterValue>> copied = new LinkedHashMap<>();
-      when.forEach(
-          (axis, values) ->
-              copied.put(axis, Collections.unmodifiableSet(new LinkedHashSet<>(values))));
+      when.forEach((axis, values) ->
+          copied.put(axis, Collections.unmodifiableSet(new LinkedHashSet<>(values))));
       when = Collections.unmodifiableMap(copied);
     }
 
@@ -1125,26 +1124,24 @@ final class DeclarativeBenchmarkPlan {
             List<String> values = new ArrayList<>();
             value
                 .getAsJsonArray()
-                .forEach(
-                    item -> {
-                      if (!isString(item)) {
-                        throw new IllegalArgumentException();
-                      }
-                      values.add(item.getAsString());
-                    });
+                .forEach(item -> {
+                  if (!isString(item)) {
+                    throw new IllegalArgumentException();
+                  }
+                  values.add(item.getAsString());
+                });
             yield new RecipeStringList(values);
           }
           case INTEGER_LIST -> {
             List<Integer> values = new ArrayList<>();
             value
                 .getAsJsonArray()
-                .forEach(
-                    item -> {
-                      if (!isIntegerPrimitive(item)) {
-                        throw new IllegalArgumentException();
-                      }
-                      values.add(item.getAsBigDecimal().intValueExact());
-                    });
+                .forEach(item -> {
+                  if (!isIntegerPrimitive(item)) {
+                    throw new IllegalArgumentException();
+                  }
+                  values.add(item.getAsBigDecimal().intValueExact());
+                });
             yield new RecipeIntegerList(values);
           }
         };
@@ -1205,10 +1202,9 @@ final class DeclarativeBenchmarkPlan {
         Map<String, ParameterValue> parameters, String inputId, String argumentName) {
       return new RecipeStringList(
           values.stream()
-              .map(
-                  value ->
-                      DeclarativeBenchmarkPlan.substituteValue(
-                          value, parameters, inputId + " recipe " + argumentName))
+              .map(value ->
+                  DeclarativeBenchmarkPlan.substituteValue(
+                      value, parameters, inputId + " recipe " + argumentName))
               .toList());
     }
   }
@@ -1461,11 +1457,10 @@ final class DeclarativeBenchmarkPlan {
           List<Integer> codePoints = integers(arguments, "codePoints");
           if (codePoints.isEmpty()
               || codePoints.stream()
-                  .anyMatch(
-                      codePoint ->
-                          !Character.isValidCodePoint(codePoint)
-                              || (codePoint >= Character.MIN_SURROGATE
-                                  && codePoint <= Character.MAX_SURROGATE))) {
+                  .anyMatch(codePoint ->
+                      !Character.isValidCodePoint(codePoint)
+                          || (codePoint >= Character.MIN_SURROGATE
+                              && codePoint <= Character.MAX_SURROGATE))) {
             throw new IllegalArgumentException(
                 "randomCodePoints recipe requires valid Unicode scalar codePoints");
           }
@@ -2446,13 +2441,12 @@ final class DeclarativeBenchmarkPlan {
         List<String> result = new ArrayList<>();
         value
             .getAsJsonArray()
-            .forEach(
-                item -> {
-                  if (!isString(item)) {
-                    throw new IllegalArgumentException();
-                  }
-                  result.add(item.getAsString());
-                });
+            .forEach(item -> {
+              if (!isString(item)) {
+                throw new IllegalArgumentException();
+              }
+              result.add(item.getAsString());
+            });
         return List.copyOf(result);
       } catch (RuntimeException exception) {
         throw new IllegalArgumentException(

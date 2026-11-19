@@ -121,15 +121,14 @@ class NfaProgramPreparationTest {
       List<Future<Prog>> results = new ArrayList<>();
       for (int i = 0; i < threads; i++) {
         results.add(
-            executor.submit(
-                () -> {
-                  ready.countDown();
-                  start.await();
-                  assertThat(pattern.matcher("cherry").matches()).isTrue();
-                  Prog selected = pattern.nfaProg(pattern.prog());
-                  assertThat(selected.didFlatten()).isTrue();
-                  return selected;
-                }));
+            executor.submit(() -> {
+              ready.countDown();
+              start.await();
+              assertThat(pattern.matcher("cherry").matches()).isTrue();
+              Prog selected = pattern.nfaProg(pattern.prog());
+              assertThat(selected.didFlatten()).isTrue();
+              return selected;
+            }));
       }
       ready.await();
       start.countDown();

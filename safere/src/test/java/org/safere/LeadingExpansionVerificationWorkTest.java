@@ -57,16 +57,15 @@ class LeadingExpansionVerificationWorkTest {
             () -> assertThat(pattern.matcher(input).replaceAll(m -> "X")).isEqualTo(input));
         operations.put("split", () -> assertThat(pattern.split(input)).containsExactly(input));
         long reference = work(operations.get("String find"));
-        operations.forEach(
-            (name, operation) -> {
-              long actual = work(operation);
-              if (actual > reference * 2 + 100) {
-                failures.add(
-                    String.format(
-                        "%s: %s at %s repetitions: %s units versus %s for find()",
-                        regex, name, size, actual, reference));
-              }
-            });
+        operations.forEach((name, operation) -> {
+          long actual = work(operation);
+          if (actual > reference * 2 + 100) {
+            failures.add(
+                String.format(
+                    "%s: %s at %s repetitions: %s units versus %s for find()",
+                    regex, name, size, actual, reference));
+          }
+        });
       }
     }
     assertThat(failures).as("diagnostics=%s", diagnostics).isEmpty();

@@ -46,19 +46,18 @@ class InnerLiteralSearchWorkTest {
   }
 
   private static long findWork(Pattern pattern, String input, String match, boolean utf8) {
-    return WorkCounter.countForwardDfaStepsForTesting(
-        () -> {
-          if (utf8) {
-            Utf8Matcher matcher = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
-            assertThat(matcher.find()).isTrue();
-            assertThat(matcher.start())
-                .isEqualTo(input.getBytes(UTF_8).length - match.getBytes(UTF_8).length);
-          } else {
-            Matcher matcher = pattern.matcher(input);
-            assertThat(matcher.find()).isTrue();
-            assertThat(matcher.start()).isEqualTo(input.length() - match.length());
-          }
-        });
+    return WorkCounter.countForwardDfaStepsForTesting(() -> {
+      if (utf8) {
+        Utf8Matcher matcher = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+        assertThat(matcher.find()).isTrue();
+        assertThat(matcher.start())
+            .isEqualTo(input.getBytes(UTF_8).length - match.getBytes(UTF_8).length);
+      } else {
+        Matcher matcher = pattern.matcher(input);
+        assertThat(matcher.find()).isTrue();
+        assertThat(matcher.start()).isEqualTo(input.length() - match.length());
+      }
+    });
   }
 
   @Test

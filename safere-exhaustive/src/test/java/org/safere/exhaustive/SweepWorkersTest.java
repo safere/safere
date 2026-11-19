@@ -39,14 +39,13 @@ class SweepWorkersTest {
   void checkedExceptionsPropagateAsIoException() {
     IOException failure = new IOException("boom");
 
-    assertThatThrownBy(
-            () ->
-                SweepWorkers.run(
-                    1,
-                    "test-",
-                    workerIndex -> {
-                      throw failure;
-                    }))
+    assertThatThrownBy(() ->
+            SweepWorkers.run(
+                1,
+                "test-",
+                workerIndex -> {
+                  throw failure;
+                }))
         .isSameAs(failure);
   }
 
@@ -54,14 +53,13 @@ class SweepWorkersTest {
   void runtimeExceptionsPropagateWithoutWrapping() {
     IllegalStateException failure = new IllegalStateException("boom");
 
-    assertThatThrownBy(
-            () ->
-                SweepWorkers.run(
-                    2,
-                    "test-",
-                    workerIndex -> {
-                      throw failure;
-                    }))
+    assertThatThrownBy(() ->
+            SweepWorkers.run(
+                2,
+                "test-",
+                workerIndex -> {
+                  throw failure;
+                }))
         .isSameAs(failure);
   }
 
@@ -81,15 +79,14 @@ class SweepWorkersTest {
   void streamingLineWorkerExceptionsPropagateWithoutWrapping() {
     IllegalStateException failure = new IllegalStateException("boom");
 
-    assertThatThrownBy(
-            () ->
-                SweepWorkers.runStreamingLines(
-                    2,
-                    "test-",
-                    new BufferedReader(new StringReader("a\nb\n")),
-                    line -> {
-                      throw failure;
-                    }))
+    assertThatThrownBy(() ->
+            SweepWorkers.runStreamingLines(
+                2,
+                "test-",
+                new BufferedReader(new StringReader("a\nb\n")),
+                line -> {
+                  throw failure;
+                }))
         .isSameAs(failure);
   }
 
