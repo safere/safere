@@ -49,7 +49,9 @@ class BenchmarkOperationTest {
             RegexEngineVariant.SAFERE_UTF8,
             RegexEngineVariant.JDK_STRING)
         .flatMap(
-            variant -> Stream.of(null, "", "independent").map(mode -> Arguments.of(variant, mode)));
+            variant ->
+                Stream.of(null, "", "regionBounds", "independent")
+                    .map(mode -> Arguments.of(variant, mode)));
   }
 
   @ParameterizedTest
