@@ -913,21 +913,27 @@ class CrossEngineBenchmarkPlanTest {
   void coldFirstUseFixturesMatchJdkCaptureBoundsInBothRepresentations() {
     BenchmarkData data = BenchmarkData.get();
     for (CrossEngineWorkload workload : CrossEngineBenchmarkPlan.load().workloads()) {
-      if (!workload.id().startsWith("InitializationLatencyBenchmark.firstFind.")) {
+      if (!workload.id().startsWith("InitializationLatencyBenchmark.")) {
         continue;
       }
       String text = data.getInputString(workload.inputKeys().getFirst());
       java.util.regex.Matcher expected =
           java.util.regex.Pattern.compile(workload.patterns().getFirst()).matcher(text);
-      assertThat(expected.find()).as(workload.id()).isTrue();
-      assertThat(expected.start(1)).isNotNegative();
+      boolean found = expected.find();
+      assertThat(found).as(workload.id()).isEqualTo(workload.expected());
+      if (found) {
+        assertThat(expected.start(1)).isNotNegative();
+      }
       for (RegexEngineVariant variant :
           List.of(RegexEngineVariant.SAFERE_STRING, RegexEngineVariant.SAFERE_UTF8)) {
         try (RegexEngineVariant.CompiledRegex pattern =
             variant.compile(workload.patterns().getFirst())) {
           RegexEngineVariant.MatchCursor actual =
               pattern.matcher(variant.prepareInputs(data, workload.inputKeys()).getFirst());
-          assertThat(actual.find()).as("%s, %s", workload.id(), variant).isTrue();
+          assertThat(actual.find()).as("%s, %s", workload.id(), variant).isEqualTo(found);
+          if (!found) {
+            continue;
+          }
           for (int group = 0; group <= 1; group++) {
             int start = expected.start(group);
             int end = expected.end(group);

@@ -55,7 +55,14 @@ the first `find()`, and capture participation. `InitializationLatencyBenchmark.c
 includes compilation in that same timed operation. Both read capture group 1 through the matcher
 API, including for UTF-8; they do not use matcher-free Boolean search. Initial cases cover ASCII
 word classes, Unicode word/property classes, and ASCII classes combined with grapheme consumption
-or grapheme boundaries. These workloads are part of the regular collection plan.
+or grapheme boundaries. The long first-search controls place a capture near the end of mixed
+text or exercise a miss through the same pattern. The compile-plus-first-use cases include
+a Java-derived character class. These workloads are part of the regular collection plan.
+
+The standard cold run uses ten forks with one sample per fork. Compare the per-fork samples
+and medians alongside the JMH mean and confidence interval. Interleave A/B runs or repeat them
+in both orders to check for drift. The runner fails on errors, including an unexpected measured
+result reported by the cold validation step.
 
 ```bash
 ./run-java-benchmarks.sh --fastbuild --first-compile CrossEngineColdStartBenchmark.run -- \

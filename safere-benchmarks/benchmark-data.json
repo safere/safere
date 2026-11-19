@@ -4745,6 +4745,28 @@
         "kind": "literal",
         "text": "aé"
       }
+    },
+    {
+      "id": "initialization.firstUse.long.{outcome}",
+      "axes": {
+        "outcome": [
+          {
+            "id": "hit",
+            "value": " log:42"
+          },
+          {
+            "id": "miss",
+            "value": " log:xx"
+          }
+        ]
+      },
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "é log:xx 42 😀 ",
+        "suffix": "{outcome}",
+        "length": 8192
+      },
+      "shared": true
     }
   ],
   "workloads": [
@@ -21493,6 +21515,49 @@
       }
     },
     {
+      "id": "InitializationLatencyBenchmark.firstFind.long.{outcome}",
+      "operation": "findGroupPresent",
+      "patterns": [
+        "(\\w+):[0-9]+"
+      ],
+      "inputs": [
+        "initialization.firstUse.long.{outcome}"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "axis": "outcome"
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "axes": {
+        "outcome": [
+          {
+            "id": "hit",
+            "value": true
+          },
+          {
+            "id": "miss",
+            "value": false
+          }
+        ]
+      }
+    },
+    {
       "id": "InitializationLatencyBenchmark.compileAndFirstFind.{regex}",
       "operation": "compileAndFindGroupPresent",
       "patterns": [
@@ -21544,6 +21609,18 @@
           {
             "id": "unicodeProperty",
             "value": "(\\p{L}+)"
+          },
+          {
+            "id": "javaLowerCase",
+            "value": {
+              "java": "(\\p{javaLowerCase}+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java-derived character properties"
+                }
+              }
+            }
           },
           {
             "id": "graphemeCluster",
