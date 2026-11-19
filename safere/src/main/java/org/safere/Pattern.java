@@ -761,7 +761,7 @@ public final class Pattern implements Serializable {
       return result.matched();
     }
     return Nfa.search(
-            prog,
+            nfaProg(prog),
             scanner,
             searchStart,
             length,
@@ -874,7 +874,7 @@ public final class Pattern implements Serializable {
         MatchStrategy.DFA, StrategyDisposition.FALLBACK, StrategyReason.DFA_BUDGET_EXCEEDED);
     boolean matched =
         Nfa.search(
-                prog,
+                nfaProg(prog),
                 scanner,
                 searchStart,
                 length,
@@ -1119,7 +1119,7 @@ public final class Pattern implements Serializable {
     }
     boolean matched =
         Nfa.search(
-                prog,
+                nfaProg(prog),
                 scanner,
                 start,
                 scanner.length(),
@@ -1430,7 +1430,7 @@ public final class Pattern implements Serializable {
       return result.matched();
     }
     return Nfa.search(
-            prog,
+            nfaProg(prog),
             scanner,
             searchStart,
             length,
@@ -1678,6 +1678,19 @@ public final class Pattern implements Serializable {
       }
     }
     return p;
+  }
+
+  /**
+   * Reuses the shared flat program when already prepared and suitable for scalar NFA execution.
+   * This accessor never prepares an artifact: paths that bypass DFA preparation keep the graph
+   * interpreter, as do programs requiring progress or grapheme state.
+   */
+  Prog nfaProg(Prog source) {
+    if (source != prog || !source.supportsFlatNfa()) {
+      return source;
+    }
+    Prog prepared = flatProg;
+    return prepared != null ? prepared : source;
   }
 
   Prog flatDfaProg() {

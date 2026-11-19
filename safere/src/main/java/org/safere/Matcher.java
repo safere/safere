@@ -3130,7 +3130,9 @@ public final class Matcher implements MatchResult {
       nfaBorrowed = true;
     }
 
-    Nfa nfa = Nfa.getOrCreate(cachedNfa, prog, context, ncapture, longestMode, endmatch);
+    Nfa nfa =
+        Nfa.getOrCreate(
+            cachedNfa, parentPattern.nfaProg(prog), context, ncapture, longestMode, endmatch);
     int[] result = nfa.runSearch(anchored, nfaKind, nsubmatch, endPos, reuseGroups);
     cachedNfa = nfa;
     Pattern.returnNfa(threadCache(), nfa);

@@ -48,6 +48,7 @@ final class Prog {
   private boolean hasGraphemeClusterInstruction;
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
+  private boolean flatNfaSupported;
 
   /** Creates an empty program. */
   public Prog() {}
@@ -138,6 +139,14 @@ final class Prog {
     hasGraphemeClusterInstruction = computeHasGraphemeClusterInstruction();
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
+    flatNfaSupported = !hasGraphemeSemantics;
+    for (Inst inst : instArray) {
+      if (inst.op == InstOp.ALT_MATCH
+          || inst.op == InstOp.LOOP_ENTER
+          || inst.op == InstOp.PROGRESS_CHECK) {
+        flatNfaSupported = false;
+      }
+    }
     lineStartUnixLines = true;
     for (Inst inst : instArray) {
       if (inst.op == InstOp.EMPTY_WIDTH && (inst.arg & EmptyOp.BEGIN_LINE) != 0) {
@@ -730,6 +739,12 @@ final class Prog {
     copy.flatten();
     copy.freeze();
     return copy;
+  }
+
+  /** Whether ordinary scalar NFA execution can use this program's flattened representation. */
+  boolean supportsFlatNfa() {
+    // The compiler assigns loop registers after freeze().
+    return flatNfaSupported && numLoopRegs == 0;
   }
 
   public void flatten() {

@@ -1,0 +1,1455 @@
+{
+  "schemaVersion": 2,
+  "configuration": {
+    "collection": {
+      "allocationWorkloadPrefixes": []
+    }
+  },
+  "inputs": [
+    {
+      "id": "fruitShort",
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "Here are the apples to show for banana in this session.",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": 1000
+      },
+      "shared": true
+    },
+    {
+      "id": "fruitLong",
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "Here are the apples to show for banana in this session.",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": 100000
+      },
+      "shared": true
+    },
+    {
+      "id": "fruitReject",
+      "recipe": {
+        "kind": "repeatToLength",
+        "length": 1000,
+        "unit": "No fruit here. "
+      },
+      "shared": true
+    },
+    {
+      "id": "word",
+      "recipe": {
+        "kind": "literal",
+        "text": "one two three"
+      },
+      "shared": true
+    },
+    {
+      "id": "nullable",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "a",
+        "suffix": "b",
+        "length": 128
+      },
+      "shared": true
+    },
+    {
+      "id": "grapheme",
+      "recipe": {
+        "kind": "literal",
+        "text": "a\u0301b\ud83d\ude00a\u0301b"
+      },
+      "shared": true
+    },
+    {
+      "id": "literal",
+      "recipe": {
+        "kind": "literal",
+        "text": "cherry"
+      },
+      "shared": true
+    }
+  ],
+  "workloads": [
+    {
+      "id": "NfaInitializationBenchmark.fruitShort.compile",
+      "operation": "compile",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [],
+      "resultConsumption": "compiledObject",
+      "measurement": {
+        "mode": "compileOnly",
+        "timingUnit": "nanoseconds",
+        "constraints": []
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ]
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitShort.compileAndFind",
+      "operation": "compileAndFind",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitShort"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitShort.compileAndFindGroup",
+      "operation": "compileAndFindGroup",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitShort"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "group": 1
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitShort.compileAndReplaceAll",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitShort"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitShort.replaceAll",
+      "operation": "replaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitShort"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitShort.coldFirst",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitShort"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitLong.compile",
+      "operation": "compile",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [],
+      "resultConsumption": "compiledObject",
+      "measurement": {
+        "mode": "compileOnly",
+        "timingUnit": "nanoseconds",
+        "constraints": []
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ]
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitLong.compileAndFind",
+      "operation": "compileAndFind",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitLong"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitLong.compileAndFindGroup",
+      "operation": "compileAndFindGroup",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitLong"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "group": 1
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitLong.compileAndReplaceAll",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitLong"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitLong.replaceAll",
+      "operation": "replaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitLong"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitLong.coldFirst",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitLong"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitReject.compile",
+      "operation": "compile",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [],
+      "resultConsumption": "compiledObject",
+      "measurement": {
+        "mode": "compileOnly",
+        "timingUnit": "nanoseconds",
+        "constraints": []
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ]
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitReject.compileAndFind",
+      "operation": "compileAndFind",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitReject"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitReject.compileAndFindGroup",
+      "operation": "compileAndFindGroup",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitReject"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "group": 1
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitReject.compileAndReplaceAll",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitReject"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitReject.replaceAll",
+      "operation": "replaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitReject"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.fruitReject.coldFirst",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*"
+      ],
+      "inputs": [
+        "fruitReject"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.word.compile",
+      "operation": "compile",
+      "patterns": [
+        "([a-z]+)"
+      ],
+      "inputs": [],
+      "resultConsumption": "compiledObject",
+      "measurement": {
+        "mode": "compileOnly",
+        "timingUnit": "nanoseconds",
+        "constraints": []
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ]
+    },
+    {
+      "id": "NfaInitializationBenchmark.word.compileAndFind",
+      "operation": "compileAndFind",
+      "patterns": [
+        "([a-z]+)"
+      ],
+      "inputs": [
+        "word"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.word.compileAndFindGroup",
+      "operation": "compileAndFindGroup",
+      "patterns": [
+        "([a-z]+)"
+      ],
+      "inputs": [
+        "word"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "group": 1
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.word.compileAndReplaceAll",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "([a-z]+)"
+      ],
+      "inputs": [
+        "word"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.word.replaceAll",
+      "operation": "replaceAll",
+      "patterns": [
+        "([a-z]+)"
+      ],
+      "inputs": [
+        "word"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.word.coldFirst",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "([a-z]+)"
+      ],
+      "inputs": [
+        "word"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.nullable.compile",
+      "operation": "compile",
+      "patterns": [
+        "((a?)*)(b)"
+      ],
+      "inputs": [],
+      "resultConsumption": "compiledObject",
+      "measurement": {
+        "mode": "compileOnly",
+        "timingUnit": "nanoseconds",
+        "constraints": []
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ]
+    },
+    {
+      "id": "NfaInitializationBenchmark.nullable.compileAndFind",
+      "operation": "compileAndFind",
+      "patterns": [
+        "((a?)*)(b)"
+      ],
+      "inputs": [
+        "nullable"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.nullable.compileAndFindGroup",
+      "operation": "compileAndFindGroup",
+      "patterns": [
+        "((a?)*)(b)"
+      ],
+      "inputs": [
+        "nullable"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "group": 1
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.nullable.compileAndReplaceAll",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "((a?)*)(b)"
+      ],
+      "inputs": [
+        "nullable"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.nullable.replaceAll",
+      "operation": "replaceAll",
+      "patterns": [
+        "((a?)*)(b)"
+      ],
+      "inputs": [
+        "nullable"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.nullable.coldFirst",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "((a?)*)(b)"
+      ],
+      "inputs": [
+        "nullable"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.grapheme.compile",
+      "operation": "compile",
+      "patterns": [
+        "(\\X|a)+"
+      ],
+      "inputs": [],
+      "resultConsumption": "compiledObject",
+      "measurement": {
+        "mode": "compileOnly",
+        "timingUnit": "nanoseconds",
+        "constraints": []
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ]
+    },
+    {
+      "id": "NfaInitializationBenchmark.grapheme.compileAndFind",
+      "operation": "compileAndFind",
+      "patterns": [
+        "(\\X|a)+"
+      ],
+      "inputs": [
+        "grapheme"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.grapheme.compileAndFindGroup",
+      "operation": "compileAndFindGroup",
+      "patterns": [
+        "(\\X|a)+"
+      ],
+      "inputs": [
+        "grapheme"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "group": 1
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.grapheme.compileAndReplaceAll",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(\\X|a)+"
+      ],
+      "inputs": [
+        "grapheme"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.grapheme.replaceAll",
+      "operation": "replaceAll",
+      "patterns": [
+        "(\\X|a)+"
+      ],
+      "inputs": [
+        "grapheme"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.grapheme.coldFirst",
+      "operation": "compileAndReplaceAll",
+      "patterns": [
+        "(\\X|a)+"
+      ],
+      "inputs": [
+        "grapheme"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "arguments": {
+        "replacement": "<$1>"
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.literal.compileAndMatches",
+      "operation": "compileAndMatches",
+      "patterns": [
+        "apple|banana|cherry"
+      ],
+      "inputs": [
+        "literal"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.literal.matches",
+      "operation": "matches",
+      "patterns": [
+        "apple|banana|cherry"
+      ],
+      "inputs": [
+        "literal"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "NfaInitializationBenchmark.literal.coldFirst",
+      "operation": "compileAndMatches",
+      "patterns": [
+        "apple|banana|cherry"
+      ],
+      "inputs": [
+        "literal"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This initialization experiment compares SafeRE revisions; competitor capture semantics are outside its scope."
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    }
+  ]
+}

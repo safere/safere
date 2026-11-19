@@ -40,7 +40,7 @@ public class CrossEngineColdStartBenchmark {
             crossEngineColdStartTrial, CrossEngineWorkload.TimingGroup.MILLISECONDS);
   }
 
-  /** Releases resources retained by the selected execution variant. */
+  /** Validates the measured result and releases retained resources. */
   @TearDown
   public void tearDown() {
     try {

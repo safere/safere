@@ -110,7 +110,17 @@ final class CrossEngineTrialRunner implements AutoCloseable {
               ? new ColdResult(trial)
               : null;
       BenchmarkOperation.BenchmarkTask task;
-      if (coldResult != null) {
+      if (coldResult != null
+          && workload.operation() == BenchmarkOperation.COMPILE_AND_REPLACE_ALL) {
+        task =
+            blackhole -> {
+              RegexEngineVariant.ReplacementOutput actual =
+                  BenchmarkOperation.compileAndReplaceAll(
+                      trial.variant(), patternSources.getFirst(), inputs.getFirst(), replacement);
+              coldResult.record(actual);
+              actual.consume(blackhole);
+            };
+      } else if (coldResult != null) {
         int[] groups = workload.groups();
         task =
             blackhole -> {
@@ -130,8 +140,7 @@ final class CrossEngineTrialRunner implements AutoCloseable {
                           workload.seed(),
                           workload.count(),
                           workload.mode());
-              coldResult.actual = actual;
-              coldResult.completed = true;
+              coldResult.record(actual);
               blackhole.consume(actual);
             };
       } else {
@@ -165,7 +174,12 @@ final class CrossEngineTrialRunner implements AutoCloseable {
 
   void validateMeasuredResult() {
     if (coldResult != null && coldResult.completed) {
-      coldResult.trial.validate(coldResult.actual);
+      Object actual = coldResult.actual;
+      // Decode native replacement output only after timing, using the measured result.
+      if (actual instanceof RegexEngineVariant.ReplacementOutput replacement) {
+        actual = replacement.validationValue();
+      }
+      coldResult.trial.validate(actual);
     }
   }
 
@@ -176,6 +190,11 @@ final class CrossEngineTrialRunner implements AutoCloseable {
 
     ColdResult(CrossEngineBenchmarkPlan.Trial trial) {
       this.trial = trial;
+    }
+
+    void record(Object actual) {
+      this.actual = actual;
+      completed = true;
     }
   }
 
