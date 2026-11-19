@@ -2937,8 +2937,15 @@ public final class Matcher implements MatchResult {
       int bitStateEnd = speculate ? startPos + BitState.SPECULATIVE_WINDOW_SIZE : endPos;
       BitState bs =
           BitState.getOrCreate(
-              cachedBitState, prog, text, startPos, bitStateEnd, ncap, longest, endMatchEffective);
-      bs.setPreviousMatchEnd(previousMatchEndOnInput(text));
+              cachedBitState,
+              prog,
+              text,
+              startPos,
+              bitStateEnd,
+              ncap,
+              longest,
+              endMatchEffective,
+              previousMatchEndOnInput(text));
       int[] destBuf =
           reuseGroups != null && reuseGroups.length >= ncap ? reuseGroups : bitStateResult;
       if (destBuf == null || destBuf.length < ncap) {

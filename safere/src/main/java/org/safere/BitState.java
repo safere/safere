@@ -208,13 +208,7 @@ final class BitState {
     }
 
     int ncap = 2 * Math.max(nsubmatch, 1);
-    BitState bs;
-    if (cached != null && cached.canReuse(prog, text, startPos, textLen)) {
-      bs = cached;
-      bs.reset(text, startPos, textLen, ncap, longest, endMatch);
-    } else {
-      bs = new BitState(prog, text, startPos, textLen, ncap, longest, endMatch);
-    }
+    BitState bs = getOrCreate(cached, prog, text, startPos, textLen, ncap, longest, endMatch);
 
     return bs.doSearch(startPos, searchLimit, anchored, resultBuffer);
   }
@@ -249,11 +243,27 @@ final class BitState {
       int ncap,
       boolean longest,
       boolean endMatch) {
+    if (prog.hasPreviousMatchEnd()) {
+      throw new IllegalArgumentException("Previous-match assertions require an explicit boundary");
+    }
+    return getOrCreate(cached, prog, text, startPos, endPos, ncap, longest, endMatch, 0);
+  }
+
+  static BitState getOrCreate(
+      BitState cached,
+      Prog prog,
+      InputScanner text,
+      int startPos,
+      int endPos,
+      int ncap,
+      boolean longest,
+      boolean endMatch,
+      int previousMatchEnd) {
     if (cached != null && cached.canReuse(prog, text, startPos, endPos)) {
-      cached.reset(text, startPos, endPos, ncap, longest, endMatch);
+      cached.reset(text, startPos, endPos, ncap, longest, endMatch, previousMatchEnd);
       return cached;
     }
-    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch);
+    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch, previousMatchEnd);
   }
 
   /**
@@ -374,10 +384,6 @@ final class BitState {
   private int visitedHi;
   private int previousMatchEnd;
 
-  void setPreviousMatchEnd(int position) {
-    previousMatchEnd = position;
-  }
-
   private int deadLo;
   private int deadHi;
 
@@ -451,11 +457,12 @@ final class BitState {
       int endPos,
       int ncap,
       boolean longest,
-      boolean endMatch) {
+      boolean endMatch,
+      int previousMatchEnd) {
     this.prog = prog;
     this.instructions = prog.frozenInstructions();
     this.text = text;
-    this.previousMatchEnd = startPos;
+    this.previousMatchEnd = previousMatchEnd;
     this.textLen = text.length();
     this.basePos = startPos;
     this.endPos = endPos;
@@ -974,9 +981,15 @@ final class BitState {
    * #canReuse} first.
    */
   private void reset(
-      InputScanner text, int startPos, int endPos, int ncap, boolean longest, boolean endMatch) {
+      InputScanner text,
+      int startPos,
+      int endPos,
+      int ncap,
+      boolean longest,
+      boolean endMatch,
+      int previousMatchEnd) {
     this.text = text;
-    this.previousMatchEnd = startPos;
+    this.previousMatchEnd = previousMatchEnd;
     this.textLen = text.length();
     this.basePos = startPos;
     this.endPos = endPos;

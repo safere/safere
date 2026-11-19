@@ -2343,6 +2343,10 @@ public final class Pattern implements Serializable {
       features.add(PatternFeature.GRAPHEME);
       limitations.add(PatternLimitation.GRAPHEME_REQUIRES_EXACT_ENGINE);
     }
+    if (prog.hasPreviousMatchEnd()) {
+      features.add(PatternFeature.PREVIOUS_MATCH_BOUNDARY);
+      limitations.add(PatternLimitation.PREVIOUS_MATCH_BOUNDARY_REQUIRES_EXACT_ENGINE);
+    }
     if ((flags & CASE_INSENSITIVE) != 0) {
       features.add(PatternFeature.CASE_INSENSITIVE);
     }

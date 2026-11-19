@@ -7,6 +7,7 @@ package org.safere;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -14,6 +15,25 @@ import org.junit.jupiter.api.Test;
 
 @DisabledForCrosscheck("Uses package-private engines, UTF-8 APIs, and work accounting")
 class PreviousMatchBoundaryEngineTest {
+  @Test
+  void engineEntryPointsWithoutBoundaryRejectPreviousMatchAssertions() {
+    Prog prog = Pattern.compile("\\Ga").prog();
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> BitState.getOrCreate(null, prog, "ba", 1, 2, 2, false, false));
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () -> Nfa.search(prog, "ba", 1, Nfa.Anchor.ANCHORED, Nfa.MatchKind.FIRST_MATCH, 1));
+  }
+
+  @Test
+  void analysisReportsThePreviousMatchBoundaryAndItsEngineLimitation() {
+    PatternAnalysis analysis = Pattern.compile("\\Ga").analysis();
+    assertThat(analysis.features()).contains(PatternFeature.PREVIOUS_MATCH_BOUNDARY);
+    assertThat(analysis.limitations())
+        .contains(PatternLimitation.PREVIOUS_MATCH_BOUNDARY_REQUIRES_EXACT_ENGINE);
+    assertThat(analysis.capabilities()).doesNotContain(PatternCapability.DFA_BOUNDARY_SEARCH);
+  }
+
   @Test
   void stringAndUtf8EnginesAgreeForMultibyteTokensAndRegions() {
     String input = "é😀,α,!tail";

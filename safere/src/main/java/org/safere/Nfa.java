@@ -512,6 +512,25 @@ final class Nfa {
       MatchKind kind,
       int nsubmatch,
       GraphemeSupport.Context graphemeContext) {
+    EngineContext context =
+        EngineContext.create(
+            prog,
+            text,
+            startPos,
+            searchLimit,
+            endPos,
+            consumeRegionStart,
+            boundaryRegionStart,
+            boundaryEndPos,
+            anchorEndPos,
+            emptyAnchorStartPos,
+            emptyAnchorEndPos,
+            graphemeContext);
+    return search(prog, context, anchor, kind, nsubmatch);
+  }
+
+  static int[] search(
+      Prog prog, EngineContext context, Anchor anchor, MatchKind kind, int nsubmatch) {
     if (prog.start() == 0) {
       return null;
     }
@@ -531,22 +550,8 @@ final class Nfa {
     // We always need at least capture[0..1] to track the match boundaries.
     int ncapture = 2 * Math.max(nsubmatch, 1);
 
-    EngineContext context =
-        EngineContext.create(
-            prog,
-            text,
-            startPos,
-            searchLimit,
-            endPos,
-            consumeRegionStart,
-            boundaryRegionStart,
-            boundaryEndPos,
-            anchorEndPos,
-            emptyAnchorStartPos,
-            emptyAnchorEndPos,
-            graphemeContext);
     Nfa nfa = new Nfa(prog, context, ncapture, longestMode, endmatch);
-    return nfa.runSearch(anchored, kind, nsubmatch, endPos);
+    return nfa.runSearch(anchored, kind, nsubmatch, context.endPos());
   }
 
   /**

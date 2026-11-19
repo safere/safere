@@ -195,18 +195,12 @@ public final class SafeReDiagnostics {
 
   private static void appendResult(
       StringBuilder json, Prog prog, String input, Nfa.MatchKind matchKind) {
-    int[] groups =
-        Nfa.search(
-            prog,
-            input,
-            0,
-            input.length(),
-            input.length(),
-            0,
-            Nfa.Anchor.ANCHORED,
-            matchKind,
-            prog.numCaptures(),
-            null);
+    int end = input.length();
+    // A fixture represents a new anchored search at the beginning of the input.
+    EngineContext context =
+        EngineContext.create(
+            prog, new StringInputScanner(input), 0, end, end, 0, 0, end, end, 0, end, null, 0);
+    int[] groups = Nfa.search(prog, context, Nfa.Anchor.ANCHORED, matchKind, prog.numCaptures());
     json.append("\"result\":{");
     appendBooleanField(json, "matched", groups != null);
     json.append(',');

@@ -40,6 +40,9 @@ record EngineContext(
       int emptyAnchorStartPos,
       int emptyAnchorEndPos,
       GraphemeSupport.Context graphemeContext) {
+    if (prog.hasPreviousMatchEnd()) {
+      throw new IllegalArgumentException("Previous-match assertions require an explicit boundary");
+    }
     return create(
         prog,
         text,
@@ -53,7 +56,7 @@ record EngineContext(
         emptyAnchorStartPos,
         emptyAnchorEndPos,
         graphemeContext,
-        searchStart);
+        0);
   }
 
   static EngineContext create(
