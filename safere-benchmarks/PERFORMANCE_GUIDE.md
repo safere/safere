@@ -159,6 +159,7 @@ Keep these measurements separate:
   declarations cover common cases. Include capture/bounds access inside timing when it triggers
   additional preparation. A pattern compiled and validated during JMH setup has already lost
   these first-use costs.
+  <!-- TODO(#1205): Add `compileAndFindGroupPresent` to the operation list when #1205 lands. -->
 - **Steady-state execution:** prepare the pattern and exercise the affected path during setup,
   then measure repeated execution with the same pattern and the same Matcher lifecycle in both
   revisions. Include both successful and unsuccessful cached construction when applicable.
