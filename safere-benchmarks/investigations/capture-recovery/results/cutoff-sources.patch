@@ -1,0 +1,1178 @@
+diff --git a/safere-benchmarks/investigations/capture-recovery/PLAN.md b/safere-benchmarks/investigations/capture-recovery/PLAN.md
+new file mode 100644
+index 0000000..dc7225c
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/PLAN.md
+@@ -0,0 +1,56 @@
++# Follow-up measurement plan
++
++Baseline production is `4ead777e87f9209c2d9dc06fb958a23bd01349be`. Preserve exact source
++patches, file hashes, wrapper commands, raw JMH JSON/logs, exit statuses, and environment under
++ignored `benchmark-results/issue-1075-followups/`. No publication or policy change is implied
++by collecting a result.
++
++1. Profile unmodified main for stack text, occasional text, the stack document, scheme text,
++   and rare scheme rotation, separately for String and UTF-8. JFR timings are not comparison
++   evidence. Use samples to select a mechanism, not to claim precise time shares.
++2. Screen the simple greedy BitState loop candidate against the same main and unchanged policy
++   investigation harness. Include both representations and all eight preselected scenarios:
++   stack text, stack one-in-four text, stack rejection, stack document, scheme text, scheme
++   one-in-four text, scheme rejection, and rare rotating scheme input. Confirm the complete
++   screen with `--long`, including apparent regressions. Report every row and both modes
++   separately. Do not keep an optimization merely because one favorable case improved.
++3. Verify observed engine paths in a separate JVM after each timing cohort. Diagnostic
++   patterns omit end anchors so reverse probing at large sizes does not preempt the
++   cutoff. Rejection inputs retain required literals and digits. These refinements
++   were made before any cutoff measurement, following source-path review.
++
++   Test the new cutoff protocol against independent expected checksums and JDK. Use identical
++   source snapshots for cutoff comparisons, differing only in the eligibility constant.
++   Screen disabled preference (0) against extended preference (2048) on stack lengths 512 and
++   1024, all three operations and both representations, with `text`, `mixed`, `rare`, and
++   `reject` profiles. Include the simple OnePass family with `text` and `reject` as a control. The
++   observed prepared OnePass runner handles all three operations at the measured
++   sizes, bypassing this capture-demand cutoff. Measure production's 512 cutoff around 511/512/513 on stack text and
++   rejection. The known 512 path choices correspond to enabled preference at/below 512 and
++   disabled preference above it; do not manufacture duplicate measurements for those cells.
++4. Confirm important cutoff tradeoffs with `--long`, retaining their rejection or mixed
++   controls. Extend lengths or profiles only to resolve observed uncertainty, identifying
++   supplemental runs explicitly. A retained 512 limit is an acceptable result if workload
++   tradeoffs do not justify replacing it.
++5. Add only the small declared `CaptureRecoveryBenchmark` standing set. Check schema,
++   materialization, and execution against String/UTF-8/JDK, with the full document extraction
++   case already in `ApplicationBenchmark`. Keep diagnostic sources out of regular artifacts.
++
++Ratios are candidate time / comparator time, below one favorable to the candidate. Show each
++row's score and JMH confidence interval; summarize equal-weight cohorts only with explicit
++membership and geometric means. Synthetic row weighting is not an estimate of application
++frequency. No conclusion about a general optimal cutoff or deployment traffic follows from
++these constructed fixtures.
++
++The complete standard and long recovery comparisons disagree on the size of the
++UTF-8 scheme-extraction cost; rejection controls also vary between runs. Confirm
++stack-document extraction, scheme extraction, and scheme rejection in both
++representations with one supplemental long pair, candidate first and baseline
++second. Keep this cohort separate, preserving the original complete comparisons.
++
++The initial cutoff screen shows large extraction/rejection tradeoffs and a
++representation-dependent mixed-consumption result at 512. Confirm `text`, `mixed`,
++and `reject` at 512 in both representations and all three operations with a long
++pair in reversed order (extended preference first, disabled preference second).
++Profile the current 512 behavior at 512/1024 on String with text and rejection
++controls for each operation. Profiled timings remain outside comparison tables.
+diff --git a/safere-benchmarks/investigations/capture-recovery/README.md b/safere-benchmarks/investigations/capture-recovery/README.md
+new file mode 100644
+index 0000000..e5fa65f
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/README.md
+@@ -0,0 +1,76 @@
++# Capture recovery and anchored eligibility
++
++This is the follow-up to [issue #1075](https://github.com/eaftan/safere/issues/1075).
++It asks whether cheaper capture replay changes the tradeoff behind the 512-native-unit
++capture-demand eligibility limit for `matches()`, `lookingAt()`, and start-anchored `find()`.
++It is an opt-in investigation, excluded from release collections.
++
++The corpus owns both patterns, exact input recipes, and hit/read schedules. The stack-frame
++expression is derived from the release suite's `ApplicationBenchmark.stackTraceExtract`,
++with multiline mode removed so `^` anchors at the input start. Both diagnostic expressions
++omit the end anchor to keep end-anchored reverse probing from bypassing the cutoff
++at larger sizes. Rejections retain the required literals and some digits, and fail
++inside the expression. The second expression is a
++simple whitespace/key/integer parser that serves as a OnePass control. Public
++operation diagnostics show that the prepared OnePass runner handles all three
++operations at the measured sizes; changing this capture-demand limit does not
++change those engine paths. These are constructed
++inputs, not application traffic. Whitespace padding produces exact ASCII lengths: String
++UTF-16 units and UTF-8 bytes agree. The study does not establish a multibyte cutoff.
++
++Each invocation scans a declared batch with one retained cursor for the positive input and
++one for the rejection input, sharing a compiled Pattern. Every cursor resets before use.
++`text` reads group 1 on every hit; `mixed` reads on one in four hits; `rare` has one hit per
++batch and reads it; `reject` has no hits; `boolean` has all hits and no timed capture reads.
++All profiles prime actual capture-text consumption before measurement, including rejection
++and Boolean controls. They measure steady state after capture demand, not cold Patterns.
++The protocol validates independent tasks against JDK and then creates a fresh measurement
++Pattern. Pattern compilation, input creation, and encoding are outside timing; capture-text
++materialization is inside timing. JMH reports time per batch, not per document.
++
++Use the shared wrapper, which owns all timing settings:
++
++```bash
++./run-java-benchmarks.sh --fastbuild --investigation capture-recovery \
++  '^org\.safere\.benchmark\.CaptureCutoffBenchmark\.run$' -- \
++  -p cutoffTrial=CaptureCutoffBenchmark.stack.512@safere-string \
++  -p operation=matches,lookingAt,find -p profile=text,mixed,rare,reject,boolean \
++  -foe true -rf json -rff /tmp/capture-cutoff.json
++```
++
++Use standard mode to screen and `--long` for confirmation. For cutoff comparisons, use
++isolated source snapshots differing only in `Matcher.CAPTURE_DEMAND_TEXT_LIMIT`, with
++identical frozen harness/data and explicit source hashes and patches. Do not add a runtime
++policy switch to production. Compare the existing 512 limit with disabled preference (0)
++and extended eligibility; the BitState capacity guard still applies. Keep before/after
++recovery comparisons separate from comparisons that also change the limit.
++
++Protocol tests run explicitly:
++
++```bash
++mvn -pl safere-benchmarks -am -Dbenchmark.investigation=capture-recovery \
++  -Dexec.skip=true -Dtest=CaptureCutoffBenchmarkTest \
++  -Dsurefire.failIfNoSpecifiedTests=false test
++```
++
++The regular corpus adds only `CaptureRecoveryBenchmark`: first-frame text extraction (ASCII and a multibyte filename),
++one-in-four participation queries, primed scheme rejection, and anchored text extraction
++at 511/512/513 units. Existing `ApplicationBenchmark.stackTraceExtract` retains the full
++multi-frame extraction case. The mixed standing case queries capture participation rather
++than materializing text; the opt-in protocol measures mixed capture text. Neither promotes
++the previous full synthetic policy matrix into the release suite.
++
++The driver records exact sources, commands, source limit, expected membership, and raw results:
++
++```bash
++python3 safere-benchmarks/investigations/capture-recovery/run.py \
++  benchmark-results/capture-cutoff-current --family stack --sizes 511 512 513 \
++  --profiles text mixed rare reject
++```
++
++Each output directory must be new. Source snapshots in `sources.tar.gz` include the selected
++corpus and harness; `command.json` identifies every archived source by SHA-256. A successful
++process is also checked for complete, unique result membership. A separate JVM runs
++`CaptureCutoffPaths` after timing and saves public operation diagnostics in `paths.json`;
++no timing JVM installs a diagnostics listener. Add `--jfr` for a diagnostic profile
++collection, whose timings must be kept separate from comparison evidence.
+diff --git a/safere-benchmarks/investigations/capture-recovery/benchmark-data.json b/safere-benchmarks/investigations/capture-recovery/benchmark-data.json
+new file mode 100644
+index 0000000..8475a84
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/benchmark-data.json
+@@ -0,0 +1,201 @@
++{
++  "schemaVersion": 2,
++  "configuration": {
++    "collection": {
++      "allocationWorkloadPrefixes": []
++    },
++    "investigation": {
++      "documentsPerInvocation": 16,
++      "profiles": {
++        "text": {
++          "hitEvery": 1,
++          "readEvery": 1
++        },
++        "mixed": {
++          "hitEvery": 1,
++          "readEvery": 4
++        },
++        "rare": {
++          "hitEvery": 16,
++          "readEvery": 1
++        },
++        "reject": {
++          "hitEvery": 0,
++          "readEvery": 0
++        },
++        "boolean": {
++          "hitEvery": 1,
++          "readEvery": 0
++        }
++      }
++    }
++  },
++  "inputs": [
++    {
++      "id": "stack.hit.{size}",
++      "axes": {
++        "size": [
++          128,
++          256,
++          511,
++          512,
++          513,
++          1024,
++          2048
++        ]
++      },
++      "recipe": {
++        "kind": "surroundToLength",
++        "prefix": "",
++        "unit": " ",
++        "suffix": " at com.example.Service.run(Service.java:42)",
++        "length": "{size}"
++      }
++    },
++    {
++      "id": "stack.miss.{size}",
++      "axes": {
++        "size": [
++          128,
++          256,
++          511,
++          512,
++          513,
++          1024,
++          2048
++        ]
++      },
++      "recipe": {
++        "kind": "surroundToLength",
++        "prefix": "",
++        "unit": " ",
++        "suffix": " at com.example.Service.run(Service.java:42x)",
++        "length": "{size}"
++      }
++    },
++    {
++      "id": "onePass.hit.{size}",
++      "axes": {
++        "size": [
++          128,
++          256,
++          511,
++          512,
++          513,
++          1024,
++          2048
++        ]
++      },
++      "recipe": {
++        "kind": "surroundToLength",
++        "prefix": "",
++        "unit": " ",
++        "suffix": " word:42",
++        "length": "{size}"
++      }
++    },
++    {
++      "id": "onePass.miss.{size}",
++      "axes": {
++        "size": [
++          128,
++          256,
++          511,
++          512,
++          513,
++          1024,
++          2048
++        ]
++      },
++      "recipe": {
++        "kind": "surroundToLength",
++        "prefix": "",
++        "unit": " ",
++        "suffix": " word:xx42",
++        "length": "{size}"
++      }
++    }
++  ],
++  "workloads": [
++    {
++      "id": "CaptureCutoffBenchmark.stack.{size}",
++      "axes": {
++        "size": [
++          128,
++          256,
++          511,
++          512,
++          513,
++          1024,
++          2048
++        ]
++      },
++      "operation": "matches",
++      "patterns": [
++        {
++          "java": "^\\s+at\\s+([A-Za-z0-9_.$]+)\\.([A-Za-z0-9_$<>]+)\\(([^:()]+):(\\d+)\\)",
++          "alternates": {
++            "rust-regex": {
++              "pattern": "^(?-u:\\s)+at(?-u:\\s)+([A-Za-z0-9_.$]+)\\.([A-Za-z0-9_$<>]+)\\(([^:()]+):([0-9]+)\\)",
++              "reason": "Rust regex gives \\d and \\s Unicode semantics"
++            },
++            "dotnet": {
++              "pattern": "^[ \\t\\n\\x0B\\f\\r]+at[ \\t\\n\\x0B\\f\\r]+([A-Za-z0-9_.$]+)\\.([A-Za-z0-9_$<>]+)\\(([^:()]+):([0-9]+)\\)",
++              "reason": ".NET gives \\d and \\s Unicode semantics while Java defaults to ASCII"
++            }
++          }
++        }
++      ],
++      "inputs": [
++        "stack.hit.{size}",
++        "stack.miss.{size}"
++      ],
++      "resultConsumption": "boolean",
++      "measurement": {
++        "mode": "averageTime",
++        "timingUnit": "nanoseconds",
++        "constraints": [
++          "prematerializedInput"
++        ]
++      },
++      "expected": {
++        "type": "boolean",
++        "value": true
++      }
++    },
++    {
++      "id": "CaptureCutoffBenchmark.onePass.{size}",
++      "axes": {
++        "size": [
++          128,
++          256,
++          511,
++          512,
++          513,
++          1024,
++          2048
++        ]
++      },
++      "operation": "matches",
++      "patterns": [
++        "^\\s*([a-z]+):([0-9]+)"
++      ],
++      "inputs": [
++        "onePass.hit.{size}",
++        "onePass.miss.{size}"
++      ],
++      "resultConsumption": "boolean",
++      "measurement": {
++        "mode": "averageTime",
++        "timingUnit": "nanoseconds",
++        "constraints": [
++          "prematerializedInput"
++        ]
++      },
++      "expected": {
++        "type": "boolean",
++        "value": true
++      }
++    }
++  ]
++}
+diff --git a/safere-benchmarks/investigations/capture-recovery/run.py b/safere-benchmarks/investigations/capture-recovery/run.py
+new file mode 100644
+index 0000000..c89325f
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/run.py
+@@ -0,0 +1,114 @@
++#!/usr/bin/env python3
++"""Run one frozen cutoff snapshot through the shared Java benchmark wrapper."""
++
++import argparse
++import hashlib
++import json
++import math
++from pathlib import Path
++import re
++import subprocess
++import tarfile
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("output", type=Path)
++    modes = parser.add_mutually_exclusive_group()
++    modes.add_argument("--long", action="store_true")
++    modes.add_argument("--smoke", action="store_true")
++    parser.add_argument("--jfr", action="store_true", help="collect diagnostic JFR profiles")
++    parser.add_argument("--family", choices=("stack", "onePass"), default="stack")
++    parser.add_argument("--sizes", nargs="+", type=int, default=[511, 512, 513])
++    parser.add_argument("--engines", nargs="+", choices=("safere-string", "safere-utf8"),
++                        default=["safere-string", "safere-utf8"])
++    parser.add_argument("--operations", nargs="+", choices=("matches", "lookingAt", "find"),
++                        default=["matches", "lookingAt", "find"])
++    parser.add_argument("--profiles", nargs="+", default=["text", "mixed", "rare", "reject"])
++    args = parser.parse_args()
++    root = Path(__file__).resolve().parents[3]
++    data_path = Path(__file__).with_name("benchmark-data.json")
++    data = json.loads(data_path.read_text())
++    known_sizes = set(data["workloads"][0]["axes"]["size"])
++    known_profiles = data["configuration"]["investigation"]["profiles"]
++    if not set(args.sizes) <= known_sizes or not set(args.profiles) <= known_profiles.keys():
++        parser.error("unknown corpus size or profile")
++    for values in (args.sizes, args.engines, args.operations, args.profiles):
++        if len(set(values)) != len(values):
++            parser.error("duplicate selections are not allowed")
++    output = args.output.resolve()
++    output.mkdir(parents=True, exist_ok=False)
++    trials = [f"CaptureCutoffBenchmark.{args.family}.{size}@{engine}"
++              for size in args.sizes for engine in args.engines]
++    command = [str(root / "run-java-benchmarks.sh")]
++    if args.long:
++        command.append("--long")
++    elif args.smoke:
++        command.append("--smoke")
++    command += ["--fastbuild", "--investigation", "capture-recovery",
++                r"^org\.safere\.benchmark\.CaptureCutoffBenchmark\.run$", "--",
++                "-p", "cutoffTrial=" + ",".join(trials),
++                "-p", "operation=" + ",".join(args.operations),
++                "-p", "profile=" + ",".join(args.profiles),
++                "-foe", "true", "-rf", "json", "-rff", str(output / "results.json")]
++    if args.jfr:
++        command += ["-prof", "jfr:dir=" + str(output / "jfr")]
++    files = {root / ".mvn/jvm.config", root / "pom.xml", root / "run-java-benchmarks.sh",
++             root / "materialize-benchmark-inputs.sh"}
++    for module in ("safere", "safere-crosscheck", "safere-benchmarks", "safere-ffm-re2"):
++        files.add(root / module / "pom.xml")
++        files.update(p for p in (root / module / "src/main").rglob("*") if p.is_file())
++    files.update(p for p in data_path.parent.rglob("*")
++                 if p.is_file() and "__pycache__" not in p.parts)
++    hashes = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
++              for p in sorted(files)}
++    with tarfile.open(output / "sources.tar.gz", "w:gz") as archive:
++        for path in sorted(files):
++            archive.add(path, arcname=str(path.relative_to(root)))
++    matcher = (root / "safere/src/main/java/org/safere/Matcher.java").read_text()
++    limit = int(re.search(r"CAPTURE_DEMAND_TEXT_LIMIT = (\d+);", matcher).group(1))
++    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True,
++                              text=True)
++    manifest = {"cwd": str(root), "argv": command,
++                "mode": "long" if args.long else "smoke" if args.smoke else "standard",
++                "baseRevision": revision.stdout.strip() if revision.returncode == 0 else None,
++                "eligibilityLimit": limit, "sourceSha256": hashes,
++                "profiler": "jfr" if args.jfr else None,
++                "trials": trials, "operations": args.operations, "profiles": args.profiles,
++                "expectedRows": len(trials) * len(args.operations) * len(args.profiles)}
++    audit_command = ["java", "-Dsafere.benchmark.corpus=" + str(
++        root / "safere-benchmarks/target/investigations/capture-recovery/corpus"),
++        "-cp", str(root / "safere-benchmarks/target/investigations/capture-recovery/build/benchmarks.jar"),
++        "org.safere.benchmark.CaptureCutoffPaths", ",".join(trials),
++        ",".join(args.operations), ",".join(args.profiles)]
++    manifest["pathArgv"] = audit_command
++    (output / "command.json").write_text(json.dumps(manifest, indent=2) + "\n")
++    with (output / "run.log").open("w") as log:
++        result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT)
++    (output / "exit.txt").write_text(str(result.returncode) + "\n")
++    if result.returncode:
++        raise SystemExit(result.returncode)
++    rows = json.loads((output / "results.json").read_text())
++    actual = {(row["params"]["cutoffTrial"], row["params"]["operation"],
++               row["params"]["profile"]) for row in rows}
++    expected = {(trial, operation, profile) for trial in trials
++                for operation in args.operations for profile in args.profiles}
++    if any(not math.isfinite(row["primaryMetric"]["score"])
++           or row["primaryMetric"]["score"] <= 0
++           or row["primaryMetric"]["scoreUnit"] != "ns/op" for row in rows):
++        raise SystemExit("Invalid cutoff measurements")
++    if len(rows) != len(expected) or actual != expected:
++        raise SystemExit("Incomplete or duplicate cutoff results")
++    with (output / "paths.json").open("w") as paths, (output / "paths.log").open("w") as log:
++        audit = subprocess.run(audit_command, cwd=root, stdout=paths, stderr=log)
++    (output / "paths-exit.txt").write_text(str(audit.returncode) + "\n")
++    if audit.returncode:
++        raise SystemExit(audit.returncode)
++    observed = json.loads((output / "paths.json").read_text())
++    if len(observed) != len(expected):
++        raise SystemExit("Incomplete path audit")
++    print(f"Completed {len(rows)} rows and path audit; evidence: {output}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffBenchmark.java b/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffBenchmark.java
+new file mode 100644
+index 0000000..b4aea10
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffBenchmark.java
+@@ -0,0 +1,95 @@
++// This file is part of a Java port of RE2 (https://github.com/google/re2).
++// Original RE2 code is Copyright (c) 2009 The RE2 Authors.
++// Modifications and Java port Copyright (c) 2026 Eddie Aftandilian.
++// Licensed under the BSD 3-Clause License (see LICENSE file).
++
++package org.safere.benchmark;
++
++import com.google.gson.JsonObject;
++import java.util.List;
++import java.util.concurrent.TimeUnit;
++import org.openjdk.jmh.annotations.Benchmark;
++import org.openjdk.jmh.annotations.BenchmarkMode;
++import org.openjdk.jmh.annotations.Mode;
++import org.openjdk.jmh.annotations.OutputTimeUnit;
++import org.openjdk.jmh.annotations.Param;
++import org.openjdk.jmh.annotations.Scope;
++import org.openjdk.jmh.annotations.Setup;
++import org.openjdk.jmh.annotations.State;
++import org.openjdk.jmh.annotations.TearDown;
++
++/** Warm capture-demand cutoff study, selected explicitly through the investigation wrapper. */
++@BenchmarkMode(Mode.AverageTime)
++@OutputTimeUnit(TimeUnit.NANOSECONDS)
++@State(Scope.Thread)
++public class CaptureCutoffBenchmark {
++  /** Corpus workload and native representation. */
++  @Param({})
++  public String cutoffTrial;
++
++  /** Public matching operation. The corpus patterns explicitly anchor find at the start. */
++  @Param({"matches", "lookingAt", "find"})
++  public String operation;
++
++  /** Independent hit and conditional capture-read schedule, owned by the corpus. */
++  @Param({"text", "mixed", "rare", "reject", "boolean"})
++  public String profile;
++
++  private CaptureCutoffTask task;
++
++  /** Checks a separate SafeRE task against JDK before preparing the measurement task. */
++  @Setup
++  public void setup() {
++    CrossEngineBenchmarkPlan.Trial trial = CrossEngineBenchmarkPlan.load().resolve(cutoffTrial);
++    CrossEngineWorkload workload = trial.workload();
++    JsonObject config = BenchmarkData.get().investigationConfiguration();
++    JsonObject schedule = config.getAsJsonObject("profiles").getAsJsonObject(profile);
++    if (schedule == null || !List.of("matches", "lookingAt", "find").contains(operation)) {
++      throw new IllegalArgumentException("Unknown cutoff operation or profile");
++    }
++    int documents = config.get("documentsPerInvocation").getAsInt();
++    int hitEvery = schedule.get("hitEvery").getAsInt();
++    int readEvery = schedule.get("readEvery").getAsInt();
++    try (CaptureCutoffTask oracle =
++            prepare(RegexEngineVariant.JDK_STRING, workload, documents, hitEvery, readEvery);
++        CaptureCutoffTask candidate =
++            prepare(trial.variant(), workload, documents, hitEvery, readEvery)) {
++      for (int round = 0; round < 4; round++) {
++        if (oracle.run() != candidate.run()) {
++          throw new IllegalStateException("Cutoff protocol differs from JDK: " + cutoffTrial);
++        }
++      }
++    }
++    task = prepare(trial.variant(), workload, documents, hitEvery, readEvery);
++  }
++
++  private CaptureCutoffTask prepare(
++      RegexEngineVariant variant,
++      CrossEngineWorkload workload,
++      int documents,
++      int hitEvery,
++      int readEvery) {
++    return new CaptureCutoffTask(
++        variant,
++        workload.patterns().getFirst(),
++        variant.prepareInputs(BenchmarkData.get(), workload.inputKeys()),
++        operation,
++        documents,
++        hitEvery,
++        readEvery);
++  }
++
++  /** Runs the declared document batch; input construction and encoding are outside timing. */
++  @Benchmark
++  public long run() {
++    return task.run();
++  }
++
++  /** Releases the compiled pattern after the trial. */
++  @TearDown
++  public void tearDown() {
++    if (task != null) {
++      task.close();
++    }
++  }
++}
+diff --git a/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffPaths.java b/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffPaths.java
+new file mode 100644
+index 0000000..c68fa6b
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffPaths.java
+@@ -0,0 +1,85 @@
++// This file is part of a Java port of RE2 (https://github.com/google/re2).
++// Original RE2 code is Copyright (c) 2009 The RE2 Authors.
++// Modifications and Java port Copyright (c) 2026 Eddie Aftandilian.
++// Licensed under the BSD 3-Clause License (see LICENSE file).
++
++package org.safere.benchmark;
++
++import com.google.gson.Gson;
++import com.google.gson.JsonObject;
++import java.util.ArrayList;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++import org.safere.OperationDiagnostics;
++import org.safere.Pattern;
++import org.safere.SafeReMatchDiagnostics;
++
++/** Separate-process path inspection; never installs diagnostics in a timing JVM. */
++public final class CaptureCutoffPaths {
++  private CaptureCutoffPaths() {}
++
++  /** Writes observed paths for trial, operation, and profile lists supplied by the runner. */
++  public static void main(String[] args) {
++    if (args.length != 3) {
++      throw new IllegalArgumentException("Expected comma-separated trials, operations, profiles");
++    }
++    List<Map<String, Object>> results = new ArrayList<>();
++    JsonObject config = BenchmarkData.get().investigationConfiguration();
++    int documents = config.get("documentsPerInvocation").getAsInt();
++    for (String trialId : args[0].split(",")) {
++      var trial = CrossEngineBenchmarkPlan.load().resolve(trialId);
++      var workload = trial.workload();
++      var inputs = trial.variant().prepareInputs(BenchmarkData.get(), workload.inputKeys());
++      for (String operation : args[1].split(",")) {
++        for (String profile : args[2].split(",")) {
++          JsonObject schedule = config.getAsJsonObject("profiles").getAsJsonObject(profile);
++          List<OperationDiagnostics> events = new ArrayList<>();
++          try (var task =
++              new CaptureCutoffTask(
++                  trial.variant(),
++                  workload.patterns().getFirst(),
++                  inputs,
++                  operation,
++                  documents,
++                  schedule.get("hitEvery").getAsInt(),
++                  schedule.get("readEvery").getAsInt())) {
++            Pattern.setDiagnostics(
++                new SafeReMatchDiagnostics() {
++                  @Override
++                  public void onOperationCompleted(OperationDiagnostics event) {
++                    events.add(event);
++                  }
++                });
++            task.run();
++          } finally {
++            Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
++          }
++          if (events.size() != documents) {
++            throw new IllegalStateException("Unexpected path-event count: " + trialId);
++          }
++          Map<String, Object> row = new LinkedHashMap<>();
++          row.put("trial", trialId);
++          row.put("operation", operation);
++          row.put("profile", profile);
++          row.put(
++              "paths",
++              events.stream()
++                  .map(
++                      event -> {
++                        Map<String, Object> path = new LinkedHashMap<>();
++                        path.put("boundary", event.boundaryStrategy().name());
++                        path.put("outcome", event.outcome().name());
++                        path.put("forwardDfa", event.forwardDfaSearchCount());
++                        path.put("reverseDfa", event.reverseDfaSearchCount());
++                        return path;
++                      })
++                  .distinct()
++                  .toList());
++          results.add(row);
++        }
++      }
++    }
++    System.out.println(new Gson().toJson(results));
++  }
++}
+diff --git a/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffTask.java b/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffTask.java
+new file mode 100644
+index 0000000..2551e60
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/src/main/java/org/safere/benchmark/CaptureCutoffTask.java
+@@ -0,0 +1,76 @@
++// This file is part of a Java port of RE2 (https://github.com/google/re2).
++// Original RE2 code is Copyright (c) 2009 The RE2 Authors.
++// Modifications and Java port Copyright (c) 2026 Eddie Aftandilian.
++// Licensed under the BSD 3-Clause License (see LICENSE file).
++
++package org.safere.benchmark;
++
++import java.util.List;
++
++/** Prepared native cursors and capture-consumption schedule for one cutoff trial. */
++final class CaptureCutoffTask implements AutoCloseable {
++  private final RegexEngineVariant.CompiledRegex pattern;
++  private final RegexEngineVariant.MatchCursor[] cursors;
++  private final String operation;
++  private final int documents;
++  private final int hitEvery;
++  private final int readEvery;
++
++  CaptureCutoffTask(
++      RegexEngineVariant variant,
++      String regex,
++      List<RegexEngineVariant.RegexInput> inputs,
++      String operation,
++      int documents,
++      int hitEvery,
++      int readEvery) {
++    if (documents < 1 || hitEvery < 0 || readEvery < 0 || inputs.size() != 2) {
++      throw new IllegalArgumentException("Invalid cutoff protocol");
++    }
++    this.operation = operation;
++    this.documents = documents;
++    this.hitEvery = hitEvery;
++    this.readEvery = readEvery;
++    pattern = variant.compile(regex);
++    cursors = inputs.stream().map(pattern::matcher).toArray(RegexEngineVariant.MatchCursor[]::new);
++    // Steady state after actual text consumption, including Boolean/rejection controls.
++    if (!search(cursors[0]) || cursors[0].group(1) == null) {
++      throw new IllegalStateException("Declared positive primer failed");
++    }
++    cursors[1].reset();
++    if (search(cursors[1])) {
++      throw new IllegalStateException("Declared rejection input matched");
++    }
++  }
++
++  private boolean search(RegexEngineVariant.MatchCursor cursor) {
++    return switch (operation) {
++      case "matches" -> cursor.matches();
++      case "lookingAt" -> cursor.lookingAt();
++      case "find" -> cursor.find();
++      default -> throw new IllegalArgumentException(operation);
++    };
++  }
++
++  long run() {
++    long checksum = 0;
++    int hits = 0;
++    for (int document = 0; document < documents; document++) {
++      int index = hitEvery > 0 && document % hitEvery == 0 ? 0 : 1;
++      RegexEngineVariant.MatchCursor cursor = cursors[index];
++      cursor.reset();
++      if (search(cursor)) {
++        checksum++;
++        if (readEvery > 0 && hits++ % readEvery == 0) {
++          checksum = checksum * 31 + cursor.group(1).hashCode();
++        }
++      }
++    }
++    return checksum;
++  }
++
++  @Override
++  public void close() {
++    pattern.close();
++  }
++}
+diff --git a/safere-benchmarks/investigations/capture-recovery/src/test/java/org/safere/benchmark/CaptureCutoffBenchmarkTest.java b/safere-benchmarks/investigations/capture-recovery/src/test/java/org/safere/benchmark/CaptureCutoffBenchmarkTest.java
+new file mode 100644
+index 0000000..4791e11
+--- /dev/null
++++ b/safere-benchmarks/investigations/capture-recovery/src/test/java/org/safere/benchmark/CaptureCutoffBenchmarkTest.java
+@@ -0,0 +1,89 @@
++// This file is part of a Java port of RE2 (https://github.com/google/re2).
++// Original RE2 code is Copyright (c) 2009 The RE2 Authors.
++// Modifications and Java port Copyright (c) 2026 Eddie Aftandilian.
++// Licensed under the BSD 3-Clause License (see LICENSE file).
++
++package org.safere.benchmark;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.google.gson.JsonObject;
++import com.google.gson.JsonParser;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.List;
++import java.util.Map;
++import org.junit.jupiter.api.Test;
++
++class CaptureCutoffBenchmarkTest {
++  @Test
++  void schedulesAndCaptureTextAgreeWithJdkAcrossTheDeclaredCorpus() throws Exception {
++    Path source = Path.of("investigations/capture-recovery/benchmark-data.json");
++    if (!Files.exists(source)) {
++      source = Path.of("safere-benchmarks").resolve(source);
++    }
++    JsonObject data = JsonParser.parseString(Files.readString(source)).getAsJsonObject();
++    Map<String, byte[]> inputs = BenchmarkInputMaterializer.materialize(data);
++    CrossEngineBenchmarkPlan plan =
++        CrossEngineBenchmarkPlan.fromMaterialized(
++            MaterializedExecutionPlan.parse(
++                    ResolvedBenchmarkPlan.create(PatternProfiles.normalizeInline(data)))
++                .entriesForRunner("java"));
++    for (CrossEngineBenchmarkPlan.Trial trial :
++        plan.trials(CrossEngineWorkload.TimingGroup.NANOSECONDS)) {
++      if (!List.of(
++              RegexEngineVariant.SAFERE_STRING,
++              RegexEngineVariant.SAFERE_UTF8,
++              RegexEngineVariant.JDK_STRING)
++          .contains(trial.variant())) {
++        continue;
++      }
++      CrossEngineWorkload workload = trial.workload();
++      int size = Integer.parseInt(workload.id().substring(workload.id().lastIndexOf('.') + 1));
++      List<RegexEngineVariant.RegexInput> prepared =
++          workload.inputKeys().stream()
++              .map(
++                  key -> {
++                    byte[] bytes = inputs.get(key);
++                    assertThat(bytes.length).isEqualTo(size);
++                    return (trial.variant() == RegexEngineVariant.SAFERE_UTF8
++                        ? RegexEngineVariant.utf8Input(bytes)
++                        : new RegexEngineVariant.StringRegexInput(
++                            new String(bytes, StandardCharsets.UTF_8)));
++                  })
++              .toList();
++      String captured = workload.id().contains(".stack.") ? "com.example.Service" : "word";
++      for (String operation : List.of("matches", "lookingAt", "find")) {
++        for (int hitEvery : new int[] {0, 1, 16}) {
++          for (int readEvery : new int[] {0, 1, 4}) {
++            long expected = 0;
++            int hits = 0;
++            for (int doc = 0; doc < 16; doc++) {
++              if (hitEvery > 0 && doc % hitEvery == 0) {
++                expected++;
++                if (readEvery > 0 && hits++ % readEvery == 0) {
++                  expected = expected * 31 + captured.hashCode();
++                }
++              }
++            }
++            try (var task =
++                new CaptureCutoffTask(
++                    trial.variant(),
++                    workload.patterns().getFirst(),
++                    prepared,
++                    operation,
++                    16,
++                    hitEvery,
++                    readEvery)) {
++              assertThat(task.run())
++                  .as("%s/%s/%s/%s", trial.id(), operation, hitEvery, readEvery)
++                  .isEqualTo(expected);
++              assertThat(task.run()).isEqualTo(expected);
++            }
++          }
++        }
++      }
++    }
++  }
++}
+diff --git a/safere-benchmarks/src/main/java/org/safere/benchmark/RegexEngineVariant.java b/safere-benchmarks/src/main/java/org/safere/benchmark/RegexEngineVariant.java
+index 7a1a082..a27a247 100644
+--- a/safere-benchmarks/src/main/java/org/safere/benchmark/RegexEngineVariant.java
++++ b/safere-benchmarks/src/main/java/org/safere/benchmark/RegexEngineVariant.java
+@@ -120,6 +120,7 @@ enum RegexEngineVariant {
+           EngineCapability.MATCHES,
+           EngineCapability.LOOKING_AT,
+           EngineCapability.GROUP_PARTICIPATION,
++          EngineCapability.GROUP_TEXT,
+           EngineCapability.REPLACE,
+           EngineCapability.APPEND_REPLACEMENT,
+           EngineCapability.MATCHER_RESET,
+@@ -157,6 +158,20 @@ enum RegexEngineVariant {
+               return matcher.lookingAt();
+             }
+ 
++            @Override
++            public String group(int group) {
++              int start = matcher.start(group);
++              if (start < 0) {
++                return null;
++              }
++              Utf8RegexInput source = (Utf8RegexInput) input;
++              return new String(
++                  source.bytes,
++                  source.offset + start,
++                  matcher.end(group) - start,
++                  StandardCharsets.UTF_8);
++            }
++
+             @Override
+             public int start(int group) {
+               return matcher.start(group);
+@@ -621,7 +636,7 @@ enum RegexEngineVariant {
+     List<RegexInput> inputs = new ArrayList<>(inputKeys.size());
+     for (String inputKey : inputKeys) {
+       if (inputRepresentation == InputRepresentation.PREEXISTING_UTF8) {
+-        inputs.add(new Utf8RegexInput(org.safere.Utf8Input.trusted(data.getInputBytes(inputKey))));
++        inputs.add(utf8Input(data.getInputBytes(inputKey)));
+       } else {
+         inputs.add(new StringRegexInput(data.getInputString(inputKey)));
+       }
+@@ -740,7 +755,30 @@ enum RegexEngineVariant {
+ 
+   record StringRegexInput(String value) implements RegexInput {}
+ 
+-  record Utf8RegexInput(org.safere.Utf8Input value) implements RegexInput {}
++  static RegexInput utf8Input(byte[] bytes) {
++    return utf8Input(bytes, 0, bytes.length);
++  }
++
++  static RegexInput utf8Input(byte[] bytes, int offset, int length) {
++    return new Utf8RegexInput(bytes, offset, length);
++  }
++
++  private static final class Utf8RegexInput implements RegexInput {
++    // Borrow immutable fixture storage; keep native view offsets for timed capture decoding.
++    private final byte[] bytes;
++    private final int offset;
++    private final org.safere.Utf8Input value;
++
++    private Utf8RegexInput(byte[] bytes, int offset, int length) {
++      this.bytes = bytes;
++      this.offset = offset;
++      this.value = org.safere.Utf8Input.trusted(bytes, offset, length);
++    }
++
++    org.safere.Utf8Input value() {
++      return value;
++    }
++  }
+ 
+   sealed interface PreparedReplacement permits StringReplacement, Utf8Replacement {}
+ 
+diff --git a/safere-benchmarks/src/test/java/org/safere/benchmark/BenchmarkOperationTest.java b/safere-benchmarks/src/test/java/org/safere/benchmark/BenchmarkOperationTest.java
+index a9c03c0..964c7e7 100644
+--- a/safere-benchmarks/src/test/java/org/safere/benchmark/BenchmarkOperationTest.java
++++ b/safere-benchmarks/src/test/java/org/safere/benchmark/BenchmarkOperationTest.java
+@@ -6,15 +6,41 @@
+ package org.safere.benchmark;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
++import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.params.ParameterizedTest;
+ import org.junit.jupiter.params.provider.CsvSource;
+ import org.junit.jupiter.params.provider.EnumSource;
+ import org.openjdk.jmh.infra.Blackhole;
+ 
+ class BenchmarkOperationTest {
++  @Test
++  void utf8CaptureTextDecodesNativeBoundsIncludingBorrowedViewOffsets() {
++    byte[] storage = "!!é😀 tail??".getBytes(java.nio.charset.StandardCharsets.UTF_8);
++    RegexEngineVariant.RegexInput input =
++        RegexEngineVariant.utf8Input(storage, 2, storage.length - 4);
++    try (RegexEngineVariant.CompiledRegex pattern =
++        RegexEngineVariant.SAFERE_UTF8.compile("(é)(😀)(x)?()")) {
++      RegexEngineVariant.MatchCursor cursor = pattern.matcher(input);
++      assertThatThrownBy(() -> cursor.group(1)).isInstanceOf(IllegalStateException.class);
++      assertThat(cursor.find()).isTrue();
++      assertThat(cursor.group(0)).isEqualTo("é😀");
++      assertThat(cursor.group(1)).isEqualTo("é");
++      assertThat(cursor.group(2)).isEqualTo("😀");
++      assertThat(cursor.start(2)).isEqualTo(2);
++      assertThat(cursor.end(2)).isEqualTo(6);
++      assertThat(cursor.group(3)).isNull();
++      assertThat(cursor.group(4)).isEmpty();
++      assertThatThrownBy(() -> cursor.group(5)).isInstanceOf(IndexOutOfBoundsException.class);
++      cursor.reset();
++      assertThat(cursor.find()).isTrue();
++      assertThat(cursor.group(0)).isEqualTo("é😀");
++    }
++  }
++
+   @ParameterizedTest
+   @EnumSource(
+       value = RegexEngineVariant.class,
+@@ -22,9 +48,8 @@ class BenchmarkOperationTest {
+   void tokenizerAdvancesInNativeCoordinatesAndCanReuseItsMatcher(RegexEngineVariant variant) {
+     RegexEngineVariant.RegexInput input =
+         variant == RegexEngineVariant.SAFERE_UTF8
+-            ? new RegexEngineVariant.Utf8RegexInput(
+-                org.safere.Utf8Input.validated(
+-                    "é 12 é ".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
++            ? RegexEngineVariant.utf8Input(
++                "é 12 é ".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+             : new RegexEngineVariant.StringRegexInput("é 12 é ");
+     try (RegexEngineVariant.CompiledRegex pattern = variant.compile("[^ ]+| +")) {
+       BenchmarkOperation operation = BenchmarkOperation.MATCHER_REGION_TOKENIZE;
+diff --git a/safere-benchmarks/src/test/java/org/safere/benchmark/CrossEngineBenchmarkPlanTest.java b/safere-benchmarks/src/test/java/org/safere/benchmark/CrossEngineBenchmarkPlanTest.java
+index 34c2b23..02b104c 100644
+--- a/safere-benchmarks/src/test/java/org/safere/benchmark/CrossEngineBenchmarkPlanTest.java
++++ b/safere-benchmarks/src/test/java/org/safere/benchmark/CrossEngineBenchmarkPlanTest.java
+@@ -299,11 +299,10 @@ class CrossEngineBenchmarkPlanTest {
+             BenchmarkOperation.REPLACE_FIRST,
+             BenchmarkOperation.REPLACE_ALL,
+             BenchmarkOperation.REPLACE_ALL_LENGTH_SUM,
+-            BenchmarkOperation.MANUAL_REPLACE_ALL)
+-        .doesNotContain(
++            BenchmarkOperation.MANUAL_REPLACE_ALL,
+             BenchmarkOperation.CAPTURE_GROUPS,
+-            BenchmarkOperation.FIND_GROUP,
+-            BenchmarkOperation.SPLIT_LENGTH_SUM);
++            BenchmarkOperation.FIND_GROUP)
++        .doesNotContain(BenchmarkOperation.SPLIT_LENGTH_SUM);
+   }
+ 
+   @Test
+@@ -337,10 +336,11 @@ class CrossEngineBenchmarkPlanTest {
+     CrossEngineBenchmarkPlan plan = CrossEngineBenchmarkPlan.load();
+ 
+     assertThat(plan.resolve("RegexBenchmark.literalMatch@safere-utf8")).isNotNull();
+-    assertThatThrownBy(() -> plan.resolve("HttpBenchmark.httpExtract@safere-utf8"))
++    assertThat(plan.resolve("HttpBenchmark.httpExtract@safere-utf8")).isNotNull();
++    assertThatThrownBy(() -> plan.resolve("Issue481ScalingBenchmark.splitWords.128@safere-utf8"))
+         .isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Unsupported cross-engine combination")
+-        .hasMessageContaining("captureText");
++        .hasMessageContaining("split");
+     assertThatThrownBy(() -> plan.resolve("missing.workload@safere-string"))
+         .isInstanceOf(IllegalArgumentException.class)
+         .hasMessage("Unknown cross-engine workload ID: missing.workload");
+@@ -722,6 +722,14 @@ class CrossEngineBenchmarkPlanTest {
+             "RegexBenchmark.literalMatch@safere-utf8",
+             "ApplicationBenchmark.uuidValidation@safere-utf8",
+             "HttpBenchmark.httpFull@safere-utf8",
++            "HttpBenchmark.httpExtract@safere-utf8",
++            "ApplicationBenchmark.stackTraceExtract@safere-utf8",
++            "CaptureScalingBenchmark.capture1@safere-utf8",
++            "CaptureRecoveryBenchmark.stack.text@safere-utf8",
++            "CaptureRecoveryBenchmark.stack.mixed@safere-utf8",
++            "CaptureRecoveryBenchmark.scheme.rejection@safere-utf8",
++            "CaptureRecoveryBenchmark.stack.matches.512@safere-utf8",
++            "CaptureRecoveryBenchmark.stack.anchoredFind.513@safere-utf8",
+             "MatcherApiBenchmark.lookingAt@safere-utf8",
+             "MatcherApiBenchmark.regionFind@safere-utf8",
+             "MatcherApiBenchmark.resetAndFind@safere-utf8",
+@@ -795,8 +803,7 @@ class CrossEngineBenchmarkPlanTest {
+   void utf8ReplacementAdapterExpandsLiteralNumberedAndNamedTemplates() {
+     RegexEngineVariant variant = RegexEngineVariant.SAFERE_UTF8;
+     RegexEngineVariant.RegexInput input =
+-        new RegexEngineVariant.Utf8RegexInput(
+-            org.safere.Utf8Input.trusted("alpha=one&beta=two".getBytes(StandardCharsets.UTF_8)));
++        RegexEngineVariant.utf8Input("alpha=one&beta=two".getBytes(StandardCharsets.UTF_8));
+ 
+     try (RegexEngineVariant.CompiledRegex literal = variant.compile("&");
+         RegexEngineVariant.CompiledRegex numbered = variant.compile("([a-z]+)=([a-z]+)");
+diff --git a/safere/src/main/java/org/safere/BitState.java b/safere/src/main/java/org/safere/BitState.java
+index 57f98d5..d56f2fa 100644
+--- a/safere/src/main/java/org/safere/BitState.java
++++ b/safere/src/main/java/org/safere/BitState.java
+@@ -407,6 +407,9 @@ final class BitState {
+   /** Progress checks immediately following captures, or null when none exist. */
+   private final Inst[] captureProgressChecks;
+ 
++  /** Consuming bodies of simple greedy loops, or null when none exist. */
++  private final Inst[] greedyRunes;
++
+   private static final byte NOT_ALT = 0;
+   private static final byte ALT = 1;
+   private static final byte CYCLE_ALT = 2;
+@@ -475,6 +478,7 @@ final class BitState {
+     this.captureRunes = prog.captureRunes();
+     this.loopEntries = prog.loopEntries();
+     this.captureProgressChecks = prog.captureProgressChecks();
++    this.greedyRunes = prog.greedyRunes();
+ 
+     int totalBits = progSize * textSlots;
+     int visitedLen = (totalBits + 63) / 64;
+@@ -665,6 +669,14 @@ final class BitState {
+           case InstOp.OP_FAIL -> {}
+ 
+           case InstOp.OP_ALT, InstOp.OP_ALT_MATCH -> {
++            Inst rune = greedyRunes == null ? null : greedyRunes[id];
++            if (rune != null) {
++              runGreedyLoop(id, ip, rune, pos);
++              if (budgetExceeded || windowExceeded) {
++                return false;
++              }
++              break;
++            }
+             // Push second alternative first (it will be tried if first fails).
+             if (shouldVisit(ip.out1, pos)) {
+               push(ip.out1, pos);
+@@ -894,6 +906,45 @@ final class BitState {
+     return matched;
+   }
+ 
++  /**
++   * Executes a greedy ALT/consumer cycle without redispatching each instruction. The entry ALT has
++   * already been charged. Keep every deferred exit and visitation in the original order, and charge
++   * each logical instruction so pruning activation and the work limit remain unchanged.
++   */
++  private void runGreedyLoop(int id, Inst alt, Inst rune, int pos) {
++    while (true) {
++      if (shouldVisit(alt.out1, pos)) {
++        push(alt.out1, pos);
++      }
++      if (!shouldVisit(alt.out, pos) || !stepWithinBudget()) {
++        return;
++      }
++      if (pos >= endPos) {
++        if (speculative && endPos < textLen) {
++          windowExceeded = true;
++        }
++        return;
++      }
++      int cp = WorkCounterConfig.ENABLED ? -1 : text.asciiAt(pos);
++      int nextPos = pos + 1;
++      if (cp < 0) {
++        long decoded = text.decodeForward(pos);
++        cp = InputScanner.codePoint(decoded);
++        nextPos = InputScanner.position(decoded);
++        if (speculative && nextPos > endPos) {
++          windowExceeded = true;
++          return;
++        }
++      }
++      boolean matches =
++          rune.opCode == InstOp.OP_CHAR_RANGE ? rune.matchesChar(cp) : rune.matchesCharClass(cp);
++      if (!matches || !shouldVisit(id, nextPos) || !stepWithinBudget()) {
++        return;
++      }
++      pos = nextPos;
++    }
++  }
++
+   /** Executes one progress check, returning a continuation or -1 when none is eligible. */
+   private int progressContinuation(Inst check, int pos) {
+     int reg = check.arg;
+diff --git a/safere/src/main/java/org/safere/Prog.java b/safere/src/main/java/org/safere/Prog.java
+index 91099d1..18f038e 100644
+--- a/safere/src/main/java/org/safere/Prog.java
++++ b/safere/src/main/java/org/safere/Prog.java
+@@ -402,16 +402,19 @@ final class Prog {
+     final CaptureRune[] captureRunes;
+     final LoopEntry[] loopEntries;
+     final Inst[] captureProgressChecks;
++    final Inst[] greedyRunes;
+ 
+     BitStateAnalysis(
+         boolean[] epsilonCycleAlts,
+         CaptureRune[] captureRunes,
+         LoopEntry[] loopEntries,
+-        Inst[] captureProgressChecks) {
++        Inst[] captureProgressChecks,
++        Inst[] greedyRunes) {
+       this.epsilonCycleAlts = epsilonCycleAlts;
+       this.captureRunes = captureRunes;
+       this.loopEntries = loopEntries;
+       this.captureProgressChecks = captureProgressChecks;
++      this.greedyRunes = greedyRunes;
+     }
+   }
+ 
+@@ -443,6 +446,29 @@ final class Prog {
+     return bitStateAnalysis().captureProgressChecks;
+   }
+ 
++  /** Returns consuming bodies of simple greedy loops, or null when none exist. */
++  Inst[] greedyRunes() {
++    return bitStateAnalysis().greedyRunes;
++  }
++
++  private Inst[] computeGreedyRunes(boolean[] reachable) {
++    Inst[] runes = null;
++    for (int i = 0; i < size(); i++) {
++      Inst alt = inst(i);
++      if (reachable[i] && (alt.opCode == InstOp.OP_ALT || alt.opCode == InstOp.OP_ALT_MATCH)) {
++        Inst rune = inst(alt.out);
++        if ((rune.opCode == InstOp.OP_CHAR_RANGE || rune.opCode == InstOp.OP_CHAR_CLASS)
++            && rune.out == i) {
++          if (runes == null) {
++            runes = new Inst[size()];
++          }
++          runes[i] = rune;
++        }
++      }
++    }
++    return runes;
++  }
++
+   private BitStateAnalysis bitStateAnalysis() {
+     BitStateAnalysis result = bitStateAnalysis;
+     if (result == null) {
+@@ -453,7 +479,8 @@ final class Prog {
+               computeEpsilonCycleAlts(reachable),
+               captures,
+               computeLoopEntries(reachable, captures),
+-              computeCaptureProgressChecks(reachable));
++              computeCaptureProgressChecks(reachable),
++              computeGreedyRunes(reachable));
+       bitStateAnalysis = result;
+     }
+     return result;
