@@ -45,8 +45,10 @@ larger opt-in cutoff study.
 `ReverseDfaFindBenchmark.wordProse.32768` counts `\b\w+\b` matches in 32 KiB of
 ASCII prose, about one match every five characters. The pattern has no captures, so
 the workload measures repeated match-start recovery without inner-capture
-extraction. In SafeRE each successful `find()` runs the forward DFA to the match end
-and the reverse DFA back to the match start, for String and direct UTF-8 input. A
+extraction. In SafeRE each successful `find()` is one forward pass of the
+start-register search, which tracks the match start along with the match end, for
+String and direct UTF-8 input. (Before it, each `find()` ran the forward DFA to the
+match end and the reverse DFA back to the start, hence the workload's name.) A
 harness test checks this with operation diagnostics, so the workload must be
 retargeted if a different path takes over. Plain `\w+` would not do: UTF-8 counts it
 with a character-class scan that skips both DFAs. Compilation and UTF-8 encoding are
