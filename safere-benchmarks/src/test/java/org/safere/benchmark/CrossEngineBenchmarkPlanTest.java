@@ -27,7 +27,12 @@ import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openjdk.jmh.infra.Blackhole;
+import org.safere.Pattern;
+import org.safere.PatternCompiledEvent;
+import org.safere.PatternFeature;
+import org.safere.SafeReMatchDiagnostics;
 
 class CrossEngineBenchmarkPlanTest {
   // This is a historical floor, not a snapshot. Additions do not raise it.
@@ -969,6 +974,44 @@ class CrossEngineBenchmarkPlanTest {
           .hasMessageContaining("one invocation per fresh fork");
     } finally {
       benchmark.tearDown();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"asciiWord", "javaLowerCase"})
+  void coldAsciiPrimerCompilesOnlyAnUnrelatedLiteralDuringSetup(String fixture) {
+    CrossEngineBenchmarkPlan plan = CrossEngineBenchmarkPlan.load();
+    String prefix = "InitializationLatencyBenchmark.";
+    String suffix = "." + fixture + "@safere-string";
+    CrossEngineWorkload unprimed = plan.resolve(prefix + "compileAndFirstFind" + suffix).workload();
+    CrossEngineBenchmarkPlan.Trial primed =
+        plan.resolve(prefix + "compileAndFirstFindAfterAscii" + suffix);
+    assertThat(primed.workload().patterns()).isEqualTo(unprimed.patterns());
+    assertThat(primed.workload().inputKeys()).isEqualTo(unprimed.inputKeys());
+
+    List<PatternCompiledEvent> compilations = new ArrayList<>();
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    Pattern.setDiagnostics(
+        new SafeReMatchDiagnostics() {
+          @Override
+          public void onPatternCompiled(PatternCompiledEvent event) {
+            compilations.add(event);
+          }
+        });
+    try (CrossEngineTrialRunner runner =
+        CrossEngineTrialRunner.prepareColdStart(
+            BenchmarkData.get(), primed, CrossEngineWorkload.TimingGroup.MILLISECONDS)) {
+      assertThat(compilations).hasSize(1);
+      assertThat(compilations.getFirst().pattern().analysis().features())
+          .contains(PatternFeature.LITERAL)
+          .doesNotContain(PatternFeature.CAPTURES);
+      runner.run(testBlackhole());
+      runner.validateMeasuredResult();
+      assertThat(compilations).hasSize(2);
+      assertThat(compilations.getLast().pattern().analysis().features())
+          .contains(PatternFeature.CAPTURES);
+    } finally {
+      Pattern.setDiagnostics(previous);
     }
   }
 

@@ -67,6 +67,13 @@ final class CrossEngineTrialRunner implements AutoCloseable {
           trialId + " belongs to " + workload.timingGroup() + ", not " + expectedTimingGroup);
     }
 
+    if (workload
+        .measurement()
+        .constraints()
+        .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.PRECOMPILE_ASCII)) {
+      // Warm common compilation classes without touching the measured pattern or running a search.
+      trial.variant().compile("safere-primer").close();
+    }
     List<RegexEngineVariant.RegexInput> inputs =
         trial.variant().prepareInputs(data, workload.inputKeys());
     RegexEngineVariant.PreparedReplacement replacement =
@@ -74,7 +81,6 @@ final class CrossEngineTrialRunner implements AutoCloseable {
     List<String> patternSources = workload.patterns();
     List<RegexEngineVariant.CompiledRegex> patterns = new ArrayList<>();
     try {
-      // A spare compilation would warm process-wide initialization before a cold combined trial.
       if (!workload.operation().compilesDuringMeasurement()) {
         for (String pattern : patternSources) {
           patterns.add(trial.variant().compile(pattern));

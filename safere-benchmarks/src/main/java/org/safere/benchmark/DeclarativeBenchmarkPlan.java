@@ -1735,6 +1735,12 @@ final class DeclarativeBenchmarkPlan {
         throw new IllegalArgumentException(
             id + " operation " + jsonName + " is incompatible with compileOnly mode");
       }
+      if (measurement.constraints().contains(ExecutionConstraint.PRECOMPILE_ASCII)
+          && (measurement.mode() != MeasurementMode.SINGLE_SHOT_COLD_START
+              || this != COMPILE_AND_FIND_GROUP_PRESENT)) {
+        throw new IllegalArgumentException(
+            id + " precompileAscii requires singleShotColdStart and compileAndFindGroupPresent");
+      }
     }
 
     EnumSet<Feature> requiredFeatures() {
@@ -2237,6 +2243,7 @@ final class DeclarativeBenchmarkPlan {
   enum ExecutionConstraint implements JsonNamed {
     NO_FORK("noFork"),
     FRESH_PROCESS_PER_INVOCATION("freshProcessPerInvocation"),
+    PRECOMPILE_ASCII("precompileAscii"),
     RETAIN_STATE("retainState"),
     PREMATERIALIZED_INPUT("prematerializedInput"),
     ALLOCATION_PROFILE("allocationProfile");

@@ -50,8 +50,9 @@ not vendored here or included in the `safere-benchmarks` Maven module.
 
 ### Cold compilation and first-use latency
 
-Regular `singleShotColdStart` declarations run in fresh JVM forks with no warmup and one measured
-invocation. They cover compilation, compile-plus-first-use, and first-use after untimed compilation.
+Regular `singleShotColdStart` declarations run in fresh JVM forks with no JMH warmup iterations
+and one measured invocation. They cover compilation, compile-plus-first-use, and first-use after
+untimed compilation.
 The cold runner never executes the measured operation for validation during setup. It retains the
 actual measured first-use result and validates it after timing, without replaying the operation;
 protocol tests also check the fixtures and preparation boundary separately. A second invocation in
@@ -66,6 +67,12 @@ word classes, Unicode word/property classes, and ASCII classes combined with gra
 or grapheme boundaries. The long first-search controls place a capture near the end of mixed
 text or exercise a miss through the same pattern. The compile-plus-first-use cases include
 a Java-derived character class. These workloads are part of the regular collection plan.
+
+`InitializationLatencyBenchmark.compileAndFirstFindAfterAscii.*` compiles an unrelated ASCII
+literal during setup in each fresh fork. The timed operation still compiles the target pattern,
+then searches and checks capture participation. The ASCII control and Java lower-case property
+use the same inputs and patterns as their unprimed `compileAndFirstFind` counterparts. Report
+this timing boundary separately when comparing first-use results.
 
 The standard cold run uses ten forks with one sample per fork. Compare the per-fork samples
 and medians alongside the JMH mean and confidence interval. Interleave A/B runs or repeat them

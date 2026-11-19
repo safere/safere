@@ -16,7 +16,8 @@ measurement boundary requires different JMH or process machinery.
 scheduling therefore depends on the `noFork` constraint, not on a benchmark family or class-name
 substring. Cold-start setup resolves the declaration and prepares any inputs. It compiles
 untimed for a first-use-only operation. In a compile-only or compile-plus-first-use operation,
-compilation occurs in the single timed invocation.
+the target pattern compiles in the single timed invocation. The optional `precompileAscii`
+constraint adds one untimed compilation of an unrelated ASCII literal to the setup.
 
 The C++, Go, and Rust runners execute native `singleShotColdStart` rows in a fresh child for
 each sample (one for smoke, five for a normal trial). The parent selects the exact pattern from

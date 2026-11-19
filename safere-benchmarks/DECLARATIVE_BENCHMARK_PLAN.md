@@ -358,8 +358,10 @@ Generic runner selection and the boundary of each unusual mode are documented in
 
 Timing units are `nanoseconds`, `microseconds`, `milliseconds`, or `bytes`.
 Constraints are `noFork`, `freshProcessPerInvocation`, `retainState`,
-`prematerializedInput`, and `allocationProfile`. Incompatible combinations,
+`prematerializedInput`, `allocationProfile`, and `precompileAscii`. Incompatible combinations,
 such as `noFork` with a fresh process per invocation, are rejected.
+`precompileAscii` requires `singleShotColdStart` with `compileAndFindGroupPresent`.
+Each fork compiles an unrelated ASCII literal during setup.
 
 Pathological workloads use `averageTime` plus `noFork`; the scheduler must not
 infer that policy from a class or workload name.
