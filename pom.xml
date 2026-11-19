@@ -129,7 +129,7 @@
               <style>GOOGLE</style>
               <reflowLongStrings>true</reflowLongStrings>
               <formatJavadoc>true</formatJavadoc>
-              <cleanup>false</cleanup>
+              <cleanup>true</cleanup>
             </googleJavaFormat>
             <removeUnusedImports/>
           </java>
