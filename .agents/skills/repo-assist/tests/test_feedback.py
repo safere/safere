@@ -205,6 +205,24 @@ def test_resolver_checks_head_repository_even_when_branch_and_commit_match(workt
     resolve_worktree(repository, metadata)
 
 
+def test_transferred_worktree_keeps_unpublished_repairs_after_remote_update(worktree):
+  repository, original, metadata = worktree
+  local_head = commit(original, "unpublished repair")
+  checkpoint = {
+    "lastRemoteHeadSha": metadata["head_oid"],
+    "lastLocalHeadSha": local_head,
+    "worktree": str(original),
+    "branch": "feature",
+  }
+  metadata["head_repository"] = "organization/r"
+  with pytest.raises(WorktreeError, match="remote"):
+    resolve_worktree(repository, metadata, checkpoint)
+  git(repository, "remote", "set-url", "origin", "https://github.com/organization/r.git")
+  result = resolve_worktree(repository, metadata, checkpoint)
+  assert result["localHeadSha"] == local_head
+  assert result["worktree"] == str(original)
+
+
 def test_resolver_blocks_unrecorded_local_commits_but_accepts_recorded_unpublished_fixes(worktree):
   repository, original, metadata = worktree
   local_head = commit(original, "local repair")
@@ -225,8 +243,33 @@ def test_resolver_blocks_unrecorded_local_commits_but_accepts_recorded_unpublish
 def test_resolver_does_not_create_replacement_when_original_branch_is_missing(worktree):
   repository, _, metadata = worktree
   metadata["head_ref"] = "missing"
-  with pytest.raises(WorktreeError, match="found 0"):
+  with pytest.raises(WorktreeError, match="PR branch missing is not currently checked out"):
     resolve_worktree(repository, metadata)
+
+
+def test_resolver_reports_branch_history_and_detached_pr_commit_without_switching(worktree):
+  repository, original, metadata = worktree
+  metadata["head_oid"] = commit(original, "published feature")
+  git(original, "switch", "-qc", "upper-layer")
+  upper_head = commit(original, "upper-layer changes")
+  detached = original.with_name("detached baseline")
+  git(repository, "worktree", "add", "-q", "--detach", str(detached), metadata["head_oid"])
+  untracked = detached / "experiment.txt"
+  untracked.write_text("user work", encoding="utf-8")
+
+  with pytest.raises(WorktreeError) as error:
+    resolve_worktree(repository, metadata)
+
+  diagnostic = str(error.value)
+  assert f"PR branch history in {original} (on upper-layer)" in diagnostic
+  assert f"Published PR commit checked out in {detached} (detached HEAD)" in diagnostic
+  assert git(original, "symbolic-ref", "HEAD") == "refs/heads/upper-layer"
+  assert git(original, "rev-parse", "HEAD") == upper_head
+  assert git(detached, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD"
+  assert untracked.read_text(encoding="utf-8") == "user work"
+
+  git(original, "switch", "-q", "feature")
+  assert resolve_worktree(repository, metadata)["worktree"] == str(original)
 
 
 def test_resolver_rejects_ambiguous_branch_matches(worktree):
@@ -371,3 +414,20 @@ def test_contributor_discovery_excludes_repository_owner_when_viewer_is_differen
   assert result["repositoryOwner"] == "owner"
   assert [pr["number"] for pr in result["trusted"]] == [3]
   assert [pr["number"] for pr in result["authored"]] == [2]
+
+
+def test_organization_owner_does_not_change_authenticated_author_categories(monkeypatch, capsys):
+  from argparse import Namespace
+
+  from repo_assist import cli
+
+  source = FeedbackSource()
+  source.repository_metadata = lambda: {"owner": "organization"}
+  monkeypatch.setattr(cli, "GitHub", lambda repository: source)
+  cli.discover(Namespace(repository="organization/r", limit=1000))
+  result = json.loads(capsys.readouterr().out)
+  assert result["repositoryOwner"] == "organization"
+  assert result["authenticatedLogin"] == "owner"
+  assert [pr["number"] for pr in result["authored"]] == [1]
+  assert [pr["number"] for pr in result["trusted"]] == [2]
+  assert result["drafts"] == []

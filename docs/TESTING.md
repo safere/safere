@@ -92,27 +92,31 @@ rewritten in Java:
 
 ## Running Tests
 
+Reserve exclusive machine access for tests, including tests in other worktrees.
+The runner waits for the current workload to finish; see
+[exclusive machine access](DEVELOPMENT.md#exclusive-machine-access).
+
 ```bash
 # Run all tests
-mvn test -pl safere
+./tools/machine-run -- mvn test -pl safere
 
 # Run a specific test class
-mvn test -pl safere -Dtest=ParserTest
+./tools/machine-run -- mvn test -pl safere -Dtest=ParserTest
 
 # Run tests with coverage report (JaCoCo)
-mvn verify -pl safere -Pcoverage
+./tools/machine-run -- mvn verify -pl safere -Pcoverage
 
 # Run crosscheck module tests
-mvn test -pl safere-crosscheck -am
+./tools/machine-run -- mvn test -pl safere-crosscheck -am
 
 # Run SafeRE tests and generated public API tests through the crosscheck facade
-mvn verify -pl safere,safere-crosscheck -am -Pcrosscheck-public-api-tests
+./tools/machine-run -- mvn verify -pl safere,safere-crosscheck -am -Pcrosscheck-public-api-tests
 
 # Run generated public API tests only, after safere and the parent POM are installed locally
-mvn verify -pl safere-crosscheck -Pcrosscheck-public-api-tests
+./tools/machine-run -- mvn verify -pl safere-crosscheck -Pcrosscheck-public-api-tests
 
 # Run Jazzer fuzz targets in regression mode
-mvn test -pl safere-fuzz -am
+./tools/machine-run -- mvn test -pl safere-fuzz -am
 ```
 
 Coverage reports are generated at
@@ -299,7 +303,7 @@ mvn -pl safere -Pvector-tests -Dtest=TeddyVectorScanTest test
 ```
 
 `TeddyVectorScanStress` is a separate diagnostic entry point for the C2 failure in
-[SafeRE #1170](https://github.com/eaftan/safere/issues/1170). It warms three-byte
+[SafeRE #1170](https://github.com/safere/safere/issues/1170). It warms three-byte
 models before introducing two-byte models and checks each scan result. Run it in
 fresh JVMs on an x86-64 AVX2 machine with an affected JDK 25 or 26. Build using the
 project build JDK first:

@@ -27,6 +27,7 @@ import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.openjdk.jmh.infra.Blackhole;
 
 class CrossEngineBenchmarkPlanTest {
@@ -299,11 +300,10 @@ class CrossEngineBenchmarkPlanTest {
             BenchmarkOperation.REPLACE_FIRST,
             BenchmarkOperation.REPLACE_ALL,
             BenchmarkOperation.REPLACE_ALL_LENGTH_SUM,
-            BenchmarkOperation.MANUAL_REPLACE_ALL)
-        .doesNotContain(
+            BenchmarkOperation.MANUAL_REPLACE_ALL,
             BenchmarkOperation.CAPTURE_GROUPS,
-            BenchmarkOperation.FIND_GROUP,
-            BenchmarkOperation.SPLIT_LENGTH_SUM);
+            BenchmarkOperation.FIND_GROUP)
+        .doesNotContain(BenchmarkOperation.SPLIT_LENGTH_SUM);
   }
 
   @Test
@@ -337,10 +337,11 @@ class CrossEngineBenchmarkPlanTest {
     CrossEngineBenchmarkPlan plan = CrossEngineBenchmarkPlan.load();
 
     assertThat(plan.resolve("RegexBenchmark.literalMatch@safere-utf8")).isNotNull();
-    assertThatThrownBy(() -> plan.resolve("HttpBenchmark.httpExtract@safere-utf8"))
+    assertThat(plan.resolve("HttpBenchmark.httpExtract@safere-utf8")).isNotNull();
+    assertThatThrownBy(() -> plan.resolve("Issue481ScalingBenchmark.splitWords.128@safere-utf8"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Unsupported cross-engine combination")
-        .hasMessageContaining("captureText");
+        .hasMessageContaining("split");
     assertThatThrownBy(() -> plan.resolve("missing.workload@safere-string"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unknown cross-engine workload ID: missing.workload");
@@ -722,6 +723,14 @@ class CrossEngineBenchmarkPlanTest {
             "RegexBenchmark.literalMatch@safere-utf8",
             "ApplicationBenchmark.uuidValidation@safere-utf8",
             "HttpBenchmark.httpFull@safere-utf8",
+            "HttpBenchmark.httpExtract@safere-utf8",
+            "ApplicationBenchmark.stackTraceExtract@safere-utf8",
+            "CaptureScalingBenchmark.capture1@safere-utf8",
+            "CaptureRecoveryBenchmark.stack.text@safere-utf8",
+            "CaptureRecoveryBenchmark.stack.mixed@safere-utf8",
+            "CaptureRecoveryBenchmark.scheme.rejection@safere-utf8",
+            "CaptureRecoveryBenchmark.stack.matches.512@safere-utf8",
+            "CaptureRecoveryBenchmark.stack.anchoredFind.513@safere-utf8",
             "MatcherApiBenchmark.lookingAt@safere-utf8",
             "MatcherApiBenchmark.regionFind@safere-utf8",
             "MatcherApiBenchmark.resetAndFind@safere-utf8",
@@ -795,8 +804,7 @@ class CrossEngineBenchmarkPlanTest {
   void utf8ReplacementAdapterExpandsLiteralNumberedAndNamedTemplates() {
     RegexEngineVariant variant = RegexEngineVariant.SAFERE_UTF8;
     RegexEngineVariant.RegexInput input =
-        new RegexEngineVariant.Utf8RegexInput(
-            org.safere.Utf8Input.trusted("alpha=one&beta=two".getBytes(StandardCharsets.UTF_8)));
+        RegexEngineVariant.utf8Input("alpha=one&beta=two".getBytes(StandardCharsets.UTF_8));
 
     try (RegexEngineVariant.CompiledRegex literal = variant.compile("&");
         RegexEngineVariant.CompiledRegex numbered = variant.compile("([a-z]+)=([a-z]+)");
@@ -833,16 +841,30 @@ class CrossEngineBenchmarkPlanTest {
     assertThat(cursor.groupParticipated(2)).isFalse();
   }
 
-  @Test
-  void coldStartPreparationDefersCompilationUntilTheMeasuredTask() {
+  @ParameterizedTest
+  @EnumSource(
+      value = BenchmarkOperation.class,
+      names = {
+        "COMPILE",
+        "COMPILE_AND_FIND",
+        "COMPILE_AND_MATCHES",
+        "COMPILE_AND_FIND_GROUP",
+        "COMPILE_AND_REPLACE_ALL"
+      })
+  void coldStartPreparationDefersCompilationUntilTheMeasuredTask(BenchmarkOperation operation) {
     CrossEngineWorkload workload =
         new CrossEngineWorkload(
             "Synthetic.coldCompile",
-            BenchmarkOperation.COMPILE,
+            operation,
             List.of("("),
-            List.of(),
-            new int[0],
-            null,
+            operation == BenchmarkOperation.COMPILE
+                ? List.of()
+                : CrossEngineBenchmarkPlan.load()
+                    .resolve("RegexBenchmark.literalMatch@safere-string")
+                    .workload()
+                    .inputKeys(),
+            new int[] {0},
+            "$0",
             null,
             0,
             DeclarativeBenchmarkPlan.MatcherLifecycle.NONE,
@@ -863,10 +885,16 @@ class CrossEngineBenchmarkPlanTest {
             "Today's password is swordfish. I understand instantiating Blackholes directly is"
                 + " dangerous.");
 
-    try (CrossEngineTrialRunner runner =
+    CrossEngineTrialRunner runner =
         CrossEngineTrialRunner.prepareColdStart(
-            BenchmarkData.get(), trial, CrossEngineWorkload.TimingGroup.MILLISECONDS)) {
-      assertThatThrownBy(() -> runner.run(blackhole)).isInstanceOf(IllegalArgumentException.class);
+            BenchmarkData.get(), trial, CrossEngineWorkload.TimingGroup.MILLISECONDS);
+    assertThatThrownBy(() -> runner.run(blackhole)).isInstanceOf(IllegalArgumentException.class);
+    if (operation == BenchmarkOperation.COMPILE) {
+      runner.close();
+    } else {
+      // Cold compound operations also validate after timing; they must not warm compilation in
+      // setup.
+      assertThatThrownBy(runner::close).isInstanceOf(IllegalArgumentException.class);
     }
   }
 

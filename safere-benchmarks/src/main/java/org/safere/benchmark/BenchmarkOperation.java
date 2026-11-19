@@ -29,6 +29,9 @@ enum BenchmarkOperation {
   COMPILE(EngineCapability.COMPILE),
   COMPILE_AND_FIND(EngineCapability.COMPILE, EngineCapability.FIND),
   COMPILE_AND_MATCHES(EngineCapability.COMPILE, EngineCapability.MATCHES),
+  COMPILE_AND_FIND_GROUP(
+      EngineCapability.COMPILE, EngineCapability.FIND, EngineCapability.GROUP_TEXT),
+  COMPILE_AND_REPLACE_ALL(EngineCapability.COMPILE, EngineCapability.REPLACE),
   FIND_ROTATING_UTF16(EngineCapability.FIND),
   COMPILE_AND_FIND_ROTATING_UTF16(EngineCapability.COMPILE, EngineCapability.FIND),
   MATCHER_RESET_FIND(EngineCapability.FIND, EngineCapability.MATCHER_RESET),
@@ -68,6 +71,8 @@ enum BenchmarkOperation {
       case COMPILE -> COMPILE;
       case COMPILE_AND_FIND -> COMPILE_AND_FIND;
       case COMPILE_AND_MATCHES -> COMPILE_AND_MATCHES;
+      case COMPILE_AND_FIND_GROUP -> COMPILE_AND_FIND_GROUP;
+      case COMPILE_AND_REPLACE_ALL -> COMPILE_AND_REPLACE_ALL;
       case FIND_ROTATING_UTF16 -> FIND_ROTATING_UTF16;
       case COMPILE_AND_FIND_ROTATING_UTF16 -> COMPILE_AND_FIND_ROTATING_UTF16;
       case MATCHER_RESET_FIND -> MATCHER_RESET_FIND;
@@ -81,6 +86,16 @@ enum BenchmarkOperation {
           throw new IllegalArgumentException(
               "Operation is not implemented by the cross-engine runner: " + operation);
     };
+  }
+
+  /** These operations must not compile even a validation pattern during cold-start setup. */
+  boolean compilesDuringMeasurement() {
+    return this == COMPILE
+        || this == COMPILE_AND_FIND
+        || this == COMPILE_AND_MATCHES
+        || this == COMPILE_AND_FIND_GROUP
+        || this == COMPILE_AND_REPLACE_ALL
+        || this == COMPILE_AND_FIND_ROTATING_UTF16;
   }
 
   boolean isSupportedBy(RegexEngineVariant variant) {
@@ -113,7 +128,7 @@ enum BenchmarkOperation {
           count,
           this == COMPILE_AND_FIND_ROTATING_UTF16);
     }
-    RegexEngineVariant.CompiledRegex pattern = patterns.getFirst();
+    RegexEngineVariant.CompiledRegex pattern = patterns.isEmpty() ? null : patterns.getFirst();
     RegexEngineVariant.RegexInput input = inputs.getFirst();
     return switch (this) {
       case MATCHES -> blackhole -> blackhole.consume(pattern.matches(input));
@@ -153,6 +168,20 @@ enum BenchmarkOperation {
             try (RegexEngineVariant.CompiledRegex compiled =
                 variant.compile(patternSources.getFirst())) {
               blackhole.consume(compiled.matches(input));
+            }
+          };
+      case COMPILE_AND_FIND_GROUP ->
+          blackhole -> {
+            try (RegexEngineVariant.CompiledRegex compiled =
+                variant.compile(patternSources.getFirst())) {
+              blackhole.consume(findGroup(compiled.matcher(input), groups[0]));
+            }
+          };
+      case COMPILE_AND_REPLACE_ALL ->
+          blackhole -> {
+            try (RegexEngineVariant.CompiledRegex compiled =
+                variant.compile(patternSources.getFirst())) {
+              compiled.replaceAll(input, replacement).consume(blackhole);
             }
           };
       case MATCHER_RESET_FIND -> {
@@ -258,7 +287,7 @@ enum BenchmarkOperation {
         return compiled.find(new RegexEngineVariant.StringRegexInput(input));
       }
     }
-    RegexEngineVariant.CompiledRegex pattern = patterns.getFirst();
+    RegexEngineVariant.CompiledRegex pattern = patterns.isEmpty() ? null : patterns.getFirst();
     RegexEngineVariant.RegexInput input = inputs.getFirst();
     return switch (this) {
       case MATCHES -> pattern.matches(input);
@@ -288,6 +317,18 @@ enum BenchmarkOperation {
         try (RegexEngineVariant.CompiledRegex compiled =
             variant.compile(patternSources.getFirst())) {
           yield compiled.matches(input);
+        }
+      }
+      case COMPILE_AND_FIND_GROUP -> {
+        try (RegexEngineVariant.CompiledRegex compiled =
+            variant.compile(patternSources.getFirst())) {
+          yield findGroup(compiled.matcher(input), groups[0]);
+        }
+      }
+      case COMPILE_AND_REPLACE_ALL -> {
+        try (RegexEngineVariant.CompiledRegex compiled =
+            variant.compile(patternSources.getFirst())) {
+          yield compiled.replaceAll(input, replacement).validationValue();
         }
       }
       case MATCHER_RESET_FIND -> {
@@ -362,7 +403,7 @@ enum BenchmarkOperation {
     String[] inputs = rotatingUtf16Inputs(seed, count);
     int[] index = {0};
     if (!compileEachInvocation) {
-      RegexEngineVariant.CompiledRegex pattern = patterns.getFirst();
+      RegexEngineVariant.CompiledRegex pattern = patterns.isEmpty() ? null : patterns.getFirst();
       return blackhole -> {
         String input = inputs[index[0]];
         index[0] = (index[0] + 1) % inputs.length;

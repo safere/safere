@@ -37,6 +37,8 @@ final class CrossEngineBenchmarkPlan {
           DeclarativeBenchmarkPlan.Operation.COMPILE,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_MATCHES,
+          DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND_GROUP,
+          DeclarativeBenchmarkPlan.Operation.COMPILE_AND_REPLACE_ALL,
           DeclarativeBenchmarkPlan.Operation.FIND_ROTATING_UTF16,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND_ROTATING_UTF16,
           DeclarativeBenchmarkPlan.Operation.MATCHER_RESET_FIND,

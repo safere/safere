@@ -9,6 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/tools/machine-lock.sh"
 DEFAULT_EXTERNAL_REPO="$SCRIPT_DIR/../safere-openjdk-regex-benchmarks"
 EXTERNAL_REPO="${SAFERE_OPENJDK_REGEX_BENCHMARKS_REPO:-$DEFAULT_EXTERNAL_REPO}"
 MODE="standard"
@@ -72,7 +73,7 @@ if [[ ! -d "$EXTERNAL_REPO" ]]; then
   cat >&2 <<EOF
 ERROR: external benchmark checkout not found: $EXTERNAL_REPO
 
-Clone https://github.com/eaftan/safere-openjdk-regex-benchmarks outside this
+Clone https://github.com/safere/openjdk-regex-benchmarks outside this
 repository, or select an existing checkout with --repo PATH.
 EOF
   exit 1
@@ -90,6 +91,8 @@ fi
 if [[ ${#BENCHMARKS[@]} -eq 0 ]]; then
   BENCHMARKS=('org.safere.bench.openjdk.*')
 fi
+
+safere_reserve_machine
 
 SAFERE_VERSION="$(
   mvn help:evaluate \

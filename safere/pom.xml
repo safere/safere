@@ -40,6 +40,12 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+      <version>${icu4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
@@ -96,7 +102,7 @@ final class WorkCounterConfig {
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.6.2</version>
+        <version>3.7.0</version>
         <executions>
           <execution>
             <id>add-work-counter-config-source</id>

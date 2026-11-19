@@ -22,6 +22,9 @@ class PreviousMatchBoundaryEngineTest {
         .isThrownBy(() -> BitState.getOrCreate(null, prog, "ba", 1, 2, 2, false, false));
     assertThatIllegalArgumentException()
         .isThrownBy(
+            () -> new BitState(prog, new StringInputScanner("ba"), 1, 2, 2, false, false, null));
+    assertThatIllegalArgumentException()
+        .isThrownBy(
             () -> Nfa.search(prog, "ba", 1, Nfa.Anchor.ANCHORED, Nfa.MatchKind.FIRST_MATCH, 1));
   }
 
@@ -81,6 +84,8 @@ class PreviousMatchBoundaryEngineTest {
         assertThat(pattern.forwardDfaSupported()).isFalse();
         assertThat(pattern.onePass()).isNull();
         assertThat(pattern.canUseReverseDfa()).isFalse();
+        assertThat(pattern.prog().supportsFlatNfa()).isFalse();
+        assertThat(pattern.nfaProg(pattern.prog())).isSameAs(pattern.prog());
         for (String input : List.of("", "aa!ba", "a".repeat(64) + "z")) {
           assertFinds(
               pattern.matcher(input), java.util.regex.Pattern.compile(regex).matcher(input), 5);

@@ -1621,6 +1621,8 @@ final class DeclarativeBenchmarkPlan {
     COMPILE("compile", false, false),
     COMPILE_AND_FIND("compileAndFind", false, true, Feature.FIND),
     COMPILE_AND_MATCHES("compileAndMatches", false, true, Feature.MATCHES),
+    COMPILE_AND_FIND_GROUP("compileAndFindGroup", false, true, Feature.FIND, Feature.CAPTURE_TEXT),
+    COMPILE_AND_REPLACE_ALL("compileAndReplaceAll", false, true, Feature.REPLACE),
     FIND_ROTATING_UTF16("findRotatingUtf16", false, false, Feature.FIND),
     COMPILE_AND_FIND_ROTATING_UTF16("compileAndFindRotatingUtf16", false, false, Feature.FIND),
     MATCHER_CONSTRUCTION("matcherConstruction", false, true, Feature.UTF8_INPUT),
@@ -1773,7 +1775,13 @@ final class DeclarativeBenchmarkPlan {
             UTF8_CAPTURE_BOUNDS,
             UTF8_REPLACEMENT ->
             consumption == ResultConsumption.INTEGER;
-        case FIND_GROUP, REPLACE_FIRST, REPLACE_ALL, APPEND_REPLACEMENT, MANUAL_REPLACE_ALL ->
+        case FIND_GROUP,
+            COMPILE_AND_FIND_GROUP,
+            COMPILE_AND_REPLACE_ALL,
+            REPLACE_FIRST,
+            REPLACE_ALL,
+            APPEND_REPLACEMENT,
+            MANUAL_REPLACE_ALL ->
             consumption == ResultConsumption.STRING;
         case CAPTURE_GROUPS ->
             consumption == ResultConsumption.STRING || consumption == ResultConsumption.STRING_LIST;
@@ -1805,8 +1813,10 @@ final class DeclarativeBenchmarkPlan {
                 RecipeValueType.INTEGER,
                 "mode",
                 RecipeValueType.STRING);
-        case FIND_GROUP_PRESENT, FIND_GROUP -> Map.of("group", RecipeValueType.INTEGER);
+        case FIND_GROUP_PRESENT, FIND_GROUP, COMPILE_AND_FIND_GROUP ->
+            Map.of("group", RecipeValueType.INTEGER);
         case REPLACE_FIRST,
+            COMPILE_AND_REPLACE_ALL,
             REPLACE_ALL,
             REPLACE_ALL_LENGTH_SUM,
             APPEND_REPLACEMENT,
@@ -1839,8 +1849,9 @@ final class DeclarativeBenchmarkPlan {
             Set.of("groups");
         case UTF8_CAPTURE_BOUNDS -> Set.of("groups", "expectedBounds");
         case FIND_SAMPLED_GROUP -> Set.of("group", "count", "mode");
-        case FIND_GROUP_PRESENT, FIND_GROUP -> Set.of("group");
+        case FIND_GROUP_PRESENT, FIND_GROUP, COMPILE_AND_FIND_GROUP -> Set.of("group");
         case REPLACE_FIRST,
+            COMPILE_AND_REPLACE_ALL,
             REPLACE_ALL,
             REPLACE_ALL_LENGTH_SUM,
             APPEND_REPLACEMENT,

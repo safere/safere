@@ -351,7 +351,7 @@ including captures, acceptance conditions, snapshots, and successive searches.
 
 This successful-path selection policy is separate from failed-path capture
 leakage. The previous copy-based compatibility implementation is preserved at
-[commit db84b9a5](https://github.com/eaftan/safere/commit/db84b9a5618c4ad299b666fd0311a8a65720b457)
+[commit db84b9a5](https://github.com/safere/safere/commit/db84b9a5618c4ad299b666fd0311a8a65720b457)
 for reference.
 
 ## ASCII Word Boundaries around Combining Marks
@@ -410,7 +410,7 @@ bugs and implementation accidents.
 
 ## Bracket Roles after Ignored Range Trivia
 
-Issue reference: [#1070](https://github.com/eaftan/safere/issues/1070), which tracks
+Issue reference: [#1070](https://github.com/safere/safere/issues/1070), which tracks
 considering an upstream JDK bug report.
 
 The [JDK 26 `COMMENTS` specification](https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/util/regex/Pattern.html#COMMENTS)
@@ -481,7 +481,7 @@ documented meaning and matches like the JDK.
 Issue reference: #858.
 
 Compatibility rationale:
-[discussion of both interpretations](https://github.com/eaftan/safere/issues/858#issuecomment-5654689232).
+[discussion of both interpretations](https://github.com/safere/safere/issues/858#issuecomment-5654689232).
 
 SafeRE treats all text from an unescaped `#` to the end of the line as
 comment trivia when comments mode is enabled. A `\Q` inside that comment
@@ -525,7 +525,7 @@ crosscheck tests with `@DisabledForCrosscheck`.
 
 ## Unicode Hexadecimal Digits
 
-Issue reference: [#985](https://github.com/eaftan/safere/issues/985).
+Issue reference: [#985](https://github.com/safere/safere/issues/985).
 
 SafeRE's `\p{IsHex_Digit}` follows Unicode's `Hex_Digit` binary property:
 ASCII and fullwidth `0`–`9`, `A`–`F`, and `a`–`f`. The
@@ -547,7 +547,8 @@ code points on JDK 26 or newer, using Unicode ranges as the `Hex_Digit` oracle.
 
 ## Java Character Classes and the Unicode Version
 
-Issue reference: [#1144](https://github.com/eaftan/safere/issues/1144).
+Issue references: [#1144](https://github.com/safere/safere/issues/1144),
+[#1196](https://github.com/safere/safere/issues/1196).
 
 `java.util.regex` defines the `\p{java...}` classes, such as
 `\p{javaLowerCase}` and `\p{javaJavaIdentifierStart}`, as equivalent to the
@@ -557,12 +558,24 @@ same data as `\p{L}`, `\p{IsLowercase}`, and the other Unicode properties.
 A pattern therefore matches the same strings on every JDK, and a `java*` class
 can't disagree with the equivalent Unicode property in the same pattern.
 
-On JDK 26 and newer, whose Unicode version matches the bundled tables, the
-classes match `Character` exactly; `UnicodeJdkConsistencyTest` checks all of
-them over every code point. On older JDKs, they can disagree with `Character`
-about code points assigned since that JDK's Unicode version, and about a few
-property changes, such as U+0295 LATIN LETTER PHARYNGEAL VOICED FRICATIVE,
-which Unicode 17.0 no longer treats as lowercase.
+On JDKs whose Unicode version matches the bundled tables, the classes match
+`Character` exactly; `UnicodeJdkConsistencyTest` checks all of them over every
+code point when the assigned repertoire agrees. On other JDKs, they can disagree
+with `Character` about newly assigned code points and property changes, such as
+U+0295 LATIN LETTER PHARYNGEAL VOICED FRICATIVE, which Unicode 17.0 no longer
+treats as lowercase.
+
+JDK 28 EA introduces Unicode 18 scripts, case pairs, and a GB9c grapheme-rule
+change. These do not change SafeRE's pinned Unicode 17 behavior. For example,
+`\X\X` on `क्‍क` finds UTF-16 bounds `[1, 4)` in SafeRE and `[2, 4)` in
+that JDK. `BoundaryMatcherTest` derives expected bounds and captures from the
+pinned ICU4J character break iterator on every runtime. Script and symmetric
+case-pair canaries also use pinned ICU4J data on every runtime.
+
+A Unicode 18 migration requires upgrading ICU4J, generated tables, grapheme
+fixtures, and the generator JDK together, as described in the
+[Unicode generator guide](safere-unicode/README.md). Updating test oracles for
+JDK 28 does not perform that migration.
 
 ## Unicode Case-Insensitive Range Closure
 
@@ -590,7 +603,7 @@ including the baseline and the rule after #866.
 
 ## Grapheme Clusters after Unassigned Code Points
 
-Issue reference: [#925](https://github.com/eaftan/safere/issues/925).
+Issue reference: [#925](https://github.com/safere/safere/issues/925).
 
 SafeRE uses Unicode grapheme-break properties when matching `\X`, including
 for unassigned code points. The
@@ -639,14 +652,14 @@ Unicode 17 support. SafeRE follows the [Unicode 17 grapheme property file](https
 and the [Unicode committee's correction](https://www.unicode.org/L2/L2021/21126-utc168-properties-recs.pdf).
 
 This specification-based difference is independent of the GB11 difference described below.
-The upstream JDK report is tracked in [#940](https://github.com/eaftan/safere/issues/940).
+The upstream JDK report is tracked in [#940](https://github.com/safere/safere/issues/940).
 `GraphemeBreakConformanceTest` pins both Ahom signs and excludes only those two
 code points from its exhaustive JDK comparison. The segmentation code and its
 linear-time bound are unchanged.
 
 ## Emoji ZWJ Sequences (GB11)
 
-Issue reference: [#936](https://github.com/eaftan/safere/issues/936).
+Issue reference: [#936](https://github.com/safere/safere/issues/936).
 
 SafeRE follows [UAX #29 rule GB11](https://www.unicode.org/reports/tr29/#GB11):
 `Extended_Pictographic Extend* ZWJ × Extended_Pictographic`. Only code points

@@ -88,7 +88,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -119,7 +119,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -171,7 +171,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up production JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -231,7 +231,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up runtime JDK ${{ matrix.java }}
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version: ${{ matrix.java }}
           distribution: 'temurin'
@@ -306,7 +306,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -357,8 +357,11 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Test benchmark result processing
-        run: python -m unittest safere-benchmarks/scripts/test_compare_benchmarks.py
+      - name: Test machine reservations
+        run: ./tools/machine-run -- python -m unittest discover -s tools
+
+      - name: Test benchmark tools
+        run: ./tools/machine-run -- python -m unittest discover -s safere-benchmarks/scripts
 
   benchmark-smoke-test-java:
     needs: [changes, prepare-maven-cache]
@@ -369,7 +372,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -427,7 +430,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up production JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -483,7 +486,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up production JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -534,7 +537,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up production JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -575,7 +578,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up production JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -608,7 +611,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Set up JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
@@ -676,7 +679,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up production JDK
-        uses: actions/setup-java@v6.1.0
+        uses: actions/setup-java@v6.2.0
         with:
           java-version-file: .sdkmanrc
           cache: maven
