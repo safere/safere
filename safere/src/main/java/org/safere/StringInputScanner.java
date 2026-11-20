@@ -226,8 +226,8 @@ final class StringInputScanner implements InputScanner {
     // misses, up to the cap. Failed windows are disjoint; the final window is at most the distance
     // already scanned in this call plus 64. Thus overrun past a match is bounded by distance
     // advanced plus 64. Each window issues up to k bounded indexOf calls, giving at most
-    // k * (2n + 64m) work for k <= 8 members and m consuming
-    // matches across n input units. Since m <= n, repeated find() work stays linear.
+    // k * (2n + 64m) work for k <= 8 members and m consuming matches across n input units.
+    // Since m <= n, repeated find() work stays linear.
     int windowLength = SMALL_SET_INITIAL_SEARCH_WINDOW;
     while (position < length) {
       int windowEnd = position + Math.min(windowLength, length - position);
