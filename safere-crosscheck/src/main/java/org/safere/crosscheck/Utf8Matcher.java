@@ -279,11 +279,10 @@ public final class Utf8Matcher {
   public void appendTail(Utf8Sink sink) {
     requireNonNull(sink, "sink");
     ByteArrayOutputStream actualOutput = new ByteArrayOutputStream();
-    delegate.appendTail(
-        (bytes, offset, length) -> {
-          actualOutput.write(bytes, offset, length);
-          sink.append(bytes, offset, length);
-        });
+    delegate.appendTail((bytes, offset, length) -> {
+      actualOutput.write(bytes, offset, length);
+      sink.append(bytes, offset, length);
+    });
     if (oracles == null) {
       return;
     }

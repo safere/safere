@@ -139,33 +139,32 @@ class OnePassTest {
         String input = expected ? "\u0100" : "\u0200";
         Thread thread =
             Thread.ofPlatform()
-                .start(
-                    () -> {
-                      try {
-                        start.await();
-                        InputScanner scanner = new StringInputScanner(input);
-                        int[] result = new int[2];
-                        int[] scratch = new int[2];
-                        for (int iteration = 0;
-                            iteration < 100_000 && failure.get() == null;
-                            iteration++) {
-                          boolean matched =
-                              onePass.search(scanner, 0, scanner.length(), true, 1, result, scratch)
-                                  != null;
-                          if (matched != expected) {
-                            failure.compareAndSet(
-                                null,
-                                "expected "
-                                    + expected
-                                    + " for U+"
-                                    + Integer.toHexString(input.charAt(0)));
-                          }
-                        }
-                      } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        failure.compareAndSet(null, "worker interrupted");
+                .start(() -> {
+                  try {
+                    start.await();
+                    InputScanner scanner = new StringInputScanner(input);
+                    int[] result = new int[2];
+                    int[] scratch = new int[2];
+                    for (int iteration = 0;
+                        iteration < 100_000 && failure.get() == null;
+                        iteration++) {
+                      boolean matched =
+                          onePass.search(scanner, 0, scanner.length(), true, 1, result, scratch)
+                              != null;
+                      if (matched != expected) {
+                        failure.compareAndSet(
+                            null,
+                            "expected "
+                                + expected
+                                + " for U+"
+                                + Integer.toHexString(input.charAt(0)));
                       }
-                    });
+                    }
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    failure.compareAndSet(null, "worker interrupted");
+                  }
+                });
         threads.add(thread);
       }
 

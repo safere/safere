@@ -67,11 +67,10 @@ class BitStateTest {
             WorkCounter.countForTesting(
                 () -> expected[0] = interpreter.doSearch(0, length, anchored));
         long fusedWork =
-            WorkCounter.countForTesting(
-                () ->
-                    assertThat(fused.doSearch(0, length, anchored))
-                        .as("%s, anchored=%s", scanner.getClass().getSimpleName(), anchored)
-                        .isEqualTo(expected[0]));
+            WorkCounter.countForTesting(() ->
+                assertThat(fused.doSearch(0, length, anchored))
+                    .as("%s, anchored=%s", scanner.getClass().getSimpleName(), anchored)
+                    .isEqualTo(expected[0]));
         assertThat(fusedWork)
             .as("%s, anchored=%s", scanner.getClass().getSimpleName(), anchored)
             .isEqualTo(interpreterWork);

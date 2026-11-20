@@ -255,14 +255,13 @@ class BitStateWindowTest {
           Matcher stringMatcher = pattern.matcher(text);
           Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.trusted(text.getBytes(UTF_8)));
           long work =
-              WorkCounter.countForTesting(
-                  () -> {
-                    int matches = 0;
-                    while (utf8 ? utf8Matcher.find() : stringMatcher.find()) {
-                      matches++;
-                    }
-                    assertThat(matches).isEqualTo(size);
-                  });
+              WorkCounter.countForTesting(() -> {
+                int matches = 0;
+                while (utf8 ? utf8Matcher.find() : stringMatcher.find()) {
+                  matches++;
+                }
+                assertThat(matches).isEqualTo(size);
+              });
           if (previous >= 0) {
             assertThat(work).as("%s, UTF-8=%s", atom, utf8).isLessThan(previous * 3);
           }
@@ -402,14 +401,13 @@ class BitStateWindowTest {
       for (int size : List.of(64, 128, 256)) {
         Matcher matcher = matchers(pattern, block.repeat(size)).get(utf8 ? 1 : 0);
         long work =
-            WorkCounter.countForTesting(
-                () -> {
-                  int matches = 0;
-                  while (matcher.find()) {
-                    matches++;
-                  }
-                  assertThat(matches).isEqualTo(size * 34);
-                });
+            WorkCounter.countForTesting(() -> {
+              int matches = 0;
+              while (matcher.find()) {
+                matches++;
+              }
+              assertThat(matches).isEqualTo(size * 34);
+            });
         if (previous >= 0) {
           assertThat(work).as("UTF-8=%s", utf8).isLessThan(previous * 3);
         }

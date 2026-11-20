@@ -182,14 +182,13 @@ class PatternPredicateTest {
   static String escape(String s) {
     StringBuilder sb = new StringBuilder("\"");
     s.chars()
-        .forEach(
-            c -> {
-              if (c < 0x20 || c >= 0x7f) {
-                sb.append(String.format("\\u%04X", c));
-              } else {
-                sb.append((char) c);
-              }
-            });
+        .forEach(c -> {
+          if (c < 0x20 || c >= 0x7f) {
+            sb.append(String.format("\\u%04X", c));
+          } else {
+            sb.append((char) c);
+          }
+        });
     return sb.append('"').toString();
   }
 }

@@ -156,6 +156,12 @@ DFA budgets bound cache growth; exhaustion leads to bounded cache management or
 fallback rather than a change in match results.
 
 The NFA processes prioritized threads in lockstep and carries capture registers.
+For scalar programs without progress guards, it can reuse the flat program
+already prepared for DFA execution. NFA selection reads that shared artifact
+without constructing another copy or changing when it is prepared. Paths that
+bypass DFA preparation use the graph interpreter until a flat program is ready;
+progress and grapheme semantics always retain graph execution.
+
 BitState uses an explicit stack and visited-state information to avoid
 unrestricted backtracking. Work limits and semantic eligibility checks keep
 these paths within the matching contract. OnePass is available only when its

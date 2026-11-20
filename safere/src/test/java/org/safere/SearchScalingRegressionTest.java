@@ -49,13 +49,12 @@ class SearchScalingRegressionTest {
       String input = "a" + "😀".repeat(pairs) + "\uDE00!";
       Matcher matcher = pattern.matcher(input);
       work[index] =
-          WorkCounter.countForTesting(
-              () -> {
-                for (int end = input.length(); end >= 1; end--) {
-                  matcher.region(1, end);
-                  assertThat(matcher.find()).isEqualTo(end >= input.length() - 1);
-                }
-              });
+          WorkCounter.countForTesting(() -> {
+            for (int end = input.length(); end >= 1; end--) {
+              matcher.region(1, end);
+              assertThat(matcher.find()).isEqualTo(end >= input.length() - 1);
+            }
+          });
     }
     assertThat(work[0]).isPositive();
     assertThat(work[1]).as("shrinking regions must not repeat tail scans").isLessThan(work[0] * 6);
@@ -71,13 +70,12 @@ class SearchScalingRegressionTest {
         String input = "a" + "😀".repeat(pairs) + "\uD83Dxy";
         Matcher matcher = pattern.matcher(input);
         work[index] =
-            WorkCounter.countForTesting(
-                () -> {
-                  for (int start = 2 * pairs - 1; start >= 1; start -= 2) {
-                    matcher.region(start, input.length());
-                    assertThat(matcher.find()).isTrue();
-                  }
-                });
+            WorkCounter.countForTesting(() -> {
+              for (int start = 2 * pairs - 1; start >= 1; start -= 2) {
+                matcher.region(start, input.length());
+                assertThat(matcher.find()).isTrue();
+              }
+            });
       }
       assertThat(work[0]).isPositive();
       assertThat(work[1])
@@ -95,12 +93,11 @@ class SearchScalingRegressionTest {
       String input = "a" + "😀".repeat(pairs + 1) + "!";
       Matcher matcher = pattern.matcher(input).region(1, 2 * pairs + 2);
       work[index] =
-          WorkCounter.countForTesting(
-              () -> {
-                assertThat(matcher.find()).isTrue();
-                assertThat(matcher.start()).isEqualTo(2);
-                assertThat(matcher.end()).isEqualTo(3);
-              });
+          WorkCounter.countForTesting(() -> {
+            assertThat(matcher.find()).isTrue();
+            assertThat(matcher.start()).isEqualTo(2);
+            assertThat(matcher.end()).isEqualTo(3);
+          });
     }
     assertThat(work[0]).isPositive();
     assertThat(work[1]).as("first result must not scan the tail").isEqualTo(work[0]);
@@ -189,11 +186,10 @@ class SearchScalingRegressionTest {
     for (int depth = 4; depth <= 12; depth += 4) {
       Pattern pattern = Pattern.compile(alternatingNullableLoops(depth), 0, nfaOnly);
       work[depth] =
-          WorkCounter.countForTesting(
-              () -> {
-                Matcher matcher = pattern.matcher(input);
-                while (matcher.find()) {}
-              });
+          WorkCounter.countForTesting(() -> {
+            Matcher matcher = pattern.matcher(input);
+            while (matcher.find()) {}
+          });
     }
     // Measured at 4,296 / 21,780 / 96,624 units for depths 4 / 8 / 12. Re-expanding each fresh
     // entry once per enclosing iteration measured 8,768 / 1,220,228 / 1,162,878,680.
@@ -276,13 +272,12 @@ class SearchScalingRegressionTest {
         Dfa reverse = Pattern.compile("needle.*$").reverseDfa();
         for (int pass = 0; pass < 2; pass++) {
           long work =
-              WorkCounter.countForTesting(
-                  () -> {
-                    Dfa.SearchResult result =
-                        reverse.doSearchReverse(scanner, scanner.length(), 0, true, true, 64);
-                    assertThat(result).isNotNull();
-                    assertThat(result.scanLimitReached()).isTrue();
-                  });
+              WorkCounter.countForTesting(() -> {
+                Dfa.SearchResult result =
+                    reverse.doSearchReverse(scanner, scanner.length(), 0, true, true, 64);
+                assertThat(result).isNotNull();
+                assertThat(result.scanLimitReached()).isTrue();
+              });
           assertThat(work).isBetween(64L, 256L);
         }
       }
@@ -321,21 +316,15 @@ class SearchScalingRegressionTest {
           WorkCounter.countForTesting(
               () -> assertThat(pattern.matcher(text.apply(64_000)).find()).isFalse());
       long smallerUtf8 =
-          WorkCounter.countForTesting(
-              () ->
-                  assertThat(
-                          pattern
-                              .matcher(Utf8Input.trusted(text.apply(2_000).getBytes(UTF_8)))
-                              .find())
-                      .isFalse());
+          WorkCounter.countForTesting(() ->
+              assertThat(
+                      pattern.matcher(Utf8Input.trusted(text.apply(2_000).getBytes(UTF_8))).find())
+                  .isFalse());
       long largerUtf8 =
-          WorkCounter.countForTesting(
-              () ->
-                  assertThat(
-                          pattern
-                              .matcher(Utf8Input.trusted(text.apply(64_000).getBytes(UTF_8)))
-                              .find())
-                      .isFalse());
+          WorkCounter.countForTesting(() ->
+              assertThat(
+                      pattern.matcher(Utf8Input.trusted(text.apply(64_000).getBytes(UTF_8))).find())
+                  .isFalse());
 
       assertThat(largerString).as("%s String", regex).isLessThan(smallerString * 2 + 64);
       assertThat(largerUtf8).as("%s UTF-8", regex).isLessThan(smallerUtf8 * 2 + 64);
@@ -528,15 +517,11 @@ class SearchScalingRegressionTest {
     Pattern pattern = Pattern.compile("AAA[A-Z]+RAREST_TOKEN");
 
     long smallerWork =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(pattern.matcher("AAA".repeat(2_000) + "xRAREST_TOKEN").find())
-                    .isFalse());
+        WorkCounter.countForTesting(() ->
+            assertThat(pattern.matcher("AAA".repeat(2_000) + "xRAREST_TOKEN").find()).isFalse());
     long largerWork =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(pattern.matcher("AAA".repeat(10_000) + "xRAREST_TOKEN").find())
-                    .isFalse());
+        WorkCounter.countForTesting(() ->
+            assertThat(pattern.matcher("AAA".repeat(10_000) + "xRAREST_TOKEN").find()).isFalse());
 
     assertThat(smallerWork).isPositive();
     assertThat(largerWork)
@@ -669,11 +654,10 @@ class SearchScalingRegressionTest {
           captureEnd = () -> matcher.end(1);
         }
         long captureWork =
-            WorkCounter.countForTesting(
-                () -> {
-                  assertThat(captureStart.getAsInt()).isEqualTo(1_024);
-                  assertThat(captureEnd.getAsInt()).isEqualTo(1_024);
-                });
+            WorkCounter.countForTesting(() -> {
+              assertThat(captureStart.getAsInt()).isEqualTo(1_024);
+              assertThat(captureEnd.getAsInt()).isEqualTo(1_024);
+            });
         assertThat(captureWork)
             .as("Known-demand captures should already be available after exact fallback")
             .isZero();
@@ -716,11 +700,10 @@ class SearchScalingRegressionTest {
     String input = "abc ".repeat(1_000);
 
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              String replaced = pattern.matcher(input).replaceAll("[$0]");
-              assertThat(replaced).isNotNull();
-            });
+        WorkCounter.countForTesting(() -> {
+          String replaced = pattern.matcher(input).replaceAll("[$0]");
+          assertThat(replaced).isNotNull();
+        });
 
     assertThat(work)
         .as("Literal replacement with group zero reference must scan the input only once")
@@ -747,11 +730,10 @@ class SearchScalingRegressionTest {
     String input = "item delim ".repeat(1_000);
 
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              String[] parts = pattern.split(input);
-              assertThat(parts).hasSize(1_001);
-            });
+        WorkCounter.countForTesting(() -> {
+          String[] parts = pattern.split(input);
+          assertThat(parts).hasSize(1_001);
+        });
 
     assertThat(work)
         .as("Literal split on parenthesized pattern should execute on fast path without DFA work")
@@ -831,10 +813,8 @@ class SearchScalingRegressionTest {
         Pattern.compile("(?i)aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab");
     String input = "a".repeat(10_000);
     long work =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))).find())
-                    .isFalse());
+        WorkCounter.countForTesting(() ->
+            assertThat(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))).find()).isFalse());
     assertThat(work)
         .as("Dense false candidate prefix verification on UTF-8 must remain linearly bounded")
         .isLessThan(input.length() * 3L);
@@ -929,25 +909,23 @@ class SearchScalingRegressionTest {
   void startAnchoredRepeatedFindTerminatesInConstantWork() {
     Pattern pattern = Pattern.compile("^abc");
     long work2000 =
-        WorkCounter.countForTesting(
-            () -> {
-              Matcher m = pattern.matcher("abc" + "x".repeat(2_000));
-              int matches = 0;
-              while (m.find()) {
-                matches++;
-              }
-              assertThat(matches).isEqualTo(1);
-            });
+        WorkCounter.countForTesting(() -> {
+          Matcher m = pattern.matcher("abc" + "x".repeat(2_000));
+          int matches = 0;
+          while (m.find()) {
+            matches++;
+          }
+          assertThat(matches).isEqualTo(1);
+        });
     long work10000 =
-        WorkCounter.countForTesting(
-            () -> {
-              Matcher m = pattern.matcher("abc" + "x".repeat(10_000));
-              int matches = 0;
-              while (m.find()) {
-                matches++;
-              }
-              assertThat(matches).isEqualTo(1);
-            });
+        WorkCounter.countForTesting(() -> {
+          Matcher m = pattern.matcher("abc" + "x".repeat(10_000));
+          int matches = 0;
+          while (m.find()) {
+            matches++;
+          }
+          assertThat(matches).isEqualTo(1);
+        });
 
     assertThat(work2000).as("Short input repeated find work").isLessThan(50);
     assertThat(work10000).as("Long input repeated find work").isLessThan(50);
@@ -1303,15 +1281,11 @@ class SearchScalingRegressionTest {
     assertThat(candidate).isZero();
     dfa.doSearch(scanner, candidate, false, false, false);
     long ordinaryWork =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(dfa.doSearch(scanner, candidate, false, false, false).matched())
-                    .isTrue());
+        WorkCounter.countForTesting(() ->
+            assertThat(dfa.doSearch(scanner, candidate, false, false, false).matched()).isTrue());
     long preselectedWork =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(dfa.doSearch(scanner, candidate, false, false, true).matched())
-                    .isTrue());
+        WorkCounter.countForTesting(() ->
+            assertThat(dfa.doSearch(scanner, candidate, false, false, true).matched()).isTrue());
 
     assertThat(preselectedWork)
         .as("DFA must trust a candidate already selected by the caller")
@@ -1341,14 +1315,13 @@ class SearchScalingRegressionTest {
   }
 
   private static long countAllMatches(FindIterator matcher, int expectedMatches) {
-    return WorkCounter.countForTesting(
-        () -> {
-          int matches = 0;
-          while (matcher.find()) {
-            matches++;
-          }
-          assertThat(matches).isEqualTo(expectedMatches);
-        });
+    return WorkCounter.countForTesting(() -> {
+      int matches = 0;
+      while (matcher.find()) {
+        matches++;
+      }
+      assertThat(matches).isEqualTo(expectedMatches);
+    });
   }
 
   @FunctionalInterface
@@ -1358,18 +1331,16 @@ class SearchScalingRegressionTest {
 
   private static void assertReverseDfaSuffixFailureIsConstantWork(IntPredicate find) {
     long work2000 =
-        WorkCounter.countForTesting(
-            () -> {
-              boolean matched = find.test(2_000);
-              assertThat(matched).isFalse();
-            });
+        WorkCounter.countForTesting(() -> {
+          boolean matched = find.test(2_000);
+          assertThat(matched).isFalse();
+        });
 
     long work10000 =
-        WorkCounter.countForTesting(
-            () -> {
-              boolean matched = find.test(10_000);
-              assertThat(matched).isFalse();
-            });
+        WorkCounter.countForTesting(() -> {
+          boolean matched = find.test(10_000);
+          assertThat(matched).isFalse();
+        });
 
     // If a required-content prefilter runs first, it scans the entire input, resulting in at least
     // 2,000 and 10,000 operations respectively.
@@ -1480,17 +1451,13 @@ class SearchScalingRegressionTest {
     dfa.doSearch(new StringInputScanner(input2000), 0, false, false);
 
     long work2000 =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(
-                        dfa.doSearch(new StringInputScanner(input2000), 0, false, false).matched())
-                    .isTrue());
+        WorkCounter.countForTesting(() ->
+            assertThat(dfa.doSearch(new StringInputScanner(input2000), 0, false, false).matched())
+                .isTrue());
     long work10000 =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(
-                        dfa.doSearch(new StringInputScanner(input10000), 0, false, false).matched())
-                    .isTrue());
+        WorkCounter.countForTesting(() ->
+            assertThat(dfa.doSearch(new StringInputScanner(input10000), 0, false, false).matched())
+                .isTrue());
 
     assertThat(work10000)
         .as("Warm DFA should scale linearly on interior self-loop escape")
@@ -1698,10 +1665,8 @@ class SearchScalingRegressionTest {
     ClassHashChain chc = ClassHashChain.compileCaseInsensitive("content_length_header");
     String text = "The quick brown fox jumps over the lazy dog. ".repeat(5); // 225 chars
     long work =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(chc.search(text, 0, WorkLimit.forRemaining(text.length())))
-                    .isEqualTo(-1));
+        WorkCounter.countForTesting(() ->
+            assertThat(chc.search(text, 0, WorkLimit.forRemaining(text.length()))).isEqualTo(-1));
 
     // 225 / 6 = ~37 operations (vs 225 operations for linear scan)
     assertThat(work)
@@ -1716,10 +1681,8 @@ class SearchScalingRegressionTest {
     ClassHashChain chc = ClassHashChain.compileCaseInsensitive("конфигурация_сервера"); // M = 20
     String text = "текст_без_совпадений_для_проверки_производительности_".repeat(5); // 270 chars
     long work =
-        WorkCounter.countForTesting(
-            () ->
-                assertThat(chc.search(text, 0, WorkLimit.forRemaining(text.length())))
-                    .isEqualTo(-1));
+        WorkCounter.countForTesting(() ->
+            assertThat(chc.search(text, 0, WorkLimit.forRemaining(text.length()))).isEqualTo(-1));
 
     // Sublinear bound: 270 / 19 = ~14 operations (vs 270 for linear scan)
     assertThat(work)
@@ -1783,11 +1746,10 @@ class SearchScalingRegressionTest {
     Matcher matcher = pattern.matcher(input);
     assertThat(matcher.find()).isTrue();
     long groupReadWork =
-        WorkCounter.countForTesting(
-            () -> {
-              assertThat(matcher.group(0)).isEqualTo("KEY:98765");
-              assertThat(matcher.group(1)).isEqualTo("98765");
-            });
+        WorkCounter.countForTesting(() -> {
+          assertThat(matcher.group(0)).isEqualTo("KEY:98765");
+          assertThat(matcher.group(1)).isEqualTo("98765");
+        });
     assertThat(groupReadWork)
         .as(
             "Unicode case-insensitive linear chain submatch extraction must run in OnePass with"
@@ -1805,11 +1767,10 @@ class SearchScalingRegressionTest {
     Matcher matcher = pattern.matcher(input);
     assertThat(matcher.find()).isTrue();
     long groupReadWork =
-        WorkCounter.countForTesting(
-            () -> {
-              assertThat(matcher.group(1)).isEqualTo("alice");
-              assertThat(matcher.group(2)).isEqualTo("google");
-            });
+        WorkCounter.countForTesting(() -> {
+          assertThat(matcher.group(1)).isEqualTo("alice");
+          assertThat(matcher.group(2)).isEqualTo("google");
+        });
     assertThat(groupReadWork)
         .as(
             "Submatch extraction work must be strictly bounded by match slice length, not haystack"
@@ -1823,12 +1784,11 @@ class SearchScalingRegressionTest {
     Dfa dfa = new Dfa(prog, 1000, Dfa.buildSetup(prog), false);
     String input = "x".repeat(10_000) + "cherry";
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              Dfa.SearchResult res = dfa.doSearch(input, false, false);
-              assertThat(res).isNotNull();
-              assertThat(res.matched()).isTrue();
-            });
+        WorkCounter.countForTesting(() -> {
+          Dfa.SearchResult res = dfa.doSearch(input, false, false);
+          assertThat(res).isNotNull();
+          assertThat(res.matched()).isTrue();
+        });
     assertThat(work)
         .as("Direct DFA start state acceleration must scan input linearly")
         .isLessThanOrEqualTo(input.length() + 20);
@@ -1861,11 +1821,10 @@ class SearchScalingRegressionTest {
     long matchWork = WorkCounter.countForTesting(() -> assertThat(matcher.matches()).isTrue());
     assertThat(matcher.group(0)).isEqualTo(input);
     long groupReadWork =
-        WorkCounter.countForTesting(
-            () -> {
-              assertThat(matcher.group(1)).isEqualTo("helloworld");
-              assertThat(matcher.group(2)).isEqualTo("welcome");
-            });
+        WorkCounter.countForTesting(() -> {
+          assertThat(matcher.group(1)).isEqualTo("helloworld");
+          assertThat(matcher.group(2)).isEqualTo("welcome");
+        });
     assertThat(matchWork)
         .as("matches() must only run forward DFA work without eager NFA state building")
         .isLessThanOrEqualTo(input.length() * 2L + 20);
@@ -1891,13 +1850,12 @@ class SearchScalingRegressionTest {
     Dfa dfa = new Dfa(prog, 1000, Dfa.buildSetup(prog), false);
     byte[] input = ("x".repeat(10_000) + "cherry").getBytes(UTF_8);
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              Dfa.SearchResult res =
-                  dfa.doSearch(new Utf8InputScanner(input, 0, input.length), 0, false, false);
-              assertThat(res).isNotNull();
-              assertThat(res.matched()).isTrue();
-            });
+        WorkCounter.countForTesting(() -> {
+          Dfa.SearchResult res =
+              dfa.doSearch(new Utf8InputScanner(input, 0, input.length), 0, false, false);
+          assertThat(res).isNotNull();
+          assertThat(res.matched()).isTrue();
+        });
     assertThat(work)
         .as("Direct DFA start state acceleration on UTF-8 must scan input linearly")
         .isLessThanOrEqualTo(input.length + 20);
