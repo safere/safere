@@ -1186,7 +1186,7 @@ public final class Pattern implements Serializable {
     return contextFreeReverseLanguage && hasUniqueEndAnchoredEndpoint(scanner);
   }
 
-  /** Terminal dollar-style anchors may also accept before the final line terminator. */
+  /** Returns whether the end anchor has only one eligible endpoint on this input. */
   boolean hasUniqueEndAnchoredEndpoint(InputScanner scanner) {
     return !prog.dollarAnchorEnd()
         || scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), scanner.length()) < 0;

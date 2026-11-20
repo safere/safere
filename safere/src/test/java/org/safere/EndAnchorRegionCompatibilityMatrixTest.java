@@ -45,11 +45,11 @@ class EndAnchorRegionCompatibilityMatrixTest {
   @ParameterizedTest(name = "[{index}] {0}")
   @MethodSource("longFinalTerminatorCases")
   void reluctantTailPrefersTheEarliestEligibleEnd(
-      String anchor, String terminator, int prefixLength, String tail) {
+      String anchor, String terminator, int prefixLength, String tail, int flags) {
     String regex = "(?s)" + tail + anchor;
     String input = "a".repeat(prefixLength) + "cx" + terminator;
-    java.util.regex.Matcher jdk = java.util.regex.Pattern.compile(regex).matcher(input);
-    Pattern pattern = Pattern.compile(regex);
+    java.util.regex.Matcher jdk = java.util.regex.Pattern.compile(regex, flags).matcher(input);
+    Pattern pattern = Pattern.compile(regex, flags);
     Matcher stringMatcher = pattern.matcher(input);
     Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8)));
 
@@ -69,10 +69,12 @@ class EndAnchorRegionCompatibilityMatrixTest {
   private static Stream<Arguments> longFinalTerminatorCases() {
     List<Arguments> cases = new ArrayList<>();
     for (String anchor : List.of("$", "\\Z", "\\z")) {
-      for (String terminator : List.of("", "\n", "\r\n", "\u2028")) {
+      for (String terminator : List.of("", "\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029")) {
         for (int length : List.of(1_024, 1_500)) {
           for (String tail : List.of(".*c.+?", ".*c(.+?)")) {
-            cases.add(Arguments.of(anchor, terminator, length, tail));
+            for (int flags : List.of(0, Pattern.UNIX_LINES)) {
+              cases.add(Arguments.of(anchor, terminator, length, tail, flags));
+            }
           }
         }
       }
