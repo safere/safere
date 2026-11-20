@@ -4345,6 +4345,28 @@
       "shared": true
     },
     {
+      "id": "literalAlternation.directions.unicode.late.262144",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "日本語 é ",
+        "suffix": "lower",
+        "length": 262144
+      },
+      "shared": true
+    },
+    {
+      "id": "literalAlternation.wide.late.8192",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "x",
+        "suffix": "west",
+        "length": 8192
+      },
+      "shared": true
+    },
+    {
       "id": "searchScaling.fixedOffsetClassDenseInteriorNoLeadingFail.{size}",
       "axes": {
         "size": [
@@ -19135,6 +19157,50 @@
         "constraints": [
           "prematerializedInput"
         ]
+      }
+    },
+    {
+      "id": "LiteralAlternationBenchmark.directions.unicode.late.262144",
+      "operation": "find",
+      "patterns": [
+        "north|south|east|west|upper|lower"
+      ],
+      "inputs": [
+        "literalAlternation.directions.unicode.late.262144"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "LiteralAlternationBenchmark.wide.late.8192",
+      "operation": "find",
+      "patterns": [
+        "@root|3value|abc|north|south|west"
+      ],
+      "inputs": [
+        "literalAlternation.wide.late.8192"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
       }
     },
     {
