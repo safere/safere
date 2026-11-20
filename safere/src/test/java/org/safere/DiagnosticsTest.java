@@ -59,15 +59,14 @@ class DiagnosticsTest {
       assertThat(pattern.matcher(utf8).find()).isFalse();
       assertThat(operationsFor(pattern))
           .hasSize(5)
-          .allSatisfy(
-              event -> {
-                assertThat(event.boundaryStrategy())
-                    .isIn(MatchStrategy.LITERAL, MatchStrategy.CHARACTER_CLASS);
-                assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-                assertThat(event.forwardDfaSearchCount()).isZero();
-                assertThat(event.auxiliaryStrategies())
-                    .anyMatch(strategy -> strategy.role() == StrategyRole.REJECT_PREFILTER);
-              });
+          .allSatisfy(event -> {
+            assertThat(event.boundaryStrategy())
+                .isIn(MatchStrategy.LITERAL, MatchStrategy.CHARACTER_CLASS);
+            assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+            assertThat(event.forwardDfaSearchCount()).isZero();
+            assertThat(event.auxiliaryStrategies())
+                .anyMatch(strategy -> strategy.role() == StrategyRole.REJECT_PREFILTER);
+          });
     }
   }
 
@@ -148,14 +147,13 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.pattern().analysis()).isSameAs(pattern.analysis());
-              assertThat(event.pattern().patternId()).isEqualTo(patternId);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.reverseDfaSearchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.pattern().analysis()).isSameAs(pattern.analysis());
+          assertThat(event.pattern().patternId()).isEqualTo(patternId);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.reverseDfaSearchCount()).isZero();
+        });
     assertThat(diagnostics.compilations).isEmpty();
     Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
     assertThat(pattern.patternId()).isEqualTo(patternId);
@@ -205,15 +203,14 @@ class DiagnosticsTest {
             .orElseThrow();
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.pattern()).isSameAs(compilation.pattern());
-              assertThat(event.operation()).isEqualTo(MatchOperation.LOOKING_AT);
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .satisfies(event -> {
+          assertThat(event.pattern()).isSameAs(compilation.pattern());
+          assertThat(event.operation()).isEqualTo(MatchOperation.LOOKING_AT);
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
   }
 
   @Test
@@ -316,13 +313,12 @@ class DiagnosticsTest {
 
   private static Stream<Arguments> reverseCandidateVerificationCases() {
     return Stream.of(false, true)
-        .flatMap(
-            bitState ->
-                Stream.of(
-                    Arguments.of(bitState, "(?:foo|fax)$", "x".repeat(1400) + "foo", true),
-                    Arguments.of(bitState, "(?:foo|fax)$", "x".repeat(1400) + "foo\r\n", false),
-                    Arguments.of(bitState, "(?:foo|fax)\\z", "x".repeat(1400) + "fax", true),
-                    Arguments.of(bitState, "foo[ab]*$", "zzfoo" + "a".repeat(2048), true)));
+        .flatMap(bitState ->
+            Stream.of(
+                Arguments.of(bitState, "(?:foo|fax)$", "x".repeat(1400) + "foo", true),
+                Arguments.of(bitState, "(?:foo|fax)$", "x".repeat(1400) + "foo\r\n", false),
+                Arguments.of(bitState, "(?:foo|fax)\\z", "x".repeat(1400) + "fax", true),
+                Arguments.of(bitState, "foo[ab]*$", "zzfoo" + "a".repeat(2048), true)));
   }
 
   @ParameterizedTest
@@ -338,20 +334,19 @@ class DiagnosticsTest {
     assertThat(pattern.find(Utf8Input.validated(input.getBytes(UTF_8)))).isTrue();
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.reverseDfaSearchCount()).isPositive();
-              assertThat(event.boundaryStrategy()).isEqualTo(verification);
-              assertThat(event.auxiliaryStrategies())
-                  .contains(
-                      new StrategyParticipation(verification, StrategyRole.CANDIDATE_VERIFICATION));
-              if (provedBounds) {
-                assertThat(event.forwardDfaSearchCount()).isZero();
-              }
-              if (regex.equals("foo[ab]*$")) {
-                assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
-              }
-            });
+        .satisfies(event -> {
+          assertThat(event.reverseDfaSearchCount()).isPositive();
+          assertThat(event.boundaryStrategy()).isEqualTo(verification);
+          assertThat(event.auxiliaryStrategies())
+              .contains(
+                  new StrategyParticipation(verification, StrategyRole.CANDIDATE_VERIFICATION));
+          if (provedBounds) {
+            assertThat(event.forwardDfaSearchCount()).isZero();
+          }
+          if (regex.equals("foo[ab]*$")) {
+            assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
+          }
+        });
   }
 
   @Test
@@ -363,16 +358,15 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
-              assertThat(event.matchCount()).isEqualTo(2);
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(
-                          MatchStrategy.CHARACTER_CLASS, StrategyRole.CANDIDATE_VERIFICATION));
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
+          assertThat(event.matchCount()).isEqualTo(2);
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(
+                      MatchStrategy.CHARACTER_CLASS, StrategyRole.CANDIDATE_VERIFICATION));
+        });
   }
 
   @Test
@@ -403,15 +397,14 @@ class DiagnosticsTest {
       assertThat(result).isEqualTo("foo---7");
       assertThat(operationsFor(pattern))
           .singleElement()
-          .satisfies(
-              event -> {
-                assertThat(event.operation()).isEqualTo(operation);
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-                assertThat(event.auxiliaryStrategies())
-                    .containsExactly(
-                        new StrategyParticipation(
-                            MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
-              });
+          .satisfies(event -> {
+            assertThat(event.operation()).isEqualTo(operation);
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+            assertThat(event.auxiliaryStrategies())
+                .containsExactly(
+                    new StrategyParticipation(
+                        MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
+          });
     }
   }
 
@@ -436,15 +429,14 @@ class DiagnosticsTest {
         assertThat(result).isEqualTo(input);
         assertThat(operationsFor(pattern))
             .singleElement()
-            .satisfies(
-                event -> {
-                  assertThat(event.operation()).isEqualTo(operation);
-                  assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
-                  assertThat(event.auxiliaryStrategies())
-                      .contains(
-                          new StrategyParticipation(
-                              MatchStrategy.CHARACTER_CLASS, StrategyRole.REJECT_PREFILTER));
-                });
+            .satisfies(event -> {
+              assertThat(event.operation()).isEqualTo(operation);
+              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
+              assertThat(event.auxiliaryStrategies())
+                  .contains(
+                      new StrategyParticipation(
+                          MatchStrategy.CHARACTER_CLASS, StrategyRole.REJECT_PREFILTER));
+            });
       }
     }
 
@@ -467,11 +459,10 @@ class DiagnosticsTest {
         assertThat(result).isEqualTo(input);
         assertThat(operationsFor(pattern))
             .singleElement()
-            .satisfies(
-                event -> {
-                  assertThat(event.operation()).isEqualTo(operation);
-                  assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-                });
+            .satisfies(event -> {
+              assertThat(event.operation()).isEqualTo(operation);
+              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+            });
       }
     }
   }
@@ -499,15 +490,14 @@ class DiagnosticsTest {
         assertThat(result).isEqualTo(input);
         assertThat(operationsFor(pattern))
             .singleElement()
-            .satisfies(
-                event -> {
-                  assertThat(event.operation()).isEqualTo(operation);
-                  assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-                  assertThat(event.auxiliaryStrategies())
-                      .containsExactly(
-                          new StrategyParticipation(
-                              MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
-                });
+            .satisfies(event -> {
+              assertThat(event.operation()).isEqualTo(operation);
+              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+              assertThat(event.auxiliaryStrategies())
+                  .containsExactly(
+                      new StrategyParticipation(
+                          MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
+            });
       }
     }
   }
@@ -530,15 +520,14 @@ class DiagnosticsTest {
       assertThat(result).isEqualTo(input);
       assertThat(operationsFor(pattern))
           .singleElement()
-          .satisfies(
-              event -> {
-                assertThat(event.operation()).isEqualTo(operation);
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
-                assertThat(event.auxiliaryStrategies())
-                    .containsExactly(
-                        new StrategyParticipation(
-                            MatchStrategy.CHARACTER_CLASS, StrategyRole.REJECT_PREFILTER));
-              });
+          .satisfies(event -> {
+            assertThat(event.operation()).isEqualTo(operation);
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
+            assertThat(event.auxiliaryStrategies())
+                .containsExactly(
+                    new StrategyParticipation(
+                        MatchStrategy.CHARACTER_CLASS, StrategyRole.REJECT_PREFILTER));
+          });
     }
   }
 
@@ -554,12 +543,11 @@ class DiagnosticsTest {
     assertThat(matcher.replaceAll("")).isEqualTo("first line\nsecond line");
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event ->
-                assertThat(event.auxiliaryStrategies())
-                    .doesNotContain(
-                        new StrategyParticipation(
-                            MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER)));
+        .satisfies(event ->
+            assertThat(event.auxiliaryStrategies())
+                .doesNotContain(
+                    new StrategyParticipation(
+                        MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER)));
   }
 
   @Test
@@ -581,12 +569,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.matchCount()).isEqualTo(2);
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.matchCount()).isEqualTo(2);
+        });
   }
 
   @Test
@@ -598,19 +585,18 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.matchCount()).isEqualTo(2);
-              // The terminal start-accelerator scan rejects without another DFA search.
-              assertThat(event.forwardDfaSearchCount()).isEqualTo(2);
-              assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
-              assertThat(event.auxiliaryStrategies())
-                  .contains(
-                      new StrategyParticipation(
-                          MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION));
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.matchCount()).isEqualTo(2);
+          // The terminal start-accelerator scan rejects without another DFA search.
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(2);
+          assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
+          assertThat(event.auxiliaryStrategies())
+              .contains(
+                  new StrategyParticipation(
+                      MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION));
+        });
   }
 
   @Test
@@ -627,12 +613,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.matchCount()).isEqualTo(1);
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.matchCount()).isEqualTo(1);
+        });
   }
 
   @Test
@@ -648,12 +633,11 @@ class DiagnosticsTest {
 
       assertThat(operationsFor(pattern))
           .singleElement()
-          .satisfies(
-              event -> {
-                assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-                assertThat(event.matchCount()).isEqualTo(expectedMatches);
-              });
+          .satisfies(event -> {
+            assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+            assertThat(event.matchCount()).isEqualTo(expectedMatches);
+          });
     }
   }
 
@@ -666,12 +650,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
-              assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
+          assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
+        });
   }
 
   @Test
@@ -698,12 +681,11 @@ class DiagnosticsTest {
       }
       assertThat(operationsFor(pattern))
           .last()
-          .satisfies(
-              event -> {
-                assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-                assertThat(event.forwardDfaSearchCount()).isPositive();
-              });
+          .satisfies(event -> {
+            assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+            assertThat(event.forwardDfaSearchCount()).isPositive();
+          });
     }
   }
 
@@ -760,11 +742,10 @@ class DiagnosticsTest {
     }
     assertThat(operationsFor(pattern))
         .last()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+        });
   }
 
   private static Stream<Arguments> captureHistoryFindCases() {
@@ -790,11 +771,10 @@ class DiagnosticsTest {
   private void assertDfaFindBoundary(Pattern pattern) {
     assertThat(operationsFor(pattern))
         .last()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.forwardDfaSearchCount()).isPositive();
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isPositive();
+        });
   }
 
   @Test
@@ -806,21 +786,19 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(deferredPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
 
     Pattern eagerPattern = Pattern.compile("(a+)b");
     assertThat(eagerPattern.matcher("aaab xx ab").replaceAll("$1")).isEqualTo("aaa xx a");
     assertThat(operationsFor(eagerPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.captureStrategy()).isNotEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .satisfies(event -> {
+          assertThat(event.captureStrategy()).isNotEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
   }
 
   @Test
@@ -833,11 +811,10 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
-              assertThat(event.matchCount()).isEqualTo(2);
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.REPLACE_ALL);
+          assertThat(event.matchCount()).isEqualTo(2);
+        });
   }
 
   @Test
@@ -858,26 +835,24 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.auxiliaryStrategies())
-                  .contains(
-                      new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.auxiliaryStrategies())
+              .contains(
+                  new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER));
+        });
 
     assertThat(pattern.matcher("aaaaX").find()).isTrue();
     assertThat(operationsFor(pattern).getLast())
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.strategyDecisions())
-                  .contains(
-                      new StrategyDecision(
-                          MatchStrategy.DFA,
-                          StrategyDisposition.BYPASSED,
-                          StrategyReason.EXACT_NULLABLE_LOOP_SEMANTICS_REQUIRED));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.strategyDecisions())
+              .contains(
+                  new StrategyDecision(
+                      MatchStrategy.DFA,
+                      StrategyDisposition.BYPASSED,
+                      StrategyReason.EXACT_NULLABLE_LOOP_SEMANTICS_REQUIRED));
+        });
   }
 
   @Test
@@ -894,12 +869,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(replacement))
         .singleElement()
-        .satisfies(
-            event ->
-                assertThat(event.auxiliaryStrategies())
-                    .contains(
-                        new StrategyParticipation(
-                            MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER)));
+        .satisfies(event ->
+            assertThat(event.auxiliaryStrategies())
+                .contains(
+                    new StrategyParticipation(
+                        MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER)));
   }
 
   @Test
@@ -914,17 +888,15 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.auxiliaryStrategies())
-                  .startsWith(
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION))
-                  .contains(
-                      new StrategyParticipation(
-                          MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.auxiliaryStrategies())
+              .startsWith(
+                  new StrategyParticipation(MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION))
+              .contains(
+                  new StrategyParticipation(
+                      MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION));
+        });
   }
 
   @Test
@@ -937,12 +909,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
     assertThat(matcher.group(1)).isEqualTo("aaa");
     assertThat(operationsFor(pattern)).hasSize(1);
   }
@@ -1068,16 +1039,15 @@ class DiagnosticsTest {
     assertThat(pattern.matcher("a".repeat(100_000) + "b").matches()).isTrue();
 
     assertThat(operationsFor(pattern).getFirst())
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.strategyDecisions())
-                  .contains(
-                      new StrategyDecision(
-                          MatchStrategy.BIT_STATE,
-                          StrategyDisposition.BYPASSED,
-                          StrategyReason.INPUT_TOO_LARGE));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.strategyDecisions())
+              .contains(
+                  new StrategyDecision(
+                      MatchStrategy.BIT_STATE,
+                      StrategyDisposition.BYPASSED,
+                      StrategyReason.INPUT_TOO_LARGE));
+        });
   }
 
   @Test
@@ -1169,22 +1139,19 @@ class DiagnosticsTest {
     Map<String, MatchStrategy> cases =
         Map.of("^target", MatchStrategy.LITERAL, "^[a-z]", MatchStrategy.CHARACTER_CLASS);
 
-    cases.forEach(
-        (regex, expectedStrategy) -> {
-          Pattern pattern = Pattern.compile(regex);
+    cases.forEach((regex, expectedStrategy) -> {
+      Pattern pattern = Pattern.compile(regex);
 
-          assertThat(pattern.matcher("9target").find()).isFalse();
-          assertThat(operationsFor(pattern))
-              .singleElement()
-              .satisfies(
-                  event -> {
-                    assertThat(event.boundaryStrategy()).isEqualTo(expectedStrategy);
-                    assertThat(event.auxiliaryStrategies())
-                        .containsExactly(
-                            new StrategyParticipation(
-                                expectedStrategy, StrategyRole.REJECT_PREFILTER));
-                  });
-        });
+      assertThat(pattern.matcher("9target").find()).isFalse();
+      assertThat(operationsFor(pattern))
+          .singleElement()
+          .satisfies(event -> {
+            assertThat(event.boundaryStrategy()).isEqualTo(expectedStrategy);
+            assertThat(event.auxiliaryStrategies())
+                .containsExactly(
+                    new StrategyParticipation(expectedStrategy, StrategyRole.REJECT_PREFILTER));
+          });
+    });
   }
 
   @Test
@@ -1218,11 +1185,10 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.forwardDfaSearchCount()).isPositive();
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isPositive();
+        });
   }
 
   @Test
@@ -1235,10 +1201,9 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.forwardDfaSearchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.forwardDfaSearchCount()).isZero();
+        });
   }
 
   @Test
@@ -1258,12 +1223,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(nullableLoopBitState))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
     Pattern nfaPattern = Pattern.compile("(\\X)b");
     Matcher nfaMatches = nfaPattern.matcher("ab");
     assertThat(nfaMatches.matches()).isTrue();
@@ -1275,12 +1239,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(nfaPattern))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
   }
 
   @Test
@@ -1300,12 +1263,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(regionPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(independentEvent.boundaryStrategy());
-              assertThat(event.captureStrategy()).isEqualTo(independentEvent.captureStrategy());
-              assertThat(event.captureMode()).isEqualTo(independentEvent.captureMode());
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(independentEvent.boundaryStrategy());
+          assertThat(event.captureStrategy()).isEqualTo(independentEvent.captureStrategy());
+          assertThat(event.captureMode()).isEqualTo(independentEvent.captureMode());
+        });
   }
 
   @Test
@@ -1320,12 +1282,11 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(lazyFallbackPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
     assertThat(lazyFallbackMatcher.group(1)).isEqualTo("aa");
 
     Pattern endAnchoredPattern = Pattern.compile("foo(a+?)b$");
@@ -1335,11 +1296,10 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(endAnchoredPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
     assertThat(endAnchoredMatcher.group(1)).isEqualTo("aa");
   }
 
@@ -1358,12 +1318,11 @@ class DiagnosticsTest {
     assertThat(acceleratedHit.capturesResolved()).isFalse();
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
     assertThat(acceleratedHit.group(1)).isEqualTo("aa");
     diagnostics.operations.clear();
 
@@ -1372,12 +1331,11 @@ class DiagnosticsTest {
     assertThat(missedCandidate.capturesResolved()).isFalse();
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
     assertThat(missedCandidate.group(1)).isEqualTo("aa");
   }
 
@@ -1394,26 +1352,24 @@ class DiagnosticsTest {
     assertThat(matched.group(2)).isEqualTo("\n");
     assertThat(operationsFor(fullMatchViaNfa))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
 
     Pattern rejectedViaNfa = Pattern.compile("^(a+?)$", 0, noDfa);
     Matcher rejected = rejectedViaNfa.matcher("aa\n");
     assertThat(rejected.matches()).isFalse();
     assertThat(operationsFor(rejectedViaNfa))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
   }
 
   @Test
@@ -1433,22 +1389,20 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(onePassPattern))
         .hasSize(4)
-        .allSatisfy(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
     assertThat(operationsFor(onePassPrefixPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
 
     Pattern anchoredKeywordPattern = Pattern.compile("(?is).*\\b(you|your)\\b.*");
     assertThat(anchoredKeywordPattern.matcher("nothing matching here").find()).isFalse();
@@ -1458,13 +1412,12 @@ class DiagnosticsTest {
     for (Pattern pattern : List.of(anchoredKeywordPattern, unanchoredKeywordPattern)) {
       assertThat(operationsFor(pattern))
           .singleElement()
-          .satisfies(
-              event -> {
-                assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
-                assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-                assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-              });
+          .satisfies(event -> {
+            assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
+            assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+            assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+          });
     }
   }
 
@@ -1479,15 +1432,14 @@ class DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION));
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(
+                      MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION));
+        });
 
     // With the start literal present but the infix literal absent, the reject prefilter still runs
     // from the first start candidate when enough input remains after it, so the forward DFA never
@@ -1498,17 +1450,14 @@ class DiagnosticsTest {
     assertThat(pattern.find(Utf8Input.trusted(startOnly.getBytes(UTF_8)))).isFalse();
     assertThat(operationsFor(pattern))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactlyInAnyOrder(
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION),
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.auxiliaryStrategies())
+              .containsExactlyInAnyOrder(
+                  new StrategyParticipation(MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION),
+                  new StrategyParticipation(MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
+        });
 
     for (String regex :
         new String[] {
@@ -1522,15 +1471,14 @@ class DiagnosticsTest {
       assertThat(operationsFor(rejectFirst))
           .as("%s should run exact rare-anchor REJECT_PREFILTER first", regex)
           .hasSize(2)
-          .allSatisfy(
-              event -> {
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-                assertThat(event.forwardDfaSearchCount()).isZero();
-                assertThat(event.auxiliaryStrategies())
-                    .containsExactly(
-                        new StrategyParticipation(
-                            MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
-              });
+          .allSatisfy(event -> {
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+            assertThat(event.forwardDfaSearchCount()).isZero();
+            assertThat(event.auxiliaryStrategies())
+                .containsExactly(
+                    new StrategyParticipation(
+                        MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
+          });
     }
   }
 
@@ -1602,31 +1550,28 @@ class DiagnosticsTest {
     assertCaptureStrategyMatchesMode(events);
     assertThat(events)
         .singleElement()
-        .satisfies(
-            event -> {
-              if (!matched || !hasCaptures) {
-                assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-                assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              } else {
-                assertThat(event.captureMode() == CaptureMode.EAGER)
-                    .isEqualTo(matcherCapturesResolved);
-              }
-            });
+        .satisfies(event -> {
+          if (!matched || !hasCaptures) {
+            assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+            assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          } else {
+            assertThat(event.captureMode() == CaptureMode.EAGER).isEqualTo(matcherCapturesResolved);
+          }
+        });
   }
 
   private static void assertCaptureStrategyMatchesMode(List<OperationDiagnostics> events) {
     assertThat(events)
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.captureStrategy() != MatchStrategy.NONE)
-                  .isEqualTo(event.captureMode() == CaptureMode.EAGER);
-              if (event.outcome() == MatchOutcome.NO_MATCH
-                  || event.pattern().analysis().captureCount() == 0) {
-                assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-                assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              }
-            });
+        .satisfies(event -> {
+          assertThat(event.captureStrategy() != MatchStrategy.NONE)
+              .isEqualTo(event.captureMode() == CaptureMode.EAGER);
+          if (event.outcome() == MatchOutcome.NO_MATCH
+              || event.pattern().analysis().captureCount() == 0) {
+            assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+            assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          }
+        });
   }
 
   @ParameterizedTest
@@ -1748,13 +1693,12 @@ class DiagnosticsTest {
     assertThat(matched).isFalse();
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(expectedStrategy);
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(expectedStrategy, StrategyRole.REJECT_PREFILTER));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(expectedStrategy);
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(expectedStrategy, StrategyRole.REJECT_PREFILTER));
+        });
   }
 
   private static final class RecordingDiagnostics extends SafeReMatchDiagnostics {

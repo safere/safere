@@ -74,12 +74,11 @@ class MatcherTransitionInventoryTest {
   void publicInstanceTransitionsDeclareDeferredCaptureBehavior() {
     assertThat(MatcherTransitionInventory.transitions())
         .filteredOn(transition -> !transition.signature().isStatic())
-        .allSatisfy(
-            transition ->
-                assertThat(transition.deferredCaptureEffect())
-                    .as("%s", format(transition.signature()))
-                    .isNotNull()
-                    .isNotEqualTo(MatcherTransitionInventory.DeferredCaptureEffect.NONE));
+        .allSatisfy(transition ->
+            assertThat(transition.deferredCaptureEffect())
+                .as("%s", format(transition.signature()))
+                .isNotNull()
+                .isNotEqualTo(MatcherTransitionInventory.DeferredCaptureEffect.NONE));
   }
 
   @Test

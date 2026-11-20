@@ -245,16 +245,15 @@ public final class FindSequenceFuzzer {
       try (ExecutorService worker = Executors.newSingleThreadExecutor()) {
         Object transferredEngine =
             worker
-                .submit(
-                    () -> {
-                      assertThat(transferred.find()).isTrue();
-                      var oracle = java.util.regex.Pattern.compile(regex).matcher(newInput);
-                      assertThat(oracle.find()).isTrue();
-                      assertThat(transferred.start()).isEqualTo(oracle.start());
-                      assertThat(transferred.end()).isEqualTo(oracle.end());
-                      assertThat(transferred.group()).isEqualTo(oracle.group());
-                      return engine.get(transferred);
-                    })
+                .submit(() -> {
+                  assertThat(transferred.find()).isTrue();
+                  var oracle = java.util.regex.Pattern.compile(regex).matcher(newInput);
+                  assertThat(oracle.find()).isTrue();
+                  assertThat(transferred.start()).isEqualTo(oracle.start());
+                  assertThat(transferred.end()).isEqualTo(oracle.end());
+                  assertThat(transferred.group()).isEqualTo(oracle.group());
+                  return engine.get(transferred);
+                })
                 .get();
         assertThat(transferredEngine).isNotNull().isNotSameAs(retainedEngine);
       }

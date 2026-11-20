@@ -164,12 +164,11 @@ class RegexLexerTest {
   void surrogateLookaheadConsumesLongTriviaOnlyOnce() {
     String regex = "\\uD83D\\uDE" + " #c\n".repeat(512) + "00";
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              RegexLexer lexer = new RegexLexer(regex, ParseFlags.LIKE_PERL | ParseFlags.COMMENTS);
-              assertThat(lexer.next().rune).isEqualTo(0x1f600);
-              assertThat(lexer.next().kind).isEqualTo(RegexLexer.Kind.END);
-            });
+        WorkCounter.countForTesting(() -> {
+          RegexLexer lexer = new RegexLexer(regex, ParseFlags.LIKE_PERL | ParseFlags.COMMENTS);
+          assertThat(lexer.next().rune).isEqualTo(0x1f600);
+          assertThat(lexer.next().kind).isEqualTo(RegexLexer.Kind.END);
+        });
     assertThat(work).isPositive().isLessThan(regex.length() * 2L);
   }
 
@@ -178,16 +177,15 @@ class RegexLexerTest {
   void repeatedClassPeeksDoNotRescanUnboundedTrivia() {
     String regex = "\\Q\\E #ignored\\Q\n".repeat(512) + "a";
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              RegexLexer lexer = new RegexLexer(regex, ParseFlags.LIKE_PERL | ParseFlags.COMMENTS);
-              for (int i = 0; i < 1000; i++) {
-                assertThat(lexer.peekClass().rune).isEqualTo('a');
-              }
-              lexer.takeClass();
-              assertThat(lexer.next().kind).isEqualTo(RegexLexer.Kind.END);
-              assertThat(lexer.sawCommentQuoting()).isTrue();
-            });
+        WorkCounter.countForTesting(() -> {
+          RegexLexer lexer = new RegexLexer(regex, ParseFlags.LIKE_PERL | ParseFlags.COMMENTS);
+          for (int i = 0; i < 1000; i++) {
+            assertThat(lexer.peekClass().rune).isEqualTo('a');
+          }
+          lexer.takeClass();
+          assertThat(lexer.next().kind).isEqualTo(RegexLexer.Kind.END);
+          assertThat(lexer.sawCommentQuoting()).isTrue();
+        });
     assertThat(work).isPositive().isLessThan(regex.length() * 2L);
   }
 }

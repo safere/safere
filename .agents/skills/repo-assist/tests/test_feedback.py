@@ -243,8 +243,33 @@ def test_resolver_blocks_unrecorded_local_commits_but_accepts_recorded_unpublish
 def test_resolver_does_not_create_replacement_when_original_branch_is_missing(worktree):
   repository, _, metadata = worktree
   metadata["head_ref"] = "missing"
-  with pytest.raises(WorktreeError, match="found 0"):
+  with pytest.raises(WorktreeError, match="PR branch missing is not currently checked out"):
     resolve_worktree(repository, metadata)
+
+
+def test_resolver_reports_branch_history_and_detached_pr_commit_without_switching(worktree):
+  repository, original, metadata = worktree
+  metadata["head_oid"] = commit(original, "published feature")
+  git(original, "switch", "-qc", "upper-layer")
+  upper_head = commit(original, "upper-layer changes")
+  detached = original.with_name("detached baseline")
+  git(repository, "worktree", "add", "-q", "--detach", str(detached), metadata["head_oid"])
+  untracked = detached / "experiment.txt"
+  untracked.write_text("user work", encoding="utf-8")
+
+  with pytest.raises(WorktreeError) as error:
+    resolve_worktree(repository, metadata)
+
+  diagnostic = str(error.value)
+  assert f"PR branch history in {original} (on upper-layer)" in diagnostic
+  assert f"Published PR commit checked out in {detached} (detached HEAD)" in diagnostic
+  assert git(original, "symbolic-ref", "HEAD") == "refs/heads/upper-layer"
+  assert git(original, "rev-parse", "HEAD") == upper_head
+  assert git(detached, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD"
+  assert untracked.read_text(encoding="utf-8") == "user work"
+
+  git(original, "switch", "-q", "feature")
+  assert resolve_worktree(repository, metadata)["worktree"] == str(original)
 
 
 def test_resolver_rejects_ambiguous_branch_matches(worktree):

@@ -109,12 +109,11 @@ class LiteralAlternationWorkTest {
   }
 
   private static long allWork(Pattern pattern, String text) {
-    return WorkCounter.countForTesting(
-        () -> {
-          Matcher matcher = pattern.matcher(text);
-          while (matcher.find()) {
-            assertThat(matcher.group()).isEqualTo("cherry");
-          }
-        });
+    return WorkCounter.countForTesting(() -> {
+      Matcher matcher = pattern.matcher(text);
+      while (matcher.find()) {
+        assertThat(matcher.group()).isEqualTo("cherry");
+      }
+    });
   }
 }

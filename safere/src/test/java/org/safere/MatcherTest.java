@@ -267,12 +267,11 @@ class MatcherTest {
     @DisabledForCrosscheck("java.util.regex backtracking makes this a SafeRE linear-time check")
     @DisplayName("group access stays stack-safe for large repeated captures")
     void groupAccessWithLargeRepeatedCapturesStaysStackSafe() {
-      assertCompletesWithinPerformanceTimeout(
-          () -> {
-            Matcher m = Pattern.compile("(a)*").matcher("a".repeat(20_000));
-            assertThat(m.matches()).isTrue();
-            assertThat(m.group(1)).isEqualTo("a");
-          });
+      assertCompletesWithinPerformanceTimeout(() -> {
+        Matcher m = Pattern.compile("(a)*").matcher("a".repeat(20_000));
+        assertThat(m.matches()).isTrue();
+        assertThat(m.group(1)).isEqualTo("a");
+      });
     }
 
     @Test
@@ -327,14 +326,13 @@ class MatcherTest {
       String pattern = repeatedDotStarCapturePattern(500, 3);
       String input = repeatedDotStarCaptureInput(500, 3);
 
-      assertCompletesWithinPerformanceTimeout(
-          () -> {
-            Matcher m = Pattern.compile(pattern).matcher(input);
-            assertThat(m.matches()).isTrue();
-            assertThat(m.group(2)).endsWith("A");
-            assertThat(m.group(3)).endsWith("B");
-            assertThat(m.group(4)).endsWith("C");
-          });
+      assertCompletesWithinPerformanceTimeout(() -> {
+        Matcher m = Pattern.compile(pattern).matcher(input);
+        assertThat(m.matches()).isTrue();
+        assertThat(m.group(2)).endsWith("A");
+        assertThat(m.group(3)).endsWith("B");
+        assertThat(m.group(4)).endsWith("C");
+      });
     }
   }
 

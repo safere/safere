@@ -239,22 +239,20 @@ public final class UnicodeTableGenerator {
     UnicodeSet idContinue = CharacterProperties.getBinaryPropertySet(UProperty.ID_CONTINUE);
     tables.put(
         "javaUnicodeIdentifierStartExtra",
-        buildRanges(
-            cp ->
-                idStart.contains(cp)
-                    && !UCharacter.isLetter(cp)
-                    && UCharacter.getType(cp) != UCharacterCategory.LETTER_NUMBER));
+        buildRanges(cp ->
+            idStart.contains(cp)
+                && !UCharacter.isLetter(cp)
+                && UCharacter.getType(cp) != UCharacterCategory.LETTER_NUMBER));
     tables.put(
         "javaUnicodeIdentifierPartExtra",
-        buildRanges(
-            cp ->
-                idContinue.contains(cp)
-                    && !UCharacter.isLetterOrDigit(cp)
-                    && UCharacter.getType(cp) != UCharacterCategory.LETTER_NUMBER
-                    && UCharacter.getType(cp) != UCharacterCategory.CONNECTOR_PUNCTUATION
-                    && UCharacter.getType(cp) != UCharacterCategory.COMBINING_SPACING_MARK
-                    && UCharacter.getType(cp) != UCharacterCategory.NON_SPACING_MARK
-                    && !UCharacter.isIdentifierIgnorable(cp)));
+        buildRanges(cp ->
+            idContinue.contains(cp)
+                && !UCharacter.isLetterOrDigit(cp)
+                && UCharacter.getType(cp) != UCharacterCategory.LETTER_NUMBER
+                && UCharacter.getType(cp) != UCharacterCategory.CONNECTOR_PUNCTUATION
+                && UCharacter.getType(cp) != UCharacterCategory.COMBINING_SPACING_MARK
+                && UCharacter.getType(cp) != UCharacterCategory.NON_SPACING_MARK
+                && !UCharacter.isIdentifierIgnorable(cp)));
 
     return tables;
   }

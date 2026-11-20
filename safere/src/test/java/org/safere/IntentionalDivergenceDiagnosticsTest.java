@@ -36,13 +36,12 @@ class IntentionalDivergenceDiagnosticsTest {
     assertThat(matcher.find()).isTrue();
     RuntimeException failure = new IllegalStateException("listener failed");
     Pattern.setDiagnostics(
-        listener(
-            divergence -> {
-              assertThat(divergence).isEqualTo(IntentionalDivergence.EXHAUSTED_EMPTY_MATCH);
-              assertThat(matcher.hasMatch()).isFalse();
-              assertThatThrownBy(matcher::group).isInstanceOf(IllegalStateException.class);
-              throw failure;
-            }));
+        listener(divergence -> {
+          assertThat(divergence).isEqualTo(IntentionalDivergence.EXHAUSTED_EMPTY_MATCH);
+          assertThat(matcher.hasMatch()).isFalse();
+          assertThatThrownBy(matcher::group).isInstanceOf(IllegalStateException.class);
+          throw failure;
+        }));
 
     assertThatThrownBy(matcher::find).isSameAs(failure);
     Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
@@ -59,12 +58,11 @@ class IntentionalDivergenceDiagnosticsTest {
     Matcher actual = pattern.matcher(input);
     RuntimeException failure = new IllegalStateException("listener failed");
     Pattern.setDiagnostics(
-        listener(
-            divergence -> {
-              assertThat(divergence).isEqualTo(IntentionalDivergence.EXHAUSTED_EMPTY_MATCH);
-              assertSameState(actual, expected);
-              throw failure;
-            }));
+        listener(divergence -> {
+          assertThat(divergence).isEqualTo(IntentionalDivergence.EXHAUSTED_EMPTY_MATCH);
+          assertSameState(actual, expected);
+          throw failure;
+        }));
 
     assertThatThrownBy(() -> replace(actual, functional, first)).isSameAs(failure);
     Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
@@ -96,15 +94,14 @@ class IntentionalDivergenceDiagnosticsTest {
     Pattern replacement = Pattern.compile("(b)");
     RuntimeException failure = new IllegalStateException("listener failed");
     Pattern.setDiagnostics(
-        listener(
-            divergence -> {
-              assertThat(divergence).isEqualTo(IntentionalDivergence.USE_PATTERN_GROUP_ZERO);
-              assertThat(matcher.pattern()).isSameAs(replacement);
-              assertThat(matcher.groupCount()).isEqualTo(1);
-              assertThat(matcher.group()).isEqualTo("a");
-              assertThat(matcher.group(1)).isNull();
-              throw failure;
-            }));
+        listener(divergence -> {
+          assertThat(divergence).isEqualTo(IntentionalDivergence.USE_PATTERN_GROUP_ZERO);
+          assertThat(matcher.pattern()).isSameAs(replacement);
+          assertThat(matcher.groupCount()).isEqualTo(1);
+          assertThat(matcher.group()).isEqualTo("a");
+          assertThat(matcher.group(1)).isNull();
+          throw failure;
+        }));
 
     assertThatThrownBy(() -> matcher.usePattern(replacement)).isSameAs(failure);
     Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
@@ -120,13 +117,12 @@ class IntentionalDivergenceDiagnosticsTest {
         catchThrowableOfType(PatternSyntaxException.class, () -> Pattern.compile(regex));
     assertThat(expected).isNotNull();
     Pattern.setDiagnostics(
-        listener(
-            divergence -> {
-              if (failure instanceof RuntimeException runtime) {
-                throw runtime;
-              }
-              throw (Error) failure;
-            }));
+        listener(divergence -> {
+          if (failure instanceof RuntimeException runtime) {
+            throw runtime;
+          }
+          throw (Error) failure;
+        }));
 
     assertThatThrownBy(() -> Pattern.compile(regex))
         .isInstanceOfSatisfying(
@@ -141,22 +137,20 @@ class IntentionalDivergenceDiagnosticsTest {
 
   private static Stream<Arguments> syntaxFailures() {
     return Stream.of("[a&&&b]", "(?x)#\\Q\n[", "(?x)#\\Q\n[a&&&b]")
-        .flatMap(
-            regex ->
-                Stream.of(
-                    Arguments.of(regex, new IllegalStateException("listener failed")),
-                    Arguments.of(regex, new AssertionError("listener failed"))));
+        .flatMap(regex ->
+            Stream.of(
+                Arguments.of(regex, new IllegalStateException("listener failed")),
+                Arguments.of(regex, new AssertionError("listener failed"))));
   }
 
   @Test
   void successfulParsePropagatesNotificationFailure() {
     RuntimeException failure = new IllegalStateException("listener failed");
     Pattern.setDiagnostics(
-        listener(
-            divergence -> {
-              assertThat(divergence).isEqualTo(IntentionalDivergence.COMMENT_QUOTING);
-              throw failure;
-            }));
+        listener(divergence -> {
+          assertThat(divergence).isEqualTo(IntentionalDivergence.COMMENT_QUOTING);
+          throw failure;
+        }));
 
     assertThatThrownBy(() -> Pattern.compile("(?x)#\\Q\n.")).isSameAs(failure);
   }
