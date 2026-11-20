@@ -36,6 +36,7 @@ final class CrossEngineBenchmarkPlan {
           DeclarativeBenchmarkPlan.Operation.SPLIT_LENGTH_SUM,
           DeclarativeBenchmarkPlan.Operation.COMPILE,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND,
+          DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND_GROUP_PRESENT,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_MATCHES,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND_GROUP,
           DeclarativeBenchmarkPlan.Operation.COMPILE_AND_REPLACE_ALL,
@@ -101,14 +102,13 @@ final class CrossEngineBenchmarkPlan {
       boolean noFork) {
     return trials(timingGroup).stream()
         .filter(trial -> trial.workload().measurement().mode() == mode)
-        .filter(
-            trial ->
-                trial
-                        .workload()
-                        .measurement()
-                        .constraints()
-                        .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.NO_FORK)
-                    == noFork)
+        .filter(trial ->
+            trial
+                    .workload()
+                    .measurement()
+                    .constraints()
+                    .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.NO_FORK)
+                == noFork)
         .toList();
   }
 
@@ -139,15 +139,12 @@ final class CrossEngineBenchmarkPlan {
     RegexEngineVariant.fromId(variantId);
     MaterializedExecutionPlan.Entry exclusion =
         exclusions.stream()
-            .filter(
-                candidate ->
-                    candidate.workloadId().equals(workloadId)
-                        && candidate.engineId().equals(variantId))
+            .filter(candidate ->
+                candidate.workloadId().equals(workloadId) && candidate.engineId().equals(variantId))
             .findFirst()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "Unaccounted cross-engine combination: " + workloadId + "@" + variantId));
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Unaccounted cross-engine combination: " + workloadId + "@" + variantId));
     throw new IllegalArgumentException(
         "Unsupported cross-engine combination: "
             + trialId
@@ -190,27 +187,23 @@ final class CrossEngineBenchmarkPlan {
     CrossEngineBenchmarkPlan plan = load();
     String trialIds =
         plan.trials(query.timingGroup()).stream()
-            .filter(
-                trial ->
-                    System.getProperty("safere.benchmark.scanProvider") == null
-                        || BenchmarkCollectionPlan.matchesScanProvider(
-                            trial.id(), System.getProperty("safere.benchmark.scanProvider")))
-            .filter(
-                trial ->
-                    query.mode() == null || trial.workload().measurement().mode() == query.mode())
-            .filter(
-                trial ->
-                    trial
-                            .workload()
-                            .measurement()
-                            .constraints()
-                            .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.NO_FORK)
-                        == query.noFork())
-            .filter(
-                trial ->
-                    queryArgs.length == 1
-                        || Arrays.stream(queryArgs, 1, queryArgs.length)
-                            .anyMatch(prefix -> trial.workload().id().startsWith(prefix)))
+            .filter(trial ->
+                System.getProperty("safere.benchmark.scanProvider") == null
+                    || BenchmarkCollectionPlan.matchesScanProvider(
+                        trial.id(), System.getProperty("safere.benchmark.scanProvider")))
+            .filter(trial ->
+                query.mode() == null || trial.workload().measurement().mode() == query.mode())
+            .filter(trial ->
+                trial
+                        .workload()
+                        .measurement()
+                        .constraints()
+                        .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.NO_FORK)
+                    == query.noFork())
+            .filter(trial ->
+                queryArgs.length == 1
+                    || Arrays.stream(queryArgs, 1, queryArgs.length)
+                        .anyMatch(prefix -> trial.workload().id().startsWith(prefix)))
             .map(Trial::id)
             .collect(Collectors.joining(","));
     if (trialIds.isEmpty()) {

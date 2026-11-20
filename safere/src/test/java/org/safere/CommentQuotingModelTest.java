@@ -63,13 +63,12 @@ class CommentQuotingModelTest {
 
   private static Stream<Arguments> commentContexts() {
     return Stream.of("\n", "\r", "\r\n")
-        .flatMap(
-            newline -> {
-              String label = newline.replace("\r", "CR").replace("\n", "LF");
-              return Stream.of(
-                  Arguments.of("compile flag / " + label, "", "", Pattern.COMMENTS, newline),
-                  Arguments.of("inline flag / " + label, "(?x)", "", 0, newline),
-                  Arguments.of("scoped flag / " + label, "(?x:", ")", 0, newline));
-            });
+        .flatMap(newline -> {
+          String label = newline.replace("\r", "CR").replace("\n", "LF");
+          return Stream.of(
+              Arguments.of("compile flag / " + label, "", "", Pattern.COMMENTS, newline),
+              Arguments.of("inline flag / " + label, "(?x)", "", 0, newline),
+              Arguments.of("scoped flag / " + label, "(?x:", ")", 0, newline));
+        });
   }
 }

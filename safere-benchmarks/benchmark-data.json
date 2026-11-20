@@ -4792,6 +4792,35 @@
       }
     },
     {
+      "id": "initialization.firstUse.text",
+      "recipe": {
+        "kind": "literal",
+        "text": "aé"
+      }
+    },
+    {
+      "id": "initialization.firstUse.long.{outcome}",
+      "axes": {
+        "outcome": [
+          {
+            "id": "hit",
+            "value": " log:42"
+          },
+          {
+            "id": "miss",
+            "value": " log:xx"
+          }
+        ]
+      },
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "é log:xx 42 😀 ",
+        "suffix": "{outcome}",
+        "length": 8192
+      },
+      "shared": true
+    },
+    {
       "id": "previousMatch.ascii.128",
       "recipe": {
         "kind": "repeat",
@@ -21751,6 +21780,274 @@
       "expected": {
         "type": "string",
         "value": "S\u00e9rvice\ud83d\ude00.java"
+      }
+    },
+    {
+      "id": "InitializationLatencyBenchmark.firstFind.{regex}",
+      "operation": "findGroupPresent",
+      "patterns": [
+        "{regex}"
+      ],
+      "inputs": [
+        "initialization.firstUse.text"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "axes": {
+        "regex": [
+          {
+            "id": "asciiWord",
+            "value": "(\\w+)"
+          },
+          {
+            "id": "unicodeWord",
+            "value": {
+              "java": "(?U)(\\w+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java Unicode-character-class mode"
+                }
+              }
+            }
+          },
+          {
+            "id": "unicodeProperty",
+            "value": "(\\p{L}+)"
+          },
+          {
+            "id": "graphemeCluster",
+            "value": {
+              "java": "(\\w+)\\X",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme cluster matching"
+                }
+              }
+            }
+          },
+          {
+            "id": "graphemeBoundary",
+            "value": {
+              "java": "(\\w+)\\b{g}",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme boundaries"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "InitializationLatencyBenchmark.firstFind.long.{outcome}",
+      "operation": "findGroupPresent",
+      "patterns": [
+        "(\\w+):[0-9]+"
+      ],
+      "inputs": [
+        "initialization.firstUse.long.{outcome}"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "axis": "outcome"
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "axes": {
+        "outcome": [
+          {
+            "id": "hit",
+            "value": true
+          },
+          {
+            "id": "miss",
+            "value": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "InitializationLatencyBenchmark.compileAndFirstFind.{regex}",
+      "operation": "compileAndFindGroupPresent",
+      "patterns": [
+        "{regex}"
+      ],
+      "inputs": [
+        "initialization.firstUse.text"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "axes": {
+        "regex": [
+          {
+            "id": "asciiWord",
+            "value": "(\\w+)"
+          },
+          {
+            "id": "unicodeWord",
+            "value": {
+              "java": "(?U)(\\w+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java Unicode-character-class mode"
+                }
+              }
+            }
+          },
+          {
+            "id": "unicodeProperty",
+            "value": "(\\p{L}+)"
+          },
+          {
+            "id": "javaLowerCase",
+            "value": {
+              "java": "(\\p{javaLowerCase}+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java-derived character properties"
+                }
+              }
+            }
+          },
+          {
+            "id": "graphemeCluster",
+            "value": {
+              "java": "(\\w+)\\X",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme cluster matching"
+                }
+              }
+            }
+          },
+          {
+            "id": "graphemeBoundary",
+            "value": {
+              "java": "(\\w+)\\b{g}",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement grapheme boundaries"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "InitializationLatencyBenchmark.compileAndFirstFindAfterAscii.{regex}",
+      "operation": "compileAndFindGroupPresent",
+      "patterns": [
+        "{regex}"
+      ],
+      "inputs": [
+        "initialization.firstUse.text"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Compare String and pre-existing UTF-8 first-search latency without timed input encoding.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "arguments": {
+        "group": 1
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation",
+          "precompileAscii"
+        ]
+      },
+      "axes": {
+        "regex": [
+          {
+            "id": "asciiWord",
+            "value": "(\\w+)"
+          },
+          {
+            "id": "javaLowerCase",
+            "value": {
+              "java": "(\\p{javaLowerCase}+)",
+              "alternates": {
+                "re2": {
+                  "unsupported": true,
+                  "reason": "RE2 does not implement Java-derived character properties"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     {

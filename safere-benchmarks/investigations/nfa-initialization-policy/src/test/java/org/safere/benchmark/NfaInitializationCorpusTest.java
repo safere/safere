@@ -77,9 +77,8 @@ class NfaInitializationCorpusTest {
             List.<RegexEngineVariant.RegexInput>of(
                 variant == RegexEngineVariant.SAFERE_STRING
                     ? new RegexEngineVariant.StringRegexInput(text)
-                    : new RegexEngineVariant.Utf8RegexInput(
-                        org.safere.Utf8Input.validated(
-                            text.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+                    : RegexEngineVariant.utf8Input(
+                        text.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         var replacement = variant.prepareReplacement("<$1>");
         Object actual =
             op.execute(

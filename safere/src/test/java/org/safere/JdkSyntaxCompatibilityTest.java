@@ -394,26 +394,20 @@ class JdkSyntaxCompatibilityTest {
 
       Stream<Arguments> groups =
           groupSpellings.stream()
-              .flatMap(
-                  rejection ->
-                      wrappers.stream()
-                          .map(
-                              wrapper ->
-                                  Arguments.of(
-                                      new DialectRejection(
-                                          rejection.family(),
-                                          String.format(wrapper, rejection.regex())))));
+              .flatMap(rejection ->
+                  wrappers.stream()
+                      .map(wrapper ->
+                          Arguments.of(
+                              new DialectRejection(
+                                  rejection.family(), String.format(wrapper, rejection.regex())))));
       Stream<Arguments> escapes =
           escapeSpellings.stream()
-              .flatMap(
-                  rejection ->
-                      wrappers.stream()
-                          .map(
-                              wrapper ->
-                                  Arguments.of(
-                                      new DialectRejection(
-                                          rejection.family(),
-                                          String.format(wrapper, rejection.regex())))));
+              .flatMap(rejection ->
+                  wrappers.stream()
+                      .map(wrapper ->
+                          Arguments.of(
+                              new DialectRejection(
+                                  rejection.family(), String.format(wrapper, rejection.regex())))));
       return Stream.concat(groups, escapes);
     }
 

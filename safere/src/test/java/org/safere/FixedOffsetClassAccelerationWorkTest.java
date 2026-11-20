@@ -29,16 +29,15 @@ class FixedOffsetClassAccelerationWorkTest {
           WorkCounter.countForTesting(
               () -> assertThat(scanner.indexOfCharClass(plan.leadingClass(), 0)).isEqualTo(-1));
       long acceleratedWork =
-          WorkCounter.countForTesting(
-              () -> {
-                int candidate =
-                    utf8
-                        ? Utf8StartAccelerator.findNextCandidate(
-                            pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
-                        : StringStartAccelerator.findNextCandidate(
-                            pattern.stringStartAccelerator(), input, 0, false);
-                assertThat(candidate).isEqualTo(-1);
-              });
+          WorkCounter.countForTesting(() -> {
+            int candidate =
+                utf8
+                    ? Utf8StartAccelerator.findNextCandidate(
+                        pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
+                    : StringStartAccelerator.findNextCandidate(
+                        pattern.stringStartAccelerator(), input, 0, false);
+            assertThat(candidate).isEqualTo(-1);
+          });
       assertThat(acceleratedWork).as(regex).isLessThanOrEqualTo(leadingWork + 8);
     }
   }

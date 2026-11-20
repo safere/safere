@@ -76,17 +76,15 @@ class BenchmarkInputMaterializerTest {
     Files.createDirectories(tempDirectory.resolve("data"));
     Files.writeString(tempDirectory.resolve("data/source.txt"), "fixture");
 
-    assertThatThrownBy(
-            () ->
-                BenchmarkInputMaterializer.materialize(
-                    fileInput("data/source.txt", "0".repeat(64)), tempDirectory))
+    assertThatThrownBy(() ->
+            BenchmarkInputMaterializer.materialize(
+                fileInput("data/source.txt", "0".repeat(64)), tempDirectory))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("File recipe SHA-256 mismatch: data/source.txt");
 
-    assertThatThrownBy(
-            () ->
-                BenchmarkInputMaterializer.materialize(
-                    fileInput("data/../source.txt", "0".repeat(64)), tempDirectory))
+    assertThatThrownBy(() ->
+            BenchmarkInputMaterializer.materialize(
+                fileInput("data/../source.txt", "0".repeat(64)), tempDirectory))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("File recipe path must stay within data: data/../source.txt");
   }
@@ -317,10 +315,9 @@ class BenchmarkInputMaterializerTest {
               executionPlan.getAsJsonArray("entries").asList().stream()
                   .map(JsonElement::getAsJsonObject)
                   .filter(planEntry -> planEntry.get("engineId").getAsString().equals(engineId))
-                  .filter(
-                      planEntry ->
-                          Set.of("runnable", "excluded")
-                              .contains(planEntry.get("status").getAsString())))
+                  .filter(planEntry ->
+                      Set.of("runnable", "excluded")
+                          .contains(planEntry.get("status").getAsString())))
           .as(engineId)
           .extracting(planEntry -> planEntry.get("workloadId").getAsString())
           .containsExactlyInAnyOrderElementsOf(workloadIds);
@@ -328,28 +325,25 @@ class BenchmarkInputMaterializerTest {
     assertThat(
             executionPlan.getAsJsonArray("entries").asList().stream()
                 .map(JsonElement::getAsJsonObject)
-                .filter(
-                    planEntry ->
-                        planEntry
-                            .get("workloadId")
-                            .getAsString()
-                            .equals("CompileBenchmark.compileSimple"))
-                .filter(
-                    planEntry ->
-                        Set.of("re2_cpp", "pcre2_jit", "go_regexp", "rust_regex")
-                            .contains(planEntry.get("engineId").getAsString())))
+                .filter(planEntry ->
+                    planEntry
+                        .get("workloadId")
+                        .getAsString()
+                        .equals("CompileBenchmark.compileSimple"))
+                .filter(planEntry ->
+                    Set.of("re2_cpp", "pcre2_jit", "go_regexp", "rust_regex")
+                        .contains(planEntry.get("engineId").getAsString())))
         .hasSize(4)
         .allSatisfy(
             planEntry -> assertThat(planEntry.get("status").getAsString()).isEqualTo("runnable"));
     assertThat(
             resolvedData.getAsJsonArray("workloads").asList().stream()
-                .filter(
-                    workload ->
-                        workload
-                            .getAsJsonObject()
-                            .get("id")
-                            .getAsString()
-                            .equals("UnicodeCompileBenchmark.compile.{regex}.{flagSet}"))
+                .filter(workload ->
+                    workload
+                        .getAsJsonObject()
+                        .get("id")
+                        .getAsString()
+                        .equals("UnicodeCompileBenchmark.compile.{regex}.{flagSet}"))
                 .findFirst()
                 .orElseThrow()
                 .getAsJsonObject()

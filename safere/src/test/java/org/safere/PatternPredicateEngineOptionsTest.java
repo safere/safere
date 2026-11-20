@@ -33,23 +33,17 @@ class PatternPredicateEngineOptionsTest {
   void asPredicateHonorsEnginePathOptions(String name, EnginePathOptions.Builder options) {
     List<String> failures = new ArrayList<>();
     PatternPredicateTest.patterns()
-        .forEach(
-            arguments -> {
-              String regex = (String) arguments.get()[0];
-              int flags = (int) arguments.get()[1];
-              Pattern pattern = Pattern.compile(regex, flags, options.build());
-              for (String input : PatternPredicateTest.INPUTS) {
-                if (pattern.asPredicate().test(input) != pattern.matcher(input).find()) {
-                  failures.add(
-                      "/"
-                          + regex
-                          + "/ flags="
-                          + flags
-                          + " on "
-                          + PatternPredicateTest.escape(input));
-                }
-              }
-            });
+        .forEach(arguments -> {
+          String regex = (String) arguments.get()[0];
+          int flags = (int) arguments.get()[1];
+          Pattern pattern = Pattern.compile(regex, flags, options.build());
+          for (String input : PatternPredicateTest.INPUTS) {
+            if (pattern.asPredicate().test(input) != pattern.matcher(input).find()) {
+              failures.add(
+                  "/" + regex + "/ flags=" + flags + " on " + PatternPredicateTest.escape(input));
+            }
+          }
+        });
     assertThat(failures).as(name).isEmpty();
   }
 }

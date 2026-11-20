@@ -43,15 +43,14 @@ class CaptureCutoffBenchmarkTest {
       int size = Integer.parseInt(workload.id().substring(workload.id().lastIndexOf('.') + 1));
       List<RegexEngineVariant.RegexInput> prepared =
           workload.inputKeys().stream()
-              .map(
-                  key -> {
-                    byte[] bytes = inputs.get(key);
-                    assertThat(bytes.length).isEqualTo(size);
-                    return (trial.variant() == RegexEngineVariant.SAFERE_UTF8
-                        ? RegexEngineVariant.utf8Input(bytes)
-                        : new RegexEngineVariant.StringRegexInput(
-                            new String(bytes, StandardCharsets.UTF_8)));
-                  })
+              .map(key -> {
+                byte[] bytes = inputs.get(key);
+                assertThat(bytes.length).isEqualTo(size);
+                return (trial.variant() == RegexEngineVariant.SAFERE_UTF8
+                    ? RegexEngineVariant.utf8Input(bytes)
+                    : new RegexEngineVariant.StringRegexInput(
+                        new String(bytes, StandardCharsets.UTF_8)));
+              })
               .toList();
       String captured = workload.id().contains(".stack.") ? "com.example.Service" : "word";
       for (String operation : List.of("matches", "lookingAt", "find")) {

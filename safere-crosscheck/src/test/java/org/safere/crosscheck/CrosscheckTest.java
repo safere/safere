@@ -365,17 +365,16 @@ class CrosscheckTest {
 
       assertThat(
               m.results()
-                  .map(
-                      result ->
-                          result.group("word")
-                              + ":"
-                              + result.start("digits")
-                              + "-"
-                              + result.end("digits")
-                              + ":"
-                              + result.namedGroups().get("word")
-                              + ","
-                              + result.namedGroups().get("digits"))
+                  .map(result ->
+                      result.group("word")
+                          + ":"
+                          + result.start("digits")
+                          + "-"
+                          + result.end("digits")
+                          + ":"
+                          + result.namedGroups().get("word")
+                          + ","
+                          + result.namedGroups().get("digits"))
                   .toList())
           .containsExactly("a:2-4:1,2", "b:7-10:1,2");
     }
@@ -387,11 +386,10 @@ class CrosscheckTest {
 
       assertThatThrownBy(() -> m.results().toList())
           .isInstanceOf(CrosscheckException.class)
-          .satisfies(
-              ex -> {
-                CrosscheckException ce = (CrosscheckException) ex;
-                assertThat(ce.trace()).contains("DIVERGENCE");
-              });
+          .satisfies(ex -> {
+            CrosscheckException ce = (CrosscheckException) ex;
+            assertThat(ce.trace()).contains("DIVERGENCE");
+          });
     }
   }
 
@@ -557,11 +555,10 @@ class CrosscheckTest {
       // JDK:    group(1) = "a" (leaked from failed attempt at earlier position)
       assertThatThrownBy(() -> m.find())
           .isInstanceOf(CrosscheckException.class)
-          .satisfies(
-              ex -> {
-                CrosscheckException ce = (CrosscheckException) ex;
-                assertThat(ce.trace()).contains("DIVERGENCE");
-              });
+          .satisfies(ex -> {
+            CrosscheckException ce = (CrosscheckException) ex;
+            assertThat(ce.trace()).contains("DIVERGENCE");
+          });
     }
   }
 

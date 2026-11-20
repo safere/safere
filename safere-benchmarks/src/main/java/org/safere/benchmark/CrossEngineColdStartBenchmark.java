@@ -6,6 +6,7 @@
 package org.safere.benchmark;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -28,24 +29,33 @@ public class CrossEngineColdStartBenchmark {
   public String crossEngineColdStartTrial;
 
   private CrossEngineTrialRunner runner;
+  private final AtomicBoolean measured = new AtomicBoolean();
 
-  /** Resolves the declaration without compiling or executing the measured regex operation. */
+  /** Prepares inputs and any untimed compilation without exercising the measured operation. */
   @Setup
   public void setup() {
+    measured.set(false);
     runner =
         CrossEngineTrialRunner.prepareColdStart(
             crossEngineColdStartTrial, CrossEngineWorkload.TimingGroup.MILLISECONDS);
   }
 
-  /** Validates compile-plus-operation results after timing and releases retained resources. */
+  /** Validates the measured result and releases retained resources. */
   @TearDown
   public void tearDown() {
-    runner.close();
+    try {
+      runner.validateMeasuredResult();
+    } finally {
+      runner.close();
+    }
   }
 
   /** Executes one declared cold-start operation. */
   @Benchmark
   public void run(Blackhole blackhole) {
+    if (measured.getAndSet(true)) {
+      throw new IllegalStateException("Cold-start trials require one invocation per fresh fork");
+    }
     runner.run(blackhole);
   }
 }

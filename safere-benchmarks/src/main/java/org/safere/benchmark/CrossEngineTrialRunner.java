@@ -14,15 +14,15 @@ final class CrossEngineTrialRunner implements AutoCloseable {
 
   private final List<RegexEngineVariant.CompiledRegex> patterns;
   private final BenchmarkOperation.BenchmarkTask task;
-  private final Runnable deferredValidation;
+  private final ColdResult coldResult;
 
   private CrossEngineTrialRunner(
       List<RegexEngineVariant.CompiledRegex> patterns,
       BenchmarkOperation.BenchmarkTask task,
-      Runnable deferredValidation) {
+      ColdResult coldResult) {
     this.patterns = patterns;
     this.task = task;
-    this.deferredValidation = deferredValidation;
+    this.coldResult = coldResult;
   }
 
   static CrossEngineTrialRunner prepare(
@@ -43,9 +43,13 @@ final class CrossEngineTrialRunner implements AutoCloseable {
       BenchmarkData data,
       CrossEngineBenchmarkPlan.Trial trial,
       CrossEngineWorkload.TimingGroup expectedTimingGroup) {
-    if (!trial.workload().operation().compilesDuringMeasurement()) {
+    if (trial.workload().measurement().mode()
+        != DeclarativeBenchmarkPlan.MeasurementMode.SINGLE_SHOT_COLD_START) {
+      throw new IllegalArgumentException(trial.id() + " requires singleShotColdStart mode");
+    }
+    if (!trial.workload().operation().supportsColdStart()) {
       throw new IllegalArgumentException(
-          trial.id() + " cold-start execution requires an operation that includes compilation");
+          trial.id() + " operation does not support cold-start execution");
     }
     return prepare(data, trial, expectedTimingGroup, false);
   }
@@ -63,6 +67,13 @@ final class CrossEngineTrialRunner implements AutoCloseable {
           trialId + " belongs to " + workload.timingGroup() + ", not " + expectedTimingGroup);
     }
 
+    if (workload
+        .measurement()
+        .constraints()
+        .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.PRECOMPILE_ASCII)) {
+      // Warm common compilation classes without touching the measured pattern or running a search.
+      trial.variant().compile("safere-primer").close();
+    }
     List<RegexEngineVariant.RegexInput> inputs =
         trial.variant().prepareInputs(data, workload.inputKeys());
     RegexEngineVariant.PreparedReplacement replacement =
@@ -75,9 +86,45 @@ final class CrossEngineTrialRunner implements AutoCloseable {
           patterns.add(trial.variant().compile(pattern));
         }
       }
-      Runnable validation =
-          () ->
-              trial.validate(
+      if (validateBeforeMeasurement) {
+        Object actual =
+            workload
+                .operation()
+                .execute(
+                    trial.variant(),
+                    patternSources,
+                    patterns,
+                    inputs,
+                    workload.groups(),
+                    replacement,
+                    workload.limit(),
+                    workload.lifecycle(),
+                    workload.flagSet(),
+                    workload.seed(),
+                    workload.count(),
+                    workload.mode());
+        trial.validate(actual);
+      }
+      ColdResult coldResult =
+          !validateBeforeMeasurement && workload.operation() != BenchmarkOperation.COMPILE
+              ? new ColdResult(trial)
+              : null;
+      BenchmarkOperation.BenchmarkTask task;
+      if (coldResult != null
+          && workload.operation() == BenchmarkOperation.COMPILE_AND_REPLACE_ALL) {
+        task =
+            blackhole -> {
+              RegexEngineVariant.ReplacementOutput actual =
+                  BenchmarkOperation.compileAndReplaceAll(
+                      trial.variant(), patternSources.getFirst(), inputs.getFirst(), replacement);
+              coldResult.record(actual);
+              actual.consume(blackhole);
+            };
+      } else if (coldResult != null) {
+        int[] groups = workload.groups();
+        task =
+            blackhole -> {
+              Object actual =
                   workload
                       .operation()
                       .execute(
@@ -85,39 +132,36 @@ final class CrossEngineTrialRunner implements AutoCloseable {
                           patternSources,
                           patterns,
                           inputs,
-                          workload.groups(),
+                          groups,
                           replacement,
                           workload.limit(),
                           workload.lifecycle(),
                           workload.flagSet(),
                           workload.seed(),
                           workload.count(),
-                          workload.mode()));
-      if (validateBeforeMeasurement) {
-        validation.run();
+                          workload.mode());
+              coldResult.record(actual);
+              blackhole.consume(actual);
+            };
+      } else {
+        task =
+            workload
+                .operation()
+                .bind(
+                    trial.variant(),
+                    patternSources,
+                    patterns,
+                    inputs,
+                    workload.groups(),
+                    replacement,
+                    workload.limit(),
+                    workload.lifecycle(),
+                    workload.flagSet(),
+                    workload.seed(),
+                    workload.count(),
+                    workload.mode());
       }
-      BenchmarkOperation.BenchmarkTask task =
-          workload
-              .operation()
-              .bind(
-                  trial.variant(),
-                  patternSources,
-                  patterns,
-                  inputs,
-                  workload.groups(),
-                  replacement,
-                  workload.limit(),
-                  workload.lifecycle(),
-                  workload.flagSet(),
-                  workload.seed(),
-                  workload.count(),
-                  workload.mode());
-      return new CrossEngineTrialRunner(
-          List.copyOf(patterns),
-          task,
-          !validateBeforeMeasurement && workload.operation() != BenchmarkOperation.COMPILE
-              ? validation
-              : null);
+      return new CrossEngineTrialRunner(List.copyOf(patterns), task, coldResult);
     } catch (RuntimeException | Error exception) {
       close(patterns);
       throw exception;
@@ -128,15 +172,35 @@ final class CrossEngineTrialRunner implements AutoCloseable {
     task.run(blackhole);
   }
 
+  void validateMeasuredResult() {
+    if (coldResult != null && coldResult.completed) {
+      Object actual = coldResult.actual;
+      // Decode native replacement output only after timing, using the measured result.
+      if (actual instanceof RegexEngineVariant.ReplacementOutput replacement) {
+        actual = replacement.validationValue();
+      }
+      coldResult.trial.validate(actual);
+    }
+  }
+
+  private static final class ColdResult {
+    final CrossEngineBenchmarkPlan.Trial trial;
+    Object actual;
+    boolean completed;
+
+    ColdResult(CrossEngineBenchmarkPlan.Trial trial) {
+      this.trial = trial;
+    }
+
+    void record(Object actual) {
+      this.actual = actual;
+      completed = true;
+    }
+  }
+
   @Override
   public void close() {
-    try {
-      if (deferredValidation != null) {
-        deferredValidation.run();
-      }
-    } finally {
-      close(patterns);
-    }
+    close(patterns);
   }
 
   private static void close(List<RegexEngineVariant.CompiledRegex> patterns) {
