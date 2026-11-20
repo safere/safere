@@ -271,6 +271,7 @@ internal static class ResolvedPlanProgram
             ? RotatingUtf16Inputs(seed, count)
             : [];
         int rotatingIndex = 0;
+        MatchEvaluator captureReplacement = CapturedTextReplacement(group);
         Regex regex = regexes.FirstOrDefault()!;
         string input = inputTexts.FirstOrDefault() ?? "";
 
@@ -297,6 +298,7 @@ internal static class ResolvedPlanProgram
             "captureGroups" => () => stringSink = CaptureGroups(fullRegex!.Match(input), groups),
             "replaceFirst" => () => stringSink = regex.Replace(input, replacement, 1),
             "replaceAll" => () => stringSink = regex.Replace(input, replacement),
+            "replaceAllFunction" => () => stringSink = regex.Replace(input, captureReplacement),
             "replaceAllLengthSum" => () =>
                 intSink = regexes.Sum(item => item.Replace(input, replacement).Length),
             "splitLengthSum" => () => intSink = SplitLengthSum(regex, input, limit),
@@ -329,6 +331,9 @@ internal static class ResolvedPlanProgram
             _ => throw new InvalidDataException($"Unsupported operation: {operation}")
         };
     }
+
+    private static MatchEvaluator CapturedTextReplacement(int group) =>
+        match => match.Groups[group].Value;
 
     private static void Validate(Prepared prepared)
     {
@@ -568,6 +573,19 @@ internal static class ResolvedPlanProgram
         {
             throw new InvalidOperationException(
                 ".NET character-class subtraction self-test failed");
+        }
+        foreach ((string pattern, string input, string output) in new[]
+        {
+            ("(.)", "$\\", "$\\"),
+            ("(x)?y", "y", "")
+        })
+        {
+            Regex regex = new(pattern, BaseOptions);
+            if (regex.Replace(input, CapturedTextReplacement(1)) != output)
+            {
+                throw new InvalidOperationException(
+                    "Functional replacement must return literal capture text or empty for nonparticipation");
+            }
         }
         return 0;
     }
