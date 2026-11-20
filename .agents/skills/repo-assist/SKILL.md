@@ -1,6 +1,6 @@
 ---
 name: repo-assist
-description: "Review trusted SafeRE contributor PRs and feedback on the maintainer’s PRs, repair agreed findings locally, and produce a short action report with linked reviews and evidence. Summarize new and changed issue activity without an open-issue backlog."
+description: "Review trusted SafeRE contributor PRs locally, update the maintainer’s PR branches and push agreed feedback fixes, and brief the maintainer on PRs and recent issue activity with linked evidence."
 ---
 
 # Repo Assist
@@ -12,8 +12,8 @@ Prepare a short maintainer briefing with linked review records and evidence:
 - which open non-draft contributor PRs need attention;
 - new issues and comments/updates on any issue since the last successful run, including closed
   issues, with PR coverage including drafts;
-- review feedback on the authenticated user's PRs, with agreed repairs committed locally in the
-  original worktree and disagreements explained in a separate report section;
+- update the authenticated user's open PR branches from current `main` as needed, including
+  drafts, and repair agreed feedback in their original worktrees before pushing verified updates;
 - whether each PR's idea makes sense and matches its implementation;
 - how each stacked PR contributes to the stack's shared objective and affects adjacent layers;
 - P2+ code-review findings fixed locally with `$review-fix-loop` within the cycle limit, or
@@ -23,8 +23,9 @@ Prepare a short maintainer briefing with linked review records and evidence:
 - one paste-ready, self-contained PR review containing everything the PR author needs to understand
   the findings, evidence, fixes, requests, and recommendation.
 
-Do not push branches, post PR or issue comments, close issues, or publish review text unless the user
-explicitly asks.
+The authored PR workflow pushes verified updates to the authenticated user's existing PR branches.
+Contributor reviews and fixes stay local. Posting comments or reviews, resolving threads, changing
+PR state, and merging or closing a PR through GitHub require a separate user request.
 
 ## Required Inputs And Defaults
 
@@ -71,7 +72,7 @@ the same time.
 
 ## Run To Completion
 
-Complete recent issue-activity assessment, authored-feedback assessment and agreed repairs, and
+Complete recent issue-activity assessment, authored branch updates and feedback repairs, and
 every eligible contributor PR's assessment before finalizing a successful run. Long runtime and per-item crash
 recovery checkpoints are not reasons to end a healthy sweep early. The workflow references define
 terminal states, blockers, and the contributor review/fix-cycle limit.
@@ -110,11 +111,11 @@ requires all three:
    activity since the last successful run. Do not inventory the open backlog or carry inactive
    issue assessments forward. Keep active-issue evidence in the linked issue-activity record and
    include only meaningful changes or maintainer actions in the main briefing.
-2. Read [references/authored-pr-feedback.md](references/authored-pr-feedback.md), collect
-   `authored-feedback`, and assess feedback on the authenticated user's PRs, including drafts.
-   Before contributor reviews, commit agreed repairs locally in the existing original worktree
-   resolved by `authored-worktree`; report disagreements and blockers without implementing those
-   parts.
+2. Read [references/authored-pr-feedback.md](references/authored-pr-feedback.md). Discover all open
+   PRs by the authenticated user, including drafts, and collect `authored-feedback`. Before
+   contributor reviews, bring authored PR branches up to current `main` as needed, repair agreed
+   feedback in the original worktree resolved by `authored-worktree`, and push verified updates.
+   Report disagreements, blocked updates, and any fixes that remain local.
 3. Read [references/contributor-pr-review.md](references/contributor-pr-review.md) **in full before
    discovering, triaging, reviewing, repairing, benchmarking, or reporting contributor PRs**. Follow
    its discovery, whole-stack context, delta triage, bounded review/fix loop, benchmark reproduction,
@@ -199,19 +200,21 @@ references/contributor-pr-review.md. Use this skill's deterministic helpers for 
 trust checks, and content pulls; preserve the fail-closed trust boundary.
 
 Collect and assess issue activity since the last successful run across all states, with addressing
-PR coverage including drafts. Assess review feedback on the authenticated user's open PRs,
-including drafts; implement agreed parts only and commit locally in their verified original
-worktrees. Report disagreements and blocked repairs. Then process every eligible contributor PR
-in stack dependency order and increasing PR number among independent PRs, following the reference's
-bounded repair, verification, benchmark, evidence reuse, and merge-ordering rules.
+PR coverage including drafts. For all open PRs by the authenticated user, including drafts, merge
+current main when needed, assess any review feedback, and commit agreed repairs in their verified
+original worktrees. Push verified updates to the existing authored PR branches. Report
+disagreements, blocked updates, and unpublished work. Then process every eligible contributor PR
+in stack dependency order and increasing PR number among independent PRs. Keep contributor
+changes local and follow the reference's repair, verification, benchmark, and merge-ordering rules.
 
 Produce a short action report with linked PR explanations, full review records, and copy/paste
 reviews. Read references/report-format.md. Include new/changed issue activity; omit the open backlog.
 Store state, reports, and artifacts under ~/.codex/safere-pr-review and update LATEST.md.
 Run to completion even if the sweep takes many hours. Stop early only for an explicit user stop
 request, a concrete sweep-wide blocker, or an execution environment that cannot continue. Preserve
-the previous successful issue checkpoint on interruption and release the lock. Do not push
-branches, post comments or reviewer replies, close issues, or publish review text.
+the previous successful issue checkpoint on interruption and release the lock. Only push the
+verified authored PR branch updates described above. Leave GitHub comments, reviews, threads,
+PR state changes, and PR merges to the maintainer.
 ```
 
 ## Discipline

@@ -1607,6 +1607,8 @@ final class DeclarativeBenchmarkPlan {
     CAPTURE_GROUPS("captureGroups", false, true, Feature.MATCHES, Feature.CAPTURE_TEXT),
     REPLACE_FIRST("replaceFirst", false, true, Feature.REPLACE),
     REPLACE_ALL("replaceAll", false, true, Feature.REPLACE),
+    REPLACE_ALL_FUNCTION(
+        "replaceAllFunction", false, true, Feature.REPLACE, Feature.FUNCTIONAL_REPLACEMENT),
     REPLACE_ALL_LENGTH_SUM("replaceAllLengthSum", false, true, Feature.REPLACE),
     APPEND_REPLACEMENT("appendReplacement", false, true, Feature.REPLACE),
     MANUAL_REPLACE_ALL(
@@ -1784,6 +1786,7 @@ final class DeclarativeBenchmarkPlan {
             COMPILE_AND_REPLACE_ALL,
             REPLACE_FIRST,
             REPLACE_ALL,
+            REPLACE_ALL_FUNCTION,
             APPEND_REPLACEMENT,
             MANUAL_REPLACE_ALL ->
             consumption == ResultConsumption.STRING;
@@ -1820,7 +1823,8 @@ final class DeclarativeBenchmarkPlan {
         case FIND_GROUP_PRESENT,
             FIND_GROUP,
             COMPILE_AND_FIND_GROUP_PRESENT,
-            COMPILE_AND_FIND_GROUP ->
+            COMPILE_AND_FIND_GROUP,
+            REPLACE_ALL_FUNCTION ->
             Map.of("group", RecipeValueType.INTEGER);
         case REPLACE_FIRST,
             COMPILE_AND_REPLACE_ALL,
@@ -1859,7 +1863,8 @@ final class DeclarativeBenchmarkPlan {
         case FIND_GROUP_PRESENT,
             FIND_GROUP,
             COMPILE_AND_FIND_GROUP_PRESENT,
-            COMPILE_AND_FIND_GROUP ->
+            COMPILE_AND_FIND_GROUP,
+            REPLACE_ALL_FUNCTION ->
             Set.of("group");
         case REPLACE_FIRST,
             COMPILE_AND_REPLACE_ALL,

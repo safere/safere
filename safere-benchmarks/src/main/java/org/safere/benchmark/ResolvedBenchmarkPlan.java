@@ -72,7 +72,8 @@ final class ResolvedBenchmarkPlan {
     DeclarativeBenchmarkPlan plan = DeclarativeBenchmarkPlan.parse(planData);
     PatternProfiles patternProfiles =
         PatternProfiles.parse(normalizedBenchmarkData.get("patternProfiles"))
-            .withFallback("re2-cpp", "re2");
+            .withFallback("re2-cpp", "re2")
+            .withFallback("go-regexp", "re2");
     PatternProfiles replacementProfiles =
         PatternProfiles.parse(normalizedBenchmarkData.get("replacementProfiles"));
 
@@ -172,13 +173,16 @@ final class ResolvedBenchmarkPlan {
             "go_regexp",
             "go_regexp",
             "go",
-            "re2",
+            "go-regexp",
             "go-regexp",
             true,
             true,
             true,
             PORTABLE_OPERATIONS,
             PORTABLE_MODES));
+    EnumSet<DeclarativeBenchmarkPlan.Operation> rustOperations =
+        EnumSet.copyOf(PORTABLE_OPERATIONS);
+    rustOperations.add(DeclarativeBenchmarkPlan.Operation.REPLACE_ALL_FUNCTION);
     result.add(
         portableEngine(
             "rust_regex",
@@ -189,16 +193,19 @@ final class ResolvedBenchmarkPlan {
             true,
             true,
             true,
-            PORTABLE_OPERATIONS,
-            PORTABLE_MODES));
+            rustOperations,
+            PORTABLE_MODES,
+            DeclarativeBenchmarkPlan.Feature.FUNCTIONAL_REPLACEMENT));
 
     EnumSet<DeclarativeBenchmarkPlan.Feature> dotnetFeatures = portableFeatures(false, true, false);
     dotnetFeatures.remove(DeclarativeBenchmarkPlan.Feature.UTF8_INPUT);
+    dotnetFeatures.add(DeclarativeBenchmarkPlan.Feature.FUNCTIONAL_REPLACEMENT);
     dotnetFeatures.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
     dotnetFeatures.add(DeclarativeBenchmarkPlan.Feature.JAVA_CHARACTER_CLASS);
     EnumSet<DeclarativeBenchmarkPlan.Operation> dotnetOperations =
         EnumSet.copyOf(PORTABLE_OPERATIONS);
     dotnetOperations.remove(DeclarativeBenchmarkPlan.Operation.UTF8_CAPTURE_BOUNDS);
+    dotnetOperations.add(DeclarativeBenchmarkPlan.Operation.REPLACE_ALL_FUNCTION);
     dotnetOperations.add(DeclarativeBenchmarkPlan.Operation.FIND_ROTATING_UTF16);
     dotnetOperations.add(DeclarativeBenchmarkPlan.Operation.COMPILE_AND_FIND_ROTATING_UTF16);
     result.add(
@@ -237,7 +244,11 @@ final class ResolvedBenchmarkPlan {
       boolean replacement,
       boolean retainedHeap,
       EnumSet<DeclarativeBenchmarkPlan.Operation> operations,
-      EnumSet<DeclarativeBenchmarkPlan.MeasurementMode> modes) {
+      EnumSet<DeclarativeBenchmarkPlan.MeasurementMode> modes,
+      DeclarativeBenchmarkPlan.Feature... additionalFeatures) {
+    EnumSet<DeclarativeBenchmarkPlan.Feature> features =
+        portableFeatures(linearTime, replacement, retainedHeap);
+    Collections.addAll(features, additionalFeatures);
     return new Engine(
         id,
         reportEngine,
@@ -247,7 +258,7 @@ final class ResolvedBenchmarkPlan {
         new DeclarativeBenchmarkPlan.EngineDeclaration(
             id,
             DeclarativeBenchmarkPlan.InputRepresentation.PREEXISTING_UTF8,
-            portableFeatures(linearTime, replacement, retainedHeap),
+            features,
             EnumSet.noneOf(DeclarativeBenchmarkPlan.Flag.class),
             true),
         operations,
