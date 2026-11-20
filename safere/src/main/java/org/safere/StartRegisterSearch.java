@@ -145,6 +145,9 @@ final class StartRegisterSearch {
   private static final int STATE_FLAGS_MASK =
       EmptyOp.ALL_FLAGS & ~EmptyOp.GRAPHEME_CLUSTER_BOUNDARY;
   private final int[] visited;
+  private final int[] rankByLabel;
+  private int[] stackPc = new int[16];
+  private int[] stackG = new int[16];
   private int generation;
 
   /** Lower bounds of the non-ASCII equivalence classes, starting with 128; null if too many. */
@@ -200,6 +203,7 @@ final class StartRegisterSearch {
     this.unanchoredStart = prog.startUnanchored();
     this.hasWordBoundary = prog.hasWordBoundary();
     this.visited = new int[prog.size()];
+    this.rankByLabel = new int[prog.size() + 1];
     IntArrayList bounds = new IntArrayList();
     bounds.add(128);
     for (int b : Dfa.buildBoundaries(prog)) {
@@ -216,7 +220,8 @@ final class StartRegisterSearch {
       this.eotColumn = 128;
     }
     this.row = eotColumn + 1;
-    this.maxStates = Math.min(MAX_STATES, MAX_TRANSITIONS / row);
+    // State IDs begin at 1, so the backing table includes one unused row.
+    this.maxStates = Math.min(MAX_STATES, MAX_TRANSITIONS / row - 1);
     // Start small, like Dfa: the searches this targets need a handful of states.
     this.transitions = new int[row * INITIAL_STATE_CAPACITY];
     states.add(null); // ids start at 1
@@ -331,6 +336,11 @@ final class StartRegisterSearch {
     return states.size() - 1;
   }
 
+  /** Number of transition slots currently allocated, for tests. */
+  int transitionCapacityForTesting() {
+    return transitions.length;
+  }
+
   /** The state budget, for tests. */
   int maxStatesForTesting() {
     return maxStates;
@@ -440,6 +450,9 @@ final class StartRegisterSearch {
         nextPos = pos + 1;
         column = ch;
       } else {
+        if (WorkCounterConfig.ENABLED) {
+          WorkCounter.recordForwardDfaStep();
+        }
         long decoded = text.decodeForward(pos);
         cp = InputScanner.codePoint(decoded);
         nextPos = InputScanner.position(decoded);
@@ -730,7 +743,7 @@ final class StartRegisterSearch {
   }
 
   /** Normalized thread lists: {pcs, ranks}; src receives the source label of each new rank. */
-  private static int[][] normalize(IntArrayList pc, IntArrayList g, int[] src) {
+  private int[][] normalize(IntArrayList pc, IntArrayList g, int[] src) {
     int n = pc.size();
     int[] pcs = new int[n];
     int[] ranks = new int[n];
@@ -747,18 +760,23 @@ final class StartRegisterSearch {
         ranks[i] = FRESH;
         continue;
       }
-      int r = -1;
-      for (int k = 0; k < distinct; k++) {
-        if (labels[k] == label) {
-          r = k;
-          break;
-        }
+      // Old ranks are dense. Slot zero is reserved for the previous state's fresh attempt.
+      int index = label == FRESH ? 0 : label + 1;
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.recordStartRegisterRankLookups(1);
       }
-      if (r < 0) {
+      int rank = rankByLabel[index];
+      if (rank == 0) {
         labels[distinct] = label;
-        r = distinct++;
+        rank = ++distinct;
+        rankByLabel[index] = rank;
       }
-      ranks[i] = r;
+      ranks[i] = rank - 1;
+    }
+    // Clear only the slots assigned by this frontier.
+    for (int k = 0; k < distinct; k++) {
+      int label = labels[k];
+      rankByLabel[label == FRESH ? 0 : label + 1] = 0;
     }
     if (src != null) {
       for (int k = 0; k < REGISTERS; k++) {
@@ -812,8 +830,11 @@ final class StartRegisterSearch {
     startLikeOf[s.id] = startLike;
     matchRankOf[s.id] = s.matchRank;
     stopOf[s.id] = s.highestPriorityMatch || s.pcs.length == 0;
-    if (transitions.length < (s.id + 1) * row) {
-      transitions = Arrays.copyOf(transitions, Math.max(transitions.length * 2, (s.id + 1) * row));
+    int requiredTransitions = (s.id + 1) * row;
+    if (transitions.length < requiredTransitions) {
+      int capacity =
+          Math.min((maxStates + 1) * row, Math.max(transitions.length * 2, requiredTransitions));
+      transitions = Arrays.copyOf(transitions, capacity);
     }
     return s;
   }
@@ -998,6 +1019,8 @@ final class StartRegisterSearch {
     IntArrayList tg = new IntArrayList();
     boolean deferredMatch = false;
     int deferredGroup = NONE;
+    IntArrayList ep = null;
+    IntArrayList eg = null;
     for (int i = 0; i < s.pcs.length; i++) {
       int id = s.pcs[i];
       Inst ip = prog.inst(id);
@@ -1005,9 +1028,16 @@ final class StartRegisterSearch {
         continue;
       }
       if (ip.opCode == InstOp.OP_EMPTY_WIDTH && (ip.arg & ~re) == 0) {
-        IntArrayList ep = new IntArrayList();
-        IntArrayList eg = new IntArrayList();
-        expand(new int[] {ip.out}, new int[] {s.groups[i]}, 1, re, ep, eg);
+        if (ep == null) {
+          ep = new IntArrayList();
+          eg = new IntArrayList();
+        } else {
+          ep.clear();
+          eg.clear();
+        }
+        stackPc[0] = ip.out;
+        stackG[0] = s.groups[i];
+        expand(1, re, ep, eg);
         int firstMatch = -1;
         for (int k = 0; k < ep.size(); k++) {
           if (prog.inst(ep.get(k)).opCode == InstOp.OP_MATCH) {
@@ -1093,14 +1123,27 @@ final class StartRegisterSearch {
 
   private void expand(
       int[] seedPc, int[] seedG, int n, int flags, IntArrayList outPc, IntArrayList outG) {
-    int g0 = ++generation;
-    int[] stackPc = new int[prog.size() * 2 + n + 4];
-    int[] stackG = new int[stackPc.length];
-    int top = 0;
-    for (int i = n - 1; i >= 0; i--) {
-      stackPc[top] = seedPc[i];
-      stackG[top++] = seedG[i];
+    if (stackPc.length < n) {
+      growExpansionStacks(n);
     }
+    for (int i = 0; i < n; i++) {
+      stackPc[i] = seedPc[n - i - 1];
+      stackG[i] = seedG[n - i - 1];
+    }
+    expand(n, flags, outPc, outG);
+  }
+
+  private void growExpansionStacks(int minimum) {
+    int capacity = Math.max(minimum, 2 * stackPc.length);
+    stackPc = Arrays.copyOf(stackPc, capacity);
+    stackG = Arrays.copyOf(stackG, capacity);
+    if (WorkCounterConfig.ENABLED) {
+      WorkCounter.recordStartRegisterStackSlots(2L * capacity);
+    }
+  }
+
+  private void expand(int top, int flags, IntArrayList outPc, IntArrayList outG) {
+    int g0 = ++generation;
     while (top > 0) {
       top--;
       int id = stackPc[top];
@@ -1111,8 +1154,7 @@ final class StartRegisterSearch {
       visited[id] = g0;
       Inst ip = prog.inst(id);
       if (top + 3 >= stackPc.length) {
-        stackPc = Arrays.copyOf(stackPc, stackPc.length * 2);
-        stackG = Arrays.copyOf(stackG, stackG.length * 2);
+        growExpansionStacks(top + 3);
       }
       if (flat && !ip.last) {
         stackPc[top] = id + 1;

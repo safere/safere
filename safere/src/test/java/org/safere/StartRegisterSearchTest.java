@@ -287,6 +287,20 @@ class StartRegisterSearchTest {
   }
 
   @Test
+  void growingWideRowsRespectsTheTransitionBudget() {
+    StringBuilder members = new StringBuilder();
+    for (int i = 0; i < 1450; i++) {
+      members.appendCodePoint(0x100 + i * 2);
+    }
+    String input = "z" + "a".repeat(1100);
+    Pattern pattern = Pattern.compile(input + "|q[" + members + "]");
+    StartRegisterSearch search = StartRegisterSearch.create(pattern.flatDfaProg(), null, null);
+
+    assertThat(search.searchForTesting(new StringInputScanner(input), 0)).isEqualTo(input.length());
+    assertThat(search.transitionCapacityForTesting()).isLessThanOrEqualTo(1 << 22);
+  }
+
+  @Test
   void stateBudgetResetsTheCacheAndEventuallyStops() {
     // Unanchored [ab]*a[ab]{13} needs a state per window of the last 14 characters.
     StartRegisterSearch search =
