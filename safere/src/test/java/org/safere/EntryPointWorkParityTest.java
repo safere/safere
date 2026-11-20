@@ -173,11 +173,10 @@ class EntryPointWorkParityTest {
                 : pattern.matcher(input);
         assertThat(matcher.find()).isTrue();
         WorkCounter.StartAccelerationWork selection =
-            WorkCounter.countStartAccelerationForTesting(
-                () -> {
-                  assertThat(matcher.start()).isEqualTo(expected.start());
-                  assertThat(matcher.end()).isEqualTo(expected.end());
-                });
+            WorkCounter.countStartAccelerationForTesting(() -> {
+              assertThat(matcher.start()).isEqualTo(expected.start());
+              assertThat(matcher.end()).isEqualTo(expected.end());
+            });
         assertThat(selection.calls())
             .as("bounds selection for /%s/ must reuse the candidate", scenario.regex())
             .isZero();

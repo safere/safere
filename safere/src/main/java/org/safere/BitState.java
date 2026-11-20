@@ -27,8 +27,11 @@ import java.util.Arrays;
  */
 final class BitState {
 
-  /** Maximum speculative consumption window, independent of total input length. */
+  /** Default speculative consumption window when no later DFA end hint is available. */
   static final int SPECULATIVE_WINDOW_SIZE = 256;
+
+  /** Maximum consumption window for a speculative search sized by a forward DFA hint. */
+  static final int MAX_HINTED_WINDOW_SIZE = 2_048;
 
   /** Maximum bitmap size in bits. Limits the product of prog size × text length. */
   private static final int MAX_BITMAP_BITS = 256 * 1024;
@@ -213,7 +216,7 @@ final class BitState {
       bs = cached;
       bs.reset(text, startPos, textLen, ncap, longest, endMatch);
     } else {
-      bs = new BitState(prog, text, startPos, textLen, ncap, longest, endMatch);
+      bs = new BitState(prog, text, startPos, textLen, ncap, longest, endMatch, prog.greedyRunes());
     }
 
     return bs.doSearch(startPos, searchLimit, anchored, resultBuffer);
@@ -253,7 +256,7 @@ final class BitState {
       cached.reset(text, startPos, endPos, ncap, longest, endMatch);
       return cached;
     }
-    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch);
+    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch, prog.greedyRunes());
   }
 
   /**
@@ -404,8 +407,13 @@ final class BitState {
   /** Loop entry/check continuations, optionally including one adjacent capture write. */
   private final LoopEntry[] loopEntries;
 
+  private final LazyRuneLoop[] lazyRuneLoops;
+
   /** Progress checks immediately following captures, or null when none exist. */
   private final Inst[] captureProgressChecks;
+
+  /** Consuming bodies of simple greedy loops, or null when none exist. */
+  private final Inst[] greedyRunes;
 
   private static final byte NOT_ALT = 0;
   private static final byte ALT = 1;
@@ -438,14 +446,16 @@ final class BitState {
   private int jobCount;
   private int basePos;
 
-  private BitState(
+  /** Creates a fresh workspace. Passing null greedy-loop metadata uses ordinary ALT dispatch. */
+  BitState(
       Prog prog,
       InputScanner text,
       int startPos,
       int endPos,
       int ncap,
       boolean longest,
-      boolean endMatch) {
+      boolean endMatch,
+      Inst[] greedyRunes) {
     this.prog = prog;
     this.instructions = prog.frozenInstructions();
     this.text = text;
@@ -474,7 +484,9 @@ final class BitState {
     }
     this.captureRunes = prog.captureRunes();
     this.loopEntries = prog.loopEntries();
+    this.lazyRuneLoops = prog.lazyRuneLoops();
     this.captureProgressChecks = prog.captureProgressChecks();
+    this.greedyRunes = greedyRunes;
 
     int totalBits = progSize * textSlots;
     int visitedLen = (totalBits + 63) / 64;
@@ -665,6 +677,24 @@ final class BitState {
           case InstOp.OP_FAIL -> {}
 
           case InstOp.OP_ALT, InstOp.OP_ALT_MATCH -> {
+            Inst rune = greedyRunes == null ? null : greedyRunes[id];
+            if (rune != null) {
+              runGreedyLoop(id, ip, rune, pos);
+              if (budgetExceeded || windowExceeded) {
+                return false;
+              }
+              break;
+            }
+            LazyRuneLoop loop = lazyRuneLoops == null ? null : lazyRuneLoops[id];
+            if (loop != null) {
+              pos = skipFailedLazyExits(loop, id, pos);
+              if (pos < 0) {
+                if (budgetExceeded) {
+                  return false;
+                }
+                break;
+              }
+            }
             // Push second alternative first (it will be tried if first fails).
             if (shouldVisit(ip.out1, pos)) {
               push(ip.out1, pos);
@@ -894,6 +924,92 @@ final class BitState {
     return matched;
   }
 
+  /**
+   * Executes a greedy ALT/consumer cycle without redispatching each instruction. The entry ALT has
+   * already been charged. Keep every deferred exit and visitation in the original order, and charge
+   * each logical instruction so pruning activation and the work limit remain unchanged. Keep the
+   * helper small because HotSpot can inline it into the main interpreter loop when it is hot.
+   */
+  private void runGreedyLoop(int id, Inst alt, Inst rune, int pos) {
+    while (true) {
+      if (shouldVisit(alt.out1, pos)) {
+        push(alt.out1, pos);
+      }
+      if (!shouldVisit(alt.out, pos) || !stepWithinBudget()) {
+        return;
+      }
+      if (pos >= endPos) {
+        if (speculative && endPos < textLen) {
+          windowExceeded = true;
+        }
+        return;
+      }
+      int cp = WorkCounterConfig.ENABLED ? -1 : text.asciiAt(pos);
+      int nextPos = pos + 1;
+      if (cp < 0) {
+        long decoded = text.decodeForward(pos);
+        cp = InputScanner.codePoint(decoded);
+        nextPos = InputScanner.position(decoded);
+        if (speculative && nextPos > endPos) {
+          windowExceeded = true;
+          return;
+        }
+      }
+      boolean matches =
+          rune.opCode == InstOp.OP_CHAR_RANGE ? rune.matchesChar(cp) : rune.matchesCharClass(cp);
+      if (!matches || !shouldVisit(id, nextPos) || !stepWithinBudget()) {
+        return;
+      }
+      pos = nextPos;
+    }
+  }
+
+  /** Skips only exits that necessarily fail before any assertion or branch can be reached. */
+  private int skipFailedLazyExits(LazyRuneLoop loop, int id, int pos) {
+    Inst rune = loop.rune();
+    int steps = 0;
+    while (pos < endPos) {
+      int cp = text.asciiAt(pos);
+      if (cp < 0
+          || cp == loop.exitChar()
+          || !(rune.opCode == InstOp.OP_CHAR_RANGE
+              ? rune.matchesChar(cp)
+              : rune.matchesCharClass(cp))) {
+        break;
+      }
+      if (steps == 0) {
+        // The failed literal and the body each take one step. Walk the compiled exit once
+        // to count its NOPs, captures, and restores of active capture registers.
+        steps = 2;
+        Inst exit = instructions[loop.exitStart()];
+        while (exit.opCode == InstOp.OP_CAPTURE || exit.opCode == InstOp.OP_NOP) {
+          steps++;
+          if (exit.opCode == InstOp.OP_CAPTURE && exit.arg < ncap) {
+            steps++;
+          }
+          exit = instructions[exit.out];
+        }
+      }
+      if (WorkCounterConfig.ENABLED) {
+        // The interpreter decodes the byte once for the failed literal and once for the body.
+        WorkCounter.record(steps + (text instanceof Utf8InputScanner ? 2 : 0));
+      }
+      // No tracked ALT intervenes between the two consumers. Check the budget before the
+      // next ALT visit so that it observes the same pruning state as ordinary dispatch.
+      stepCount += steps;
+      if (stepCount > nextStepThreshold && !onStepThresholdExceeded()) {
+        return -1;
+      }
+      pos++;
+      // Keep cross-start pruning and logical ALT charges identical to the interpreter. At the
+      // window edge resume ordinary dispatch, which retains speculative bailout semantics.
+      if (!shouldVisit(id, pos) || !stepWithinBudget()) {
+        return -1;
+      }
+    }
+    return pos;
+  }
+
   /** Executes one progress check, returning a continuation or -1 when none is eligible. */
   private int progressContinuation(Inst check, int pos) {
     int reg = check.arg;
@@ -931,6 +1047,11 @@ final class BitState {
   /** Returns the current work budget. Package-private for testing. */
   long stepBudgetForTesting() {
     return stepBudget;
+  }
+
+  /** Returns the logical instruction charges from the last search. */
+  long stepCountForTesting() {
+    return stepCount;
   }
 
   /**

@@ -386,6 +386,13 @@ final class ResolvedBenchmarkPlan {
           "unsupportedMeasurementMode",
           "engine does not implement measurement mode " + workload.measurement().mode().jsonName());
     }
+    if (!engine.runner().equals("java")
+        && workload.measurement().mode()
+            == DeclarativeBenchmarkPlan.MeasurementMode.SINGLE_SHOT_COLD_START
+        && workload.operation() != DeclarativeBenchmarkPlan.Operation.COMPILE) {
+      return new Exclusion(
+          "unsupportedTimingBoundary", "native cold-start runners implement compilation only");
+    }
     if ((!workload.inputIds().isEmpty() || engine.runner().equals("java"))
         && !workload.inputRepresentations().contains(engine.declaration().inputRepresentation())) {
       return new Exclusion(
@@ -447,17 +454,16 @@ final class ResolvedBenchmarkPlan {
       PatternProfiles replacementProfiles,
       String flagSet) {
     JsonObject result = new JsonObject();
-    arguments.forEach(
-        (name, value) -> {
-          JsonElement json = recipeValue(value);
-          if (name.equals("replacement")) {
-            json =
-                new JsonPrimitive(
-                    replacementProfiles.select(
-                        engine.replacementProfile(), json.getAsString(), flagSet));
-          }
-          result.add(name, json);
-        });
+    arguments.forEach((name, value) -> {
+      JsonElement json = recipeValue(value);
+      if (name.equals("replacement")) {
+        json =
+            new JsonPrimitive(
+                replacementProfiles.select(
+                    engine.replacementProfile(), json.getAsString(), flagSet));
+      }
+      result.add(name, json);
+    });
     return result;
   }
 

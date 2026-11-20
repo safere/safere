@@ -36,18 +36,17 @@ class MatcherLinearTimeTest {
               ? new Matcher(pattern, new Utf8InputScanner(input.getBytes(UTF_8)))
               : pattern.matcher(input);
       long work =
-          WorkCounter.countWithForwardDfaStepsForTesting(
-              () -> {
-                for (int pass = 0; pass < 2; pass++) {
-                  int count = 0;
-                  while (matcher.find()) {
-                    assertThat(matcher.end()).isGreaterThan(matcher.start());
-                    count++;
-                  }
-                  assertThat(count).isEqualTo(size + 1);
-                  matcher.reset();
-                }
-              });
+          WorkCounter.countWithForwardDfaStepsForTesting(() -> {
+            for (int pass = 0; pass < 2; pass++) {
+              int count = 0;
+              while (matcher.find()) {
+                assertThat(matcher.end()).isGreaterThan(matcher.start());
+                count++;
+              }
+              assertThat(count).isEqualTo(size + 1);
+              matcher.reset();
+            }
+          });
       assertThat(work).isPositive();
       if (previous > 0) {
         assertThat(work)

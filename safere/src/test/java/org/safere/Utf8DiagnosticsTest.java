@@ -48,11 +48,10 @@ class Utf8DiagnosticsTest {
     assertThat(operationsFor(pattern))
         .filteredOn(event -> event.outcome() == MatchOutcome.MATCH)
         .isNotEmpty()
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+        });
   }
 
   @ParameterizedTest
@@ -78,13 +77,12 @@ class Utf8DiagnosticsTest {
     assertThat(matched).isTrue();
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(operation);
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.inputLength()).isEqualTo(logicalInput.length);
-              assertThat(event.matchCount()).isEqualTo(1);
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(operation);
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.inputLength()).isEqualTo(logicalInput.length);
+          assertThat(event.matchCount()).isEqualTo(1);
+        });
   }
 
   @Test
@@ -96,14 +94,13 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.pattern()).isSameAs(pattern.descriptor());
-              assertThat(event.operation()).isEqualTo(MatchOperation.LOOKING_AT);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .satisfies(event -> {
+          assertThat(event.pattern()).isSameAs(pattern.descriptor());
+          assertThat(event.operation()).isEqualTo(MatchOperation.LOOKING_AT);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
   }
 
   @Test
@@ -115,12 +112,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.reverseDfaSearchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.reverseDfaSearchCount()).isZero();
+        });
   }
 
   @Test
@@ -133,14 +129,13 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.FIND);
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-              assertThat(event.inputLength()).isEqualTo(4);
-              assertThat(event.matchCount()).isEqualTo(1);
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.FIND);
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+          assertThat(event.inputLength()).isEqualTo(4);
+          assertThat(event.matchCount()).isEqualTo(1);
+        });
   }
 
   @ParameterizedTest
@@ -174,24 +169,21 @@ class Utf8DiagnosticsTest {
     MatchStrategy expected = literalFastPaths ? MatchStrategy.LITERAL : MatchStrategy.DFA;
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(expected);
-              assertThat(event.forwardDfaSearchCount()).isEqualTo(literalFastPaths ? 0 : 1);
-              assertThat(event.outcome())
-                  .isEqualTo(present ? MatchOutcome.MATCH : MatchOutcome.NO_MATCH);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(expected);
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(literalFastPaths ? 0 : 1);
+          assertThat(event.outcome())
+              .isEqualTo(present ? MatchOutcome.MATCH : MatchOutcome.NO_MATCH);
+        });
   }
 
   private static Stream<Arguments> literalFindOptions() {
     return Stream.of("hello", "é", "😀", "café😀")
-        .flatMap(
-            literal ->
-                Stream.of(false, true)
-                    .flatMap(
-                        literalFastPaths ->
-                            Stream.of(false, true)
-                                .map(present -> Arguments.of(literal, literalFastPaths, present))));
+        .flatMap(literal ->
+            Stream.of(false, true)
+                .flatMap(literalFastPaths ->
+                    Stream.of(false, true)
+                        .map(present -> Arguments.of(literal, literalFastPaths, present))));
   }
 
   @Test
@@ -206,22 +198,20 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(matcherPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.KEYWORD);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.reverseDfaSearchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.KEYWORD);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.reverseDfaSearchCount()).isZero();
+        });
     assertThat(operationsFor(booleanPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.reverseDfaSearchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.reverseDfaSearchCount()).isZero();
+        });
   }
 
   @Test
@@ -245,17 +235,15 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
-              assertThat(event.reverseDfaSearchCount()).isZero();
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION),
-                      new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
+          assertThat(event.reverseDfaSearchCount()).isZero();
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION),
+                  new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER));
+        });
   }
 
   @Test
@@ -267,14 +255,13 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(
-                          MatchStrategy.CHARACTER_CLASS, StrategyRole.START_ACCELERATION));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(
+                      MatchStrategy.CHARACTER_CLASS, StrategyRole.START_ACCELERATION));
+        });
   }
 
   @Test
@@ -300,14 +287,13 @@ class Utf8DiagnosticsTest {
           assertThat(utf8Matcher.end()).isEqualTo(text.getBytes(UTF_8).length);
         }
         assertThat(operationsFor(utf8Fast).getLast())
-            .satisfies(
-                event -> {
-                  assertThat(event.boundaryStrategy()).isEqualTo(stringEvent.boundaryStrategy());
-                  if (!text.isEmpty() || expected) {
-                    assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
-                  }
-                  assertThat(event.forwardDfaSearchCount()).isZero();
-                });
+            .satisfies(event -> {
+              assertThat(event.boundaryStrategy()).isEqualTo(stringEvent.boundaryStrategy());
+              if (!text.isEmpty() || expected) {
+                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.CHARACTER_CLASS);
+              }
+              assertThat(event.forwardDfaSearchCount()).isZero();
+            });
         Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
         assertThat(fallback.matcher(input(text)).matches()).isEqualTo(expected);
 
@@ -346,12 +332,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
   }
 
   @Test
@@ -364,13 +349,12 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.operation()).isEqualTo(MatchOperation.FIND);
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.matchCount()).isEqualTo(1);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .satisfies(event -> {
+          assertThat(event.operation()).isEqualTo(MatchOperation.FIND);
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.matchCount()).isEqualTo(1);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
   }
 
   @Test
@@ -382,12 +366,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-              assertThat(event.matchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+          assertThat(event.matchCount()).isZero();
+        });
   }
 
   @ParameterizedTest
@@ -407,13 +390,12 @@ class Utf8DiagnosticsTest {
         assertThat(pattern.find(input(text))).isEqualTo(valid);
         assertThat(operationsFor(pattern))
             .singleElement()
-            .satisfies(
-                event -> {
-                  assertThat(event.outcome())
-                      .isEqualTo(valid ? MatchOutcome.MATCH : MatchOutcome.NO_MATCH);
-                  assertThat(event.reverseDfaSearchCount()).isZero();
-                  assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-                });
+            .satisfies(event -> {
+              assertThat(event.outcome())
+                  .isEqualTo(valid ? MatchOutcome.MATCH : MatchOutcome.NO_MATCH);
+              assertThat(event.reverseDfaSearchCount()).isZero();
+              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+            });
       }
     }
   }
@@ -429,11 +411,10 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
   }
 
   @Test
@@ -445,16 +426,15 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION));
-              assertThat(event.matchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(
+                      MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION));
+          assertThat(event.matchCount()).isZero();
+        });
   }
 
   @ParameterizedTest
@@ -499,11 +479,10 @@ class Utf8DiagnosticsTest {
         assertThat(existenceOnly ? pattern.find(input) : pattern.matcher(input).find()).isFalse();
         assertThat(operationsFor(pattern))
             .singleElement()
-            .satisfies(
-                event -> {
-                  assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-                  assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-                });
+            .satisfies(event -> {
+              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+            });
       }
     }
   }
@@ -520,17 +499,16 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(verification);
-              assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
-              assertThat(event.forwardDfaSearchCount()).isZero();
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER),
-                      new StrategyParticipation(verification, StrategyRole.CANDIDATE_VERIFICATION));
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(verification);
+          assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER),
+                  new StrategyParticipation(verification, StrategyRole.CANDIDATE_VERIFICATION));
+        });
   }
 
   @Test
@@ -542,19 +520,17 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.forwardDfaSearchCount()).isEqualTo(2);
-              assertThat(event.reverseDfaSearchCount()).isZero();
-              assertThat(event.auxiliaryStrategies())
-                  .containsExactly(
-                      new StrategyParticipation(
-                          MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION),
-                      new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER),
-                      new StrategyParticipation(
-                          MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(2);
+          assertThat(event.reverseDfaSearchCount()).isZero();
+          assertThat(event.auxiliaryStrategies())
+              .containsExactly(
+                  new StrategyParticipation(MatchStrategy.LITERAL, StrategyRole.START_ACCELERATION),
+                  new StrategyParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER),
+                  new StrategyParticipation(
+                      MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION));
+        });
   }
 
   @Test
@@ -566,12 +542,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
-              assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
+          assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
+        });
   }
 
   @Test
@@ -601,12 +576,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
     assertThat(matcher.start(1)).isEqualTo(2);
     assertThat(matcher.end(1)).isEqualTo(6);
     assertThat(operationsFor(pattern)).hasSize(1);
@@ -628,14 +602,13 @@ class Utf8DiagnosticsTest {
     assertThat(operationsFor(pattern))
         .filteredOn(event -> event.outcome() == MatchOutcome.MATCH)
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              // Resolving inner captures records demand for them, which moves later finds off the
-              // DFA.
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
-            });
+        .allSatisfy(event -> {
+          // Resolving inner captures records demand for them, which moves later finds off the
+          // DFA.
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.DEFERRED);
+        });
   }
 
   @Test
@@ -647,12 +620,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-              assertThat(event.matchCount()).isZero();
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+          assertThat(event.matchCount()).isZero();
+        });
   }
 
   @Test
@@ -664,16 +636,15 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(pattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.strategyDecisions())
-                  .contains(
-                      new StrategyDecision(
-                          MatchStrategy.BIT_STATE,
-                          StrategyDisposition.BYPASSED,
-                          StrategyReason.INPUT_TOO_LARGE));
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.strategyDecisions())
+              .contains(
+                  new StrategyDecision(
+                      MatchStrategy.BIT_STATE,
+                      StrategyDisposition.BYPASSED,
+                      StrategyReason.INPUT_TOO_LARGE));
+        });
   }
 
   @Test
@@ -741,20 +712,18 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(nullableLoopBitState))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
     assertThat(operationsFor(regionBitState))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
 
     Pattern nfaPattern = Pattern.compile("(\\X)x");
     assertThat(matcher(nfaPattern, "éx").matches()).isTrue();
@@ -762,12 +731,11 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(nfaPattern))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NFA);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NFA);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.EAGER);
+        });
   }
 
   @Test
@@ -781,25 +749,23 @@ class Utf8DiagnosticsTest {
 
     assertThat(operationsFor(onePassPattern))
         .hasSize(2)
-        .allSatisfy(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.ONE_PASS);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
 
     Pattern keywordPattern = Pattern.compile("(?is).*\\b(you|your)\\b.*");
     assertThat(matcher(keywordPattern, "nothing matching").find()).isFalse();
     assertThat(operationsFor(keywordPattern))
         .singleElement()
-        .satisfies(
-            event -> {
-              assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-              assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
-              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-              assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
-            });
+        .satisfies(event -> {
+          assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.KEYWORD);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.captureMode()).isEqualTo(CaptureMode.NONE);
+        });
   }
 
   @Test
@@ -889,16 +855,15 @@ class Utf8DiagnosticsTest {
     for (Pattern p : List.of(matcherPattern, booleanPattern)) {
       assertThat(operationsFor(p))
           .singleElement()
-          .satisfies(
-              event -> {
-                assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
-                assertThat(event.auxiliaryStrategies())
-                    .contains(
-                        new StrategyParticipation(
-                            MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
-                assertThat(event.forwardDfaSearchCount()).isZero();
-              });
+          .satisfies(event -> {
+            assertThat(event.outcome()).isEqualTo(MatchOutcome.NO_MATCH);
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LITERAL);
+            assertThat(event.auxiliaryStrategies())
+                .contains(
+                    new StrategyParticipation(
+                        MatchStrategy.LITERAL, StrategyRole.REJECT_PREFILTER));
+            assertThat(event.forwardDfaSearchCount()).isZero();
+          });
     }
 
     assertThat(matcherPattern.matcher(hit).find()).isTrue();

@@ -73,23 +73,21 @@ class ResolvedBenchmarkPlanTest {
           plan.getAsJsonArray("entries").asList().stream()
               .map(JsonObject.class::cast)
               .filter(row -> row.get("engineId").getAsString().equals(engine))
-              .filter(
-                  row ->
-                      row.get("workloadId")
-                          .getAsString()
-                          .startsWith("UnicodeFirstCompileBenchmark.firstCompile."))
+              .filter(row ->
+                  row.get("workloadId")
+                      .getAsString()
+                      .startsWith("UnicodeFirstCompileBenchmark.firstCompile."))
               .toList();
       assertThat(rows).hasSize(36);
       assertThat(rows.stream().filter(row -> row.get("status").getAsString().equals("runnable")))
           .hasSize(engine.equals("pcre2_jit") || engine.equals("rust_regex") ? 12 : 9)
-          .allSatisfy(
-              row -> {
-                assertThat(row.getAsJsonObject("measurement").get("mode").getAsString())
-                    .isEqualTo("singleShotColdStart");
-                assertThat(row.getAsJsonObject("measurement").get("timingUnit").getAsString())
-                    .isEqualTo("milliseconds");
-                assertThat(row.getAsJsonArray("options")).isEmpty();
-              });
+          .allSatisfy(row -> {
+            assertThat(row.getAsJsonObject("measurement").get("mode").getAsString())
+                .isEqualTo("singleShotColdStart");
+            assertThat(row.getAsJsonObject("measurement").get("timingUnit").getAsString())
+                .isEqualTo("milliseconds");
+            assertThat(row.getAsJsonArray("options")).isEmpty();
+          });
       assertThat(
               entry(
                       plan,
@@ -246,12 +244,11 @@ class ResolvedBenchmarkPlanTest {
                 .map(JsonObject.class::cast)
                 .filter(entry -> entry.get("status").getAsString().equals("excluded")))
         .singleElement()
-        .satisfies(
-            entry -> {
-              assertThat(id(entry)).isEqualTo("Synthetic.replace@find-only");
-              assertThat(entry.getAsJsonObject("exclusion").get("kind").getAsString())
-                  .isEqualTo("unsupportedOperation");
-            });
+        .satisfies(entry -> {
+          assertThat(id(entry)).isEqualTo("Synthetic.replace@find-only");
+          assertThat(entry.getAsJsonObject("exclusion").get("kind").getAsString())
+              .isEqualTo("unsupportedOperation");
+        });
   }
 
   @Test

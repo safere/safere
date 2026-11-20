@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 2,
+  "configuration": {
+    "collection": {
+      "allocationWorkloadPrefixes": []
+    },
+    "investigation": {
+      "groupText": {
+        "rare": "a",
+        "frequent": "é"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "nfaStateSpikeUnicode.rare",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "é😀",
+        "suffix": "aaaaaaaaaaaaaaaaZ",
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpikeUnicode.frequent",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "é",
+        "suffix": "Z",
+        "length": 32768
+      },
+      "shared": true
+    }
+  ],
+  "workloads": [
+    {
+      "id": "NfaStateSpikeUnicodeBenchmark.rare.text",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?s).*(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)Z.*"
+      ],
+      "inputs": [
+        "nfaStateSpikeUnicode.rare"
+      ],
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 16
+      },
+      "arguments": {
+        "groups": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "SafeRE state-storage experiment; equivalent quantified capture semantics and stack behavior have not been established for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeUnicodeBenchmark.rare.replace",
+      "operation": "replaceAll",
+      "patterns": [
+        "(?s).*(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)Z.*"
+      ],
+      "inputs": [
+        "nfaStateSpikeUnicode.rare"
+      ],
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "resultConsumption": "string",
+      "expected": {
+        "type": "string",
+        "value": "a"
+      },
+      "arguments": {
+        "replacement": "$1"
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "SafeRE state-storage experiment; equivalent quantified capture semantics and stack behavior have not been established for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeUnicodeBenchmark.frequent.text",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?:(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)|é)+Z"
+      ],
+      "inputs": [
+        "nfaStateSpikeUnicode.frequent"
+      ],
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 16
+      },
+      "arguments": {
+        "groups": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "SafeRE state-storage experiment; equivalent quantified capture semantics and stack behavior have not been established for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeUnicodeBenchmark.frequent.replace",
+      "operation": "replaceAll",
+      "patterns": [
+        "(?:(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)(é)|é)+Z"
+      ],
+      "inputs": [
+        "nfaStateSpikeUnicode.frequent"
+      ],
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "resultConsumption": "string",
+      "expected": {
+        "type": "string",
+        "value": "é"
+      },
+      "arguments": {
+        "replacement": "$1"
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "SafeRE state-storage experiment; equivalent quantified capture semantics and stack behavior have not been established for other engines."
+        }
+      ]
+    }
+  ]
+}

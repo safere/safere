@@ -147,11 +147,10 @@ class DeclarativeBenchmarkPlanTest {
 
     assertThat(expanded.workloads())
         .singleElement()
-        .satisfies(
-            workload -> {
-              assertThat(workload.id()).isEqualTo("Synthetic.unicode.letter");
-              assertThat(workload.patterns()).containsExactly("\\p{L}+");
-            });
+        .satisfies(workload -> {
+          assertThat(workload.id()).isEqualTo("Synthetic.unicode.letter");
+          assertThat(workload.patterns()).containsExactly("\\p{L}+");
+        });
   }
 
   @Test
@@ -196,12 +195,11 @@ class DeclarativeBenchmarkPlanTest {
         .isEqualTo(new DeclarativeBenchmarkPlan.RecipeString("hello"));
     assertThat(expanded.workloads())
         .singleElement()
-        .satisfies(
-            workload -> {
-              assertThat(workload.id()).isEqualTo("Synthetic.replace.bang");
-              assertThat(workload.arguments().get("replacement"))
-                  .isEqualTo(new DeclarativeBenchmarkPlan.RecipeString("$0!"));
-            });
+        .satisfies(workload -> {
+          assertThat(workload.id()).isEqualTo("Synthetic.replace.bang");
+          assertThat(workload.arguments().get("replacement"))
+              .isEqualTo(new DeclarativeBenchmarkPlan.RecipeString("$0!"));
+        });
   }
 
   @Test
@@ -287,13 +285,11 @@ class DeclarativeBenchmarkPlanTest {
         .isEqualTo("Synthetic.find@string");
     assertThat(expanded.exclusions())
         .singleElement()
-        .satisfies(
-            exclusion -> {
-              assertThat(exclusion.engineId()).isEqualTo("utf8");
-              assertThat(exclusion.kind())
-                  .isEqualTo(
-                      DeclarativeBenchmarkPlan.ExclusionKind.UNSUPPORTED_INPUT_REPRESENTATION);
-            });
+        .satisfies(exclusion -> {
+          assertThat(exclusion.engineId()).isEqualTo("utf8");
+          assertThat(exclusion.kind())
+              .isEqualTo(DeclarativeBenchmarkPlan.ExclusionKind.UNSUPPORTED_INPUT_REPRESENTATION);
+        });
   }
 
   @Test
@@ -316,15 +312,14 @@ class DeclarativeBenchmarkPlanTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining(
             "requires a nonblank inputRepresentationReason when inputRepresentations is set");
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        workload.replace(
-                            "\"resultConsumption\"",
-                            "\"inputRepresentationReason\": \"  \","
-                                + System.lineSeparator()
-                                + "  \"resultConsumption\""))))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    workload.replace(
+                        "\"resultConsumption\"",
+                        "\"inputRepresentationReason\": \"  \","
+                            + System.lineSeparator()
+                            + "  \"resultConsumption\""))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining(
             "requires a nonblank inputRepresentationReason when inputRepresentations is set");
@@ -332,25 +327,24 @@ class DeclarativeBenchmarkPlanTest {
 
   @Test
   void inputRepresentationReasonWithoutARestrictionIsRejected() {
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "requirements": ["find"],
-                          "inputRepresentationReason": "There is no corresponding restriction.",
-                          "resultConsumption": "boolean",
-                          "measurement": {
-                            "mode": "averageTime",
-                            "timingUnit": "nanoseconds"
-                          }
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "requirements": ["find"],
+                      "inputRepresentationReason": "There is no corresponding restriction.",
+                      "resultConsumption": "boolean",
+                      "measurement": {
+                        "mode": "averageTime",
+                        "timingUnit": "nanoseconds"
+                      }
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining(
             "must not declare inputRepresentationReason without inputRepresentations");
@@ -358,31 +352,30 @@ class DeclarativeBenchmarkPlanTest {
 
   @Test
   void explicitlyListingEveryInputRepresentationIsRejected() {
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "requirements": ["find"],
-                          "inputRepresentations": [
-                            "javaString",
-                            "preexistingUtf8",
-                            "javaStringWithTimedUtf8Conversion"
-                          ],
-                          "inputRepresentationReason":
-                              "This fixture verifies that redundant all-value lists are rejected.",
-                          "resultConsumption": "boolean",
-                          "measurement": {
-                            "mode": "averageTime",
-                            "timingUnit": "nanoseconds"
-                          }
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "requirements": ["find"],
+                      "inputRepresentations": [
+                        "javaString",
+                        "preexistingUtf8",
+                        "javaStringWithTimedUtf8Conversion"
+                      ],
+                      "inputRepresentationReason":
+                          "This fixture verifies that redundant all-value lists are rejected.",
+                      "resultConsumption": "boolean",
+                      "measurement": {
+                        "mode": "averageTime",
+                        "timingUnit": "nanoseconds"
+                      }
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("omit inputRepresentations instead");
   }
@@ -435,13 +428,12 @@ class DeclarativeBenchmarkPlanTest {
             "Synthetic.find@string", "Synthetic.find@utf8", "Synthetic.matches@string");
     assertThat(expanded.exclusions())
         .singleElement()
-        .satisfies(
-            exclusion -> {
-              assertThat(exclusion.workloadId()).isEqualTo("Synthetic.matches");
-              assertThat(exclusion.engineId()).isEqualTo("utf8");
-              assertThat(exclusion.kind())
-                  .isEqualTo(DeclarativeBenchmarkPlan.ExclusionKind.UNSUPPORTED_FEATURE);
-            });
+        .satisfies(exclusion -> {
+          assertThat(exclusion.workloadId()).isEqualTo("Synthetic.matches");
+          assertThat(exclusion.engineId()).isEqualTo("utf8");
+          assertThat(exclusion.kind())
+              .isEqualTo(DeclarativeBenchmarkPlan.ExclusionKind.UNSUPPORTED_FEATURE);
+        });
   }
 
   @Test
@@ -467,13 +459,12 @@ class DeclarativeBenchmarkPlanTest {
 
     assertThat(plan.workloads())
         .singleElement()
-        .satisfies(
-            workload ->
-                assertThat(workload.requirements())
-                    .containsExactlyInAnyOrder(
-                        DeclarativeBenchmarkPlan.Feature.FIND,
-                        DeclarativeBenchmarkPlan.Feature.MATCHER_STATE,
-                        DeclarativeBenchmarkPlan.Feature.REGIONS));
+        .satisfies(workload ->
+            assertThat(workload.requirements())
+                .containsExactlyInAnyOrder(
+                    DeclarativeBenchmarkPlan.Feature.FIND,
+                    DeclarativeBenchmarkPlan.Feature.MATCHER_STATE,
+                    DeclarativeBenchmarkPlan.Feature.REGIONS));
   }
 
   @Test
@@ -575,10 +566,8 @@ class DeclarativeBenchmarkPlanTest {
         .extracting(DeclarativeBenchmarkPlan.Exclusion::kind)
         .containsExactly(DeclarativeBenchmarkPlan.ExclusionKind.MISSING_ENGINE_ADAPTER);
 
-    assertThatThrownBy(
-            () ->
-                plan.expand(
-                    List.of(supported), EnumSet.of(DeclarativeBenchmarkPlan.Operation.MATCHES)))
+    assertThatThrownBy(() ->
+            plan.expand(List.of(supported), EnumSet.of(DeclarativeBenchmarkPlan.Operation.MATCHES)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("produces no supported trials")
         .hasMessageContaining("MISSING_OPERATION_IMPLEMENTATION");
@@ -744,59 +733,55 @@ class DeclarativeBenchmarkPlanTest {
     assertInvalidTrialExclusion(
         "{\"engineIds\": [\"jdk-string\"], \"reason\": \"reason\"," + " \"unknown\": true}",
         "has unknown field: unknown");
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "trialExclusions": {},
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "trialExclusions": {},
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("trialExclusions must be an array");
     assertInvalidTrialExclusion(
         "{\"engineIds\": [\"jdk-string\"], \"when\": [], \"reason\": \"reason\"}",
         "when must be an object");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "trialExclusions": [{
-                            "engineIds": ["jdk-string"],
-                            "reason": "reason"
-                          }],
-                          "disabledReason": "disabled",
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "trialExclusions": [{
+                        "engineIds": ["jdk-string"],
+                        "reason": "reason"
+                      }],
+                      "disabledReason": "disabled",
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("must not declare both disabledReason and trialExclusions");
 
     DeclarativeBenchmarkPlan unknownEngine =
         planWithTrialExclusions("{\"engineIds\": [\"jdk-string\"], \"reason\": \"reason\"}");
-    assertThatThrownBy(
-            () ->
-                unknownEngine.expand(
-                    List.of(
-                        engine(
-                            "safere-string",
-                            DeclarativeBenchmarkPlan.InputRepresentation.JAVA_STRING)),
-                    EnumSet.of(DeclarativeBenchmarkPlan.Operation.FIND)))
+    assertThatThrownBy(() ->
+            unknownEngine.expand(
+                List.of(
+                    engine(
+                        "safere-string", DeclarativeBenchmarkPlan.InputRepresentation.JAVA_STRING)),
+                EnumSet.of(DeclarativeBenchmarkPlan.Operation.FIND)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("references unknown engine ID: jdk-string");
 
@@ -805,14 +790,11 @@ class DeclarativeBenchmarkPlanTest {
             "{\"engineIds\": [\"jdk-string\"], \"when\": {\"size\": [8]},"
                 + " \"reason\": \"first\"},"
                 + "{\"engineIds\": [\"jdk-string\"], \"reason\": \"second\"}");
-    assertThatThrownBy(
-            () ->
-                overlap.expand(
-                    List.of(
-                        engine(
-                            "jdk-string",
-                            DeclarativeBenchmarkPlan.InputRepresentation.JAVA_STRING)),
-                    EnumSet.of(DeclarativeBenchmarkPlan.Operation.FIND)))
+    assertThatThrownBy(() ->
+            overlap.expand(
+                List.of(
+                    engine("jdk-string", DeclarativeBenchmarkPlan.InputRepresentation.JAVA_STRING)),
+                EnumSet.of(DeclarativeBenchmarkPlan.Operation.FIND)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining(
             "Synthetic.find.8 has overlapping trial exclusions for engine jdk-string");
@@ -878,10 +860,9 @@ class DeclarativeBenchmarkPlanTest {
     assertThat(expanded.trials()).isEmpty();
     assertThat(expanded.exclusions())
         .singleElement()
-        .satisfies(
-            exclusion ->
-                assertThat(exclusion.kind())
-                    .isEqualTo(DeclarativeBenchmarkPlan.ExclusionKind.WORKLOAD_DISABLED));
+        .satisfies(exclusion ->
+            assertThat(exclusion.kind())
+                .isEqualTo(DeclarativeBenchmarkPlan.ExclusionKind.WORKLOAD_DISABLED));
   }
 
   @Test
@@ -901,15 +882,14 @@ class DeclarativeBenchmarkPlanTest {
                 }]
                 """));
 
-    assertThatThrownBy(
-            () ->
-                plan.expand(
-                    List.of(
-                        engine(
-                            "string",
-                            DeclarativeBenchmarkPlan.InputRepresentation.JAVA_STRING,
-                            DeclarativeBenchmarkPlan.Feature.FIND)),
-                    EnumSet.of(DeclarativeBenchmarkPlan.Operation.FIND)))
+    assertThatThrownBy(() ->
+            plan.expand(
+                List.of(
+                    engine(
+                        "string",
+                        DeclarativeBenchmarkPlan.InputRepresentation.JAVA_STRING,
+                        DeclarativeBenchmarkPlan.Feature.FIND)),
+                EnumSet.of(DeclarativeBenchmarkPlan.Operation.FIND)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("produces no supported trials")
         .hasMessageContaining("disabledReason");
@@ -917,144 +897,136 @@ class DeclarativeBenchmarkPlanTest {
 
   @Test
   void strictLoadingRejectsUnknownFieldsAndEnumValues() {
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 1,
-                      "inputs": [],
-                      "workloads": []
-                    }
-                    """))
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 1,
+                  "inputs": [],
+                  "workloads": []
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unsupported benchmark plan schema version: 1");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 3,
-                      "inputs": [],
-                      "workloads": []
-                    }
-                    """))
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 3,
+                  "inputs": [],
+                  "workloads": []
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unsupported benchmark plan schema version: 3");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 2,
-                      "inputs": [],
-                      "workloads": [],
-                      "family": "Regex"
-                    }
-                    """))
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 2,
+                  "inputs": [],
+                  "workloads": [],
+                  "family": "Regex"
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("plan has unknown field: family");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.unknown",
-                          "operation": "familySpecificOperation",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.unknown",
+                      "operation": "familySpecificOperation",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unknown benchmark operation: familySpecificOperation");
   }
 
   @Test
   void loadingRejectsDuplicateIdsInvalidReferencesAndUnstableAxes() {
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 2,
-                      "inputs": [
-                        {"id": "same", "recipe": {"kind": "literal", "text": "a"}},
-                        {"id": "same", "recipe": {"kind": "literal", "text": "b"}}
-                      ],
-                      "workloads": [{
-                        "id": "Synthetic.find",
-                        "operation": "find",
-                        "patterns": ["x"],
-                        "inputs": ["same"],
-                        "resultConsumption": "boolean",
-                        "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                      }]
-                    }
-                    """))
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 2,
+                  "inputs": [
+                    {"id": "same", "recipe": {"kind": "literal", "text": "a"}},
+                    {"id": "same", "recipe": {"kind": "literal", "text": "b"}}
+                  ],
+                  "workloads": [{
+                    "id": "Synthetic.find",
+                    "operation": "find",
+                    "patterns": ["x"],
+                    "inputs": ["same"],
+                    "resultConsumption": "boolean",
+                    "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                  }]
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Duplicate benchmark input ID: same");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["missing.input"],
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["missing.input"],
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Synthetic.find references unknown expanded benchmark input: missing.input");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "axes": {"size": [8, 16]},
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "axes": {"size": [8, 16]},
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("ID omits expansion axes")
         .hasMessageContaining("size");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 2,
-                      "inputs": [{
-                        "id": "orphaned.input",
-                        "recipe": {"kind": "literal", "text": "x"}
-                      }],
-                      "workloads": [{
-                        "id": "Synthetic.compile",
-                        "operation": "compile",
-                        "patterns": ["x"],
-                        "resultConsumption": "compiledObject",
-                        "measurement": {"mode": "compileOnly", "timingUnit": "nanoseconds"}
-                      }]
-                    }
-                    """))
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 2,
+                  "inputs": [{
+                    "id": "orphaned.input",
+                    "recipe": {"kind": "literal", "text": "x"}
+                  }],
+                  "workloads": [{
+                    "id": "Synthetic.compile",
+                    "operation": "compile",
+                    "patterns": ["x"],
+                    "resultConsumption": "compiledObject",
+                    "measurement": {"mode": "compileOnly", "timingUnit": "nanoseconds"}
+                  }]
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage(
             "Benchmark input is not referenced by a workload and is not shared: orphaned.input");
@@ -1062,189 +1034,180 @@ class DeclarativeBenchmarkPlanTest {
 
   @Test
   void loadingRejectsMalformedExpectedLifecycleAndMeasurementDeclarations() {
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.expected",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "resultConsumption": "boolean",
-                          "expected": {"type": "integer", "value": 1},
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.expected",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "resultConsumption": "boolean",
+                      "expected": {"type": "integer", "value": 1},
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("requires expected type boolean");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.region",
-                          "operation": "matcherRegionFind",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.region",
+                      "operation": "matcherRegionFind",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("requires lifecycle");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.cold",
-                          "operation": "compile",
-                          "patterns": ["x"],
-                          "resultConsumption": "compiledObject",
-                          "measurement": {
-                            "mode": "singleShotColdStart",
-                            "timingUnit": "milliseconds"
-                          }
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.cold",
+                      "operation": "compile",
+                      "patterns": ["x"],
+                      "resultConsumption": "compiledObject",
+                      "measurement": {
+                        "mode": "singleShotColdStart",
+                        "timingUnit": "milliseconds"
+                      }
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("freshProcessPerInvocation");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.badConsumption",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "resultConsumption": "integer",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.badConsumption",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "resultConsumption": "integer",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("find cannot use result consumption integer");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.replace",
-                          "operation": "replaceAll",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "resultConsumption": "string",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.replace",
+                      "operation": "replaceAll",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "resultConsumption": "string",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("replaceAll requires arguments [replacement]");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    planJson(
-                        """
-                        [{
-                          "id": "Synthetic.find",
-                          "operation": "find",
-                          "patterns": ["x"],
-                          "inputs": ["literal.input"],
-                          "arguments": {"family": "Regex"},
-                          "resultConsumption": "boolean",
-                          "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                        }]
-                        """)))
+    assertThatThrownBy(() ->
+            parse(
+                planJson(
+                    """
+                    [{
+                      "id": "Synthetic.find",
+                      "operation": "find",
+                      "patterns": ["x"],
+                      "inputs": ["literal.input"],
+                      "arguments": {"family": "Regex"},
+                      "resultConsumption": "boolean",
+                      "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                    }]
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Synthetic.find operation find has unknown argument: family");
   }
 
   @Test
   void boundedRecipeVocabularyRejectsUnknownKindsAndArguments() {
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 2,
-                      "inputs": [{
-                        "id": "bad.input",
-                        "recipe": {"kind": "executeJava", "class": "FamilyGenerator"}
-                      }],
-                      "workloads": [{
-                        "id": "Synthetic.find",
-                        "operation": "find",
-                        "patterns": ["x"],
-                        "inputs": ["bad.input"],
-                        "resultConsumption": "boolean",
-                        "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                      }]
-                    }
-                    """))
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 2,
+                  "inputs": [{
+                    "id": "bad.input",
+                    "recipe": {"kind": "executeJava", "class": "FamilyGenerator"}
+                  }],
+                  "workloads": [{
+                    "id": "Synthetic.find",
+                    "operation": "find",
+                    "patterns": ["x"],
+                    "inputs": ["bad.input"],
+                    "resultConsumption": "boolean",
+                    "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                  }]
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unknown input recipe kind: executeJava");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 2,
-                      "inputs": [{
-                        "id": "bad.input",
-                        "recipe": {
-                          "kind": "literal",
-                          "text": "x",
-                          "family": "Regex"
-                        }
-                      }],
-                      "workloads": [{
-                        "id": "Synthetic.find",
-                        "operation": "find",
-                        "patterns": ["x"],
-                        "inputs": ["bad.input"],
-                        "resultConsumption": "boolean",
-                        "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                      }]
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 2,
+                  "inputs": [{
+                    "id": "bad.input",
+                    "recipe": {
+                      "kind": "literal",
+                      "text": "x",
+                      "family": "Regex"
                     }
-                    """))
+                  }],
+                  "workloads": [{
+                    "id": "Synthetic.find",
+                    "operation": "find",
+                    "patterns": ["x"],
+                    "inputs": ["bad.input"],
+                    "resultConsumption": "boolean",
+                    "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                  }]
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("bad.input recipe has unknown field: family");
 
-    assertThatThrownBy(
-            () ->
-                parse(
-                    """
-                    {
-                      "schemaVersion": 2,
-                      "inputs": [{
-                        "id": "bad.input",
-                        "recipe": {
-                          "kind": "repeatToLength",
-                          "unit": "",
-                          "length": 1
-                        }
-                      }],
-                      "workloads": [{
-                        "id": "Synthetic.find",
-                        "operation": "find",
-                        "patterns": ["x"],
-                        "inputs": ["bad.input"],
-                        "resultConsumption": "boolean",
-                        "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
-                      }]
+    assertThatThrownBy(() ->
+            parse(
+                """
+                {
+                  "schemaVersion": 2,
+                  "inputs": [{
+                    "id": "bad.input",
+                    "recipe": {
+                      "kind": "repeatToLength",
+                      "unit": "",
+                      "length": 1
                     }
-                    """))
+                  }],
+                  "workloads": [{
+                    "id": "Synthetic.find",
+                    "operation": "find",
+                    "patterns": ["x"],
+                    "inputs": ["bad.input"],
+                    "resultConsumption": "boolean",
+                    "measurement": {"mode": "averageTime", "timingUnit": "nanoseconds"}
+                  }]
+                }
+                """))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Recipe field unit must not be empty");
   }
