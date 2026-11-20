@@ -141,6 +141,8 @@ def resolve_worktree(
   metadata: dict[str, Any],
   checkpoint: dict[str, Any] | None = None,
   runner: Callable[[list[str]], str] = subprocess_runner,
+  *,
+  allow_behind: bool = False,
 ) -> dict[str, str]:
   """Find a unique clean original branch; never create, switch, reset, or mutate a worktree."""
 
@@ -210,14 +212,24 @@ def resolve_worktree(
   local_head = git(path, "rev-parse", "HEAD").strip()
   if local_head != remote_head:
     prior = checkpoint or {}
-    if not (
+    if (
       prior.get("lastRemoteHeadSha") == remote_head
       and prior.get("lastLocalHeadSha") == local_head
       and prior.get("worktree") == str(path)
       and prior.get("branch") == branch
     ):
+      git(path, "merge-base", "--is-ancestor", remote_head, local_head)
+    elif allow_behind:
+      try:
+        git(path, "merge-base", "--is-ancestor", local_head, remote_head)
+      except subprocess.CalledProcessError as error:
+        if error.returncode != 1:
+          raise
+        raise WorktreeError(
+          "original worktree cannot fast-forward to the published PR head"
+        ) from error
+    else:
       raise WorktreeError("original worktree HEAD differs from the published PR head")
-    git(path, "merge-base", "--is-ancestor", remote_head, local_head)
   if git(path, "rev-parse", "HEAD").strip() != local_head:
     raise WorktreeError("worktree HEAD changed during discovery")
   ensure_editable()
