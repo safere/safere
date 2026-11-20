@@ -14,6 +14,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.MatchResult;
 import org.openjdk.jmh.infra.Blackhole;
 import org.safere.Utf8Sink;
 
@@ -95,6 +97,12 @@ enum RegexEngineVariant {
         public ReplacementOutput replaceFirst(RegexInput input, PreparedReplacement replacement) {
           return new StringReplacementOutput(
               pattern.matcher(string(input)).replaceFirst(string(replacement)));
+        }
+
+        @Override
+        public ReplacementOutput replaceAllFunction(
+            RegexInput input, Function<MatchResult, String> function) {
+          return new StringReplacementOutput(pattern.matcher(string(input)).replaceAll(function));
         }
 
         @Override
@@ -302,6 +310,12 @@ enum RegexEngineVariant {
         public ReplacementOutput replaceFirst(RegexInput input, PreparedReplacement replacement) {
           return new StringReplacementOutput(
               pattern.matcher(string(input)).replaceFirst(string(replacement)));
+        }
+
+        @Override
+        public ReplacementOutput replaceAllFunction(
+            RegexInput input, Function<MatchResult, String> function) {
+          return new StringReplacementOutput(pattern.matcher(string(input)).replaceAll(function));
         }
 
         @Override
@@ -583,6 +597,8 @@ enum RegexEngineVariant {
           features.add(DeclarativeBenchmarkPlan.Feature.APPEND_REPLACEMENT);
           features.add(DeclarativeBenchmarkPlan.Feature.NUMBERED_REPLACEMENT);
         }
+        case FUNCTIONAL_REPLACEMENT ->
+            features.add(DeclarativeBenchmarkPlan.Feature.FUNCTIONAL_REPLACEMENT);
         case SPLIT -> features.add(DeclarativeBenchmarkPlan.Feature.SPLIT);
         case MATCHER_RESET -> features.add(DeclarativeBenchmarkPlan.Feature.MATCHER_STATE);
         case REGIONS -> {
@@ -593,6 +609,7 @@ enum RegexEngineVariant {
     }
     switch (this) {
       case SAFERE_STRING -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.DFA_CACHE);
         features.add(DeclarativeBenchmarkPlan.Feature.DIAGNOSTICS);
         features.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
@@ -602,6 +619,7 @@ enum RegexEngineVariant {
         features.add(DeclarativeBenchmarkPlan.Feature.RETAINED_HEAP);
       }
       case SAFERE_UTF8, SAFERE_UTF8_VECTOR -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.DIAGNOSTICS);
         features.add(DeclarativeBenchmarkPlan.Feature.LINEAR_TIME);
         features.add(DeclarativeBenchmarkPlan.Feature.MATCHER_STATE);
@@ -610,11 +628,13 @@ enum RegexEngineVariant {
         features.add(DeclarativeBenchmarkPlan.Feature.UTF8_REPLACEMENT);
       }
       case JDK_STRING -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
         features.add(DeclarativeBenchmarkPlan.Feature.JAVA_CHARACTER_CLASS);
         features.add(DeclarativeBenchmarkPlan.Feature.RETAINED_HEAP);
       }
       case RE2J_STRING -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
         features.add(DeclarativeBenchmarkPlan.Feature.LINEAR_TIME);
         features.add(DeclarativeBenchmarkPlan.Feature.RETAINED_HEAP);
@@ -715,6 +735,7 @@ enum RegexEngineVariant {
   private static EnumSet<EngineCapability> re2jCapabilities() {
     EnumSet<EngineCapability> capabilities = allCapabilities();
     capabilities.remove(EngineCapability.REGIONS);
+    capabilities.remove(EngineCapability.FUNCTIONAL_REPLACEMENT);
     return capabilities;
   }
 
@@ -897,6 +918,11 @@ enum RegexEngineVariant {
     }
 
     default ReplacementOutput replaceAll(RegexInput input, PreparedReplacement replacement) {
+      throw new UnsupportedOperationException();
+    }
+
+    default ReplacementOutput replaceAllFunction(
+        RegexInput input, Function<MatchResult, String> function) {
       throw new UnsupportedOperationException();
     }
 

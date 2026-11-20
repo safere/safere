@@ -7,7 +7,11 @@ package org.safere.benchmark;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
+import java.util.function.Function;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
 import org.openjdk.jmh.infra.Blackhole;
 
 /** Generic operation semantics and result consumption for cross-engine regex workloads. */
@@ -23,6 +27,7 @@ enum BenchmarkOperation {
   CAPTURE_GROUPS(EngineCapability.MATCHES, EngineCapability.GROUP_TEXT),
   REPLACE_FIRST(EngineCapability.REPLACE),
   REPLACE_ALL(EngineCapability.REPLACE),
+  REPLACE_ALL_FUNCTION(EngineCapability.FUNCTIONAL_REPLACEMENT),
   REPLACE_ALL_LENGTH_SUM(EngineCapability.REPLACE),
   MANUAL_REPLACE_ALL(EngineCapability.APPEND_REPLACEMENT),
   SPLIT_LENGTH_SUM(EngineCapability.SPLIT),
@@ -67,6 +72,7 @@ enum BenchmarkOperation {
       case CAPTURE_GROUPS -> CAPTURE_GROUPS;
       case REPLACE_FIRST -> REPLACE_FIRST;
       case REPLACE_ALL -> REPLACE_ALL;
+      case REPLACE_ALL_FUNCTION -> REPLACE_ALL_FUNCTION;
       case REPLACE_ALL_LENGTH_SUM -> REPLACE_ALL_LENGTH_SUM;
       case MANUAL_REPLACE_ALL -> MANUAL_REPLACE_ALL;
       case SPLIT_LENGTH_SUM -> SPLIT_LENGTH_SUM;
@@ -173,6 +179,11 @@ enum BenchmarkOperation {
       case REPLACE_FIRST ->
           blackhole -> pattern.replaceFirst(input, replacement).consume(blackhole);
       case REPLACE_ALL -> blackhole -> pattern.replaceAll(input, replacement).consume(blackhole);
+      case REPLACE_ALL_FUNCTION -> {
+        int group = groups[0];
+        Function<MatchResult, String> function = capturedTextReplacement(group);
+        yield blackhole -> pattern.replaceAllFunction(input, function).consume(blackhole);
+      }
       case REPLACE_ALL_LENGTH_SUM ->
           blackhole -> blackhole.consume(replaceAllLengthSum(patterns, input, replacement));
       case MANUAL_REPLACE_ALL ->
@@ -334,6 +345,8 @@ enum BenchmarkOperation {
       case CAPTURE_GROUPS -> captureGroups(pattern.matcher(input), groups);
       case REPLACE_FIRST -> pattern.replaceFirst(input, replacement).validationValue();
       case REPLACE_ALL -> pattern.replaceAll(input, replacement).validationValue();
+      case REPLACE_ALL_FUNCTION ->
+          pattern.replaceAllFunction(input, capturedTextReplacement(groups[0])).validationValue();
       case REPLACE_ALL_LENGTH_SUM -> replaceAllLengthSum(patterns, input, replacement);
       case MANUAL_REPLACE_ALL -> pattern.manualReplaceAll(input, replacement).validationValue();
       case SPLIT_LENGTH_SUM -> splitLengthSum(pattern.split(input, limit));
@@ -404,6 +417,7 @@ enum BenchmarkOperation {
   }
 
   private static int tokenize(RegexEngineVariant.MatchCursor matcher, int length, String mode) {
+    mode = mode == null ? "" : mode;
     boolean independent = mode.startsWith("independent");
     if (independent) {
       matcher.reset();
@@ -555,6 +569,10 @@ enum BenchmarkOperation {
       result.append(matcher.group(group));
     }
     return result.toString();
+  }
+
+  private static Function<MatchResult, String> capturedTextReplacement(int group) {
+    return match -> Matcher.quoteReplacement(Objects.toString(match.group(group), ""));
   }
 
   private static int replaceAllLengthSum(

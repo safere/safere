@@ -10,10 +10,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openjdk.jmh.infra.Blackhole;
 
 class BenchmarkOperationTest {
@@ -44,8 +47,48 @@ class BenchmarkOperationTest {
   @ParameterizedTest
   @EnumSource(
       value = RegexEngineVariant.class,
-      names = {"SAFERE_STRING", "SAFERE_UTF8", "JDK_STRING"})
-  void tokenizerAdvancesInNativeCoordinatesAndCanReuseItsMatcher(RegexEngineVariant variant) {
+      names = {"SAFERE_STRING", "JDK_STRING"})
+  void functionalReplacementConsumesLiteralCaptureTextAndHandlesNonparticipation(
+      RegexEngineVariant variant) {
+    for (String regex : List.of("(.)", "(x)?y")) {
+      String inputText = regex.equals("(.)") ? "$\\" : "y";
+      String expected = regex.equals("(.)") ? inputText : "";
+      var input = new RegexEngineVariant.StringRegexInput(inputText);
+      try (var compiled = variant.compile(regex)) {
+        Object actual =
+            BenchmarkOperation.REPLACE_ALL_FUNCTION.execute(
+                variant,
+                List.of(regex),
+                List.of(compiled),
+                List.of(input),
+                new int[] {1},
+                null,
+                0,
+                new DeclarativeBenchmarkPlan.MatcherLifecycle(
+                    DeclarativeBenchmarkPlan.MatcherReuse.NONE, List.of()),
+                null,
+                0,
+                0,
+                null);
+        assertThat(actual).isEqualTo(expected);
+      }
+    }
+  }
+
+  static Stream<Arguments> tokenizerModes() {
+    return Stream.of(
+            RegexEngineVariant.SAFERE_STRING,
+            RegexEngineVariant.SAFERE_UTF8,
+            RegexEngineVariant.JDK_STRING)
+        .flatMap(variant ->
+            Stream.of(null, "", "regionBounds", "independent")
+                .map(mode -> Arguments.of(variant, mode)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("tokenizerModes")
+  void tokenizerAdvancesInNativeCoordinatesAndCanReuseItsMatcher(
+      RegexEngineVariant variant, String mode) {
     RegexEngineVariant.RegexInput input =
         variant == RegexEngineVariant.SAFERE_UTF8
             ? RegexEngineVariant.utf8Input(
@@ -69,7 +112,7 @@ class BenchmarkOperationTest {
                   null,
                   0,
                   0,
-                  "integer"))
+                  mode))
           .isEqualTo(6);
       BenchmarkOperation.BenchmarkTask task =
           operation.bind(
@@ -84,7 +127,7 @@ class BenchmarkOperationTest {
               null,
               0,
               0,
-              "integer");
+              mode);
       Blackhole blackhole =
           new Blackhole(
               "Today's password is swordfish. I understand instantiating Blackholes directly is"

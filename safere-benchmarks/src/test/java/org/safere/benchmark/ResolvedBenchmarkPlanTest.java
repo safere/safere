@@ -21,6 +21,147 @@ import org.junit.jupiter.api.Test;
 class ResolvedBenchmarkPlanTest {
 
   @Test
+  void nullableRepeatedFindExcludesGoAndRustNativeIteration() throws IOException {
+    Path source =
+        Files.exists(Path.of("benchmark-data.json"))
+            ? Path.of("benchmark-data.json")
+            : Path.of("safere-benchmarks", "benchmark-data.json");
+    JsonObject plan =
+        ResolvedBenchmarkPlan.create(
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(Files.readString(source)).getAsJsonObject()));
+    String workload = "RepeatedClassFindBenchmark.lines.1024@";
+    for (String engine : List.of("go_regexp", "rust_regex")) {
+      JsonObject row = entry(plan, workload + engine);
+      assertThat(row.get("status").getAsString()).isEqualTo("excluded");
+      assertThat(row.getAsJsonObject("exclusion").get("reason").getAsString())
+          .contains("empty match", "nonempty match");
+    }
+    for (String engine : List.of("safere-string", "safere-utf8", "re2_cpp")) {
+      assertThat(entry(plan, workload + engine).get("status").getAsString()).isEqualTo("runnable");
+    }
+  }
+
+  @Test
+  void quantifiedCapturePatternsUseGoBaselineNamedGroupSyntax() throws IOException {
+    Path source =
+        Files.exists(Path.of("benchmark-data.json"))
+            ? Path.of("benchmark-data.json")
+            : Path.of("safere-benchmarks/benchmark-data.json");
+    JsonObject plan =
+        ResolvedBenchmarkPlan.create(
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(Files.readString(source)).getAsJsonObject()));
+    assertThat(
+            entry(plan, "Utf8MatchingBenchmark.captureBounds.named@go_regexp")
+                .getAsJsonArray("patterns")
+                .get(0)
+                .getAsString())
+        .isEqualTo("(?P<key>[A-Za-z]+)=(?P<value>[^&]+)");
+    List<JsonObject> goRows =
+        plan.getAsJsonArray("entries").asList().stream()
+            .map(JsonObject.class::cast)
+            .filter(row -> row.get("engineId").getAsString().equals("go_regexp"))
+            .filter(row -> row.get("status").getAsString().equals("runnable"))
+            .filter(row ->
+                row.get("workloadId").getAsString().startsWith("QuantifiedCaptureBenchmark."))
+            .toList();
+    assertThat(goRows).isNotEmpty();
+    for (JsonObject row : goRows) {
+      String workload = row.get("workloadId").getAsString();
+      String canonical =
+          entry(plan, workload + "@safere-string").getAsJsonArray("patterns").get(0).getAsString();
+      // Go 1.21 accepts (?P<name>...), while (?<name>...) requires a newer Go release.
+      assertThat(row.getAsJsonArray("patterns").get(0).getAsString())
+          .as(workload)
+          .isEqualTo(canonical.replace("(?<retained>", "(?P<retained>"));
+      for (String engine : List.of("re2_cpp", "rust_regex")) {
+        JsonObject comparison = entry(plan, workload + "@" + engine);
+        if (comparison.get("status").getAsString().equals("runnable")) {
+          assertThat(comparison.getAsJsonArray("patterns").get(0).getAsString())
+              .as("%s %s", workload, engine)
+              .isEqualTo(canonical);
+        }
+      }
+    }
+  }
+
+  @Test
+  void quantifiedCapturesHaveNativeComparisonsAndReplacementCapabilityExclusions()
+      throws Exception {
+    Path source =
+        Files.exists(Path.of("benchmark-data.json"))
+            ? Path.of("benchmark-data.json")
+            : Path.of("safere-benchmarks/benchmark-data.json");
+    JsonObject plan =
+        ResolvedBenchmarkPlan.create(
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(Files.readString(source)).getAsJsonObject()));
+    String prefix = "QuantifiedCaptureBenchmark.nestedGreedy.";
+    for (String observation :
+        List.of("boolean", "groupZero", "participation", "text", "numbered")) {
+      for (String engine :
+          List.of(
+              "safere-string",
+              "safere-utf8",
+              "safere-utf8-vector",
+              "jdk-string",
+              "re2j-string",
+              "re2-ffm-string-conversion",
+              "re2_cpp",
+              "pcre2_jit",
+              "go_regexp",
+              "rust_regex",
+              "dotnet_nonbacktracking")) {
+        if (observation.equals("numbered") && engine.equals("pcre2_jit")) {
+          continue;
+        }
+        assertThat(
+                entry(plan, prefix + observation + ".match.128@" + engine)
+                    .get("status")
+                    .getAsString())
+            .isEqualTo("runnable");
+      }
+    }
+    for (String engine :
+        List.of(
+            "safere-utf8",
+            "safere-utf8-vector",
+            "re2j-string",
+            "go_regexp",
+            "dotnet_nonbacktracking")) {
+      assertThat(entry(plan, prefix + "named.match.128@" + engine).get("status").getAsString())
+          .isEqualTo("runnable");
+    }
+    assertThat(
+            entry(plan, prefix + "function.match.128@dotnet_nonbacktracking")
+                .get("status")
+                .getAsString())
+        .isEqualTo("runnable");
+    for (String engine :
+        List.of("re2j-string", "re2-ffm-string-conversion", "go_regexp", "pcre2_jit")) {
+      assertThat(entry(plan, prefix + "function.match.128@" + engine).get("status").getAsString())
+          .isEqualTo("excluded");
+    }
+    assertThat(
+            entry(plan, prefix + "numbered.match.128@re2_cpp")
+                .getAsJsonObject("arguments")
+                .get("replacement")
+                .getAsString())
+        .isEqualTo("\\1");
+    for (String observation : List.of("named", "function")) {
+      assertThat(
+              entry(plan, prefix + observation + ".match.128@re2_cpp").get("status").getAsString())
+          .isEqualTo("excluded");
+      assertThat(
+              entry(plan, prefix + observation + ".match.128@rust_regex")
+                  .get("status")
+                  .getAsString())
+          .isEqualTo("runnable");
+    }
+  }
+
+  @Test
   void ffmMatcherOperationsPreserveConversionTimingAndUnsupportedExclusions() throws IOException {
     Path source =
         Files.exists(Path.of("benchmark-data.json"))
