@@ -14,6 +14,7 @@ enum EngineCapability {
   GROUP_PARTICIPATION,
   GROUP_TEXT,
   REPLACE,
+  FUNCTIONAL_REPLACEMENT,
   APPEND_REPLACEMENT,
   SPLIT,
   MATCHER_RESET,
@@ -32,6 +33,7 @@ enum EngineCapability {
       case SPLIT -> 1 << 8;
       case MATCHER_RESET -> 1 << 9;
       case REGIONS -> 1 << 10;
+      case FUNCTIONAL_REPLACEMENT -> 1 << 11;
     };
   }
 }

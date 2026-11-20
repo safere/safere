@@ -150,7 +150,8 @@ The execution-plan materializer selects one profile for each engine and syntax k
 the Java values directly. RE2/J and RE2-FFM select the `re2` pattern profile;
 native C++ RE2 selects `re2-cpp` patterns, which inherit `re2` alternates and
 allow C++-specific overrides, plus `re2-cpp` replacements; Go selects
-`re2` patterns and `go-regexp` replacements where adjacent text makes a Java
+`go-regexp` patterns, which inherit `re2` alternates and allow Go-specific overrides,
+and `go-regexp` replacements where adjacent text makes a Java
 capture reference ambiguous; and Rust `regex` selects `rust-regex` for both
 kinds. PCRE2 JIT selects `pcre2` for both kinds; this remains separate from
 `re2` because PCRE2 accepts some Java-canonical forms that RE2 does not, while
@@ -263,7 +264,7 @@ Supported operations are grouped below. Names are exact JSON values.
 | Group | Operations |
 |---|---|
 | Matching | `matches`, `find`, `lookingAt`, `findAllCount`, `findAllLengthSum`, `findAllGroupLengthSum`, `matchesCorpus`, `matchesGroupLengthSum`, `findGroupPresent`, `findGroup`, `captureGroups` |
-| Replacement and splitting | `replaceFirst`, `replaceAll`, `replaceAllLengthSum`, `appendReplacement`, `manualReplaceAll`, `split`, `splitLengthSum` |
+| Replacement and splitting | `replaceFirst`, `replaceAll`, `replaceAllFunction`, `replaceAllLengthSum`, `appendReplacement`, `manualReplaceAll`, `split`, `splitLengthSum` |
 | Compilation and matcher state | `compile`, `compileAndFind`, `compileAndFindGroupPresent`, `compileAndMatches`, `findRotatingUtf16`, `compileAndFindRotatingUtf16`, `matcherConstruction`, `matcherResetFind`, `matcherRegionFind`, `matcherRegionMatches`, `matcherRegionTokenize`, `findInWindow` |
 | Pattern collections | `patternSetCompile`, `patternSetFind`, `patternSetMatches` |
 | UTF-8 | `utf8CaptureBounds`, `utf8DecodeFind`, `utf8Replacement` |
@@ -271,7 +272,13 @@ Supported operations are grouped below. Names are exact JSON values.
 
 Operation-specific data uses a strict `arguments` object rather than
 workload-family fields. Group-consuming operations use `group` or `groups`;
-replacement operations require `replacement`; split operations accept `limit`;
+template replacement operations require `replacement`; `replaceAllFunction`
+requires `group` and invokes the native function replacement API, returning that
+group's literal text (or empty text for a nonparticipating group). The Java and
+.NET callbacks are bound outside timing; Rust uses a closure over the prepared
+group metadata. This operation is supported by SafeRE String, JDK String, Rust
+regex, and .NET; adapters without a capture-aware callback operation are excluded.
+Split operations accept `limit`;
 PatternSet operations require `anchor` with `anchored` or `unanchored` and may
 declare `patternCount`; flagged compilation uses `flagSet`; rotating UTF-16
 operations use `seed` and `count`. Arguments may reference declared axes.
