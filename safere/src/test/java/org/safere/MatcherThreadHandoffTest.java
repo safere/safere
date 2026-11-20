@@ -33,17 +33,16 @@ class MatcherThreadHandoffTest {
     assertThat(originalReverse).isNotNull().isSameAs(pattern.reverseDfa());
 
     Dfa[] worker =
-        onWorker(
-            () -> {
-              assertThat(transferred.find()).isTrue();
-              assertThat(transferred.group()).isEqualTo("bcdex");
-              return new Dfa[] {
-                (Dfa) field("cachedForwardFirstMatchDfa").get(transferred),
-                (Dfa) field("cachedReverseDfa").get(transferred),
-                pattern.forwardFirstMatchDfa(),
-                pattern.reverseDfa(),
-              };
-            });
+        onWorker(() -> {
+          assertThat(transferred.find()).isTrue();
+          assertThat(transferred.group()).isEqualTo("bcdex");
+          return new Dfa[] {
+            (Dfa) field("cachedForwardFirstMatchDfa").get(transferred),
+            (Dfa) field("cachedReverseDfa").get(transferred),
+            pattern.forwardFirstMatchDfa(),
+            pattern.reverseDfa(),
+          };
+        });
     assertThat(worker[0]).isNotSameAs(originalForward).isSameAs(worker[2]);
     assertThat(worker[1]).isNotSameAs(originalReverse).isSameAs(worker[3]);
   }
@@ -63,14 +62,13 @@ class MatcherThreadHandoffTest {
     assertThat(originalEngine).isNotNull();
 
     Object workerEngine =
-        onWorker(
-            () -> {
-              assertThat(transferred.find()).isTrue();
-              // Read the engine before group(), which can rebuild it for capture resolution.
-              Object engine = engineField.get(transferred);
-              assertThat(transferred.group(2)).isEqualTo("789");
-              return engine;
-            });
+        onWorker(() -> {
+          assertThat(transferred.find()).isTrue();
+          // Read the engine before group(), which can rebuild it for capture resolution.
+          Object engine = engineField.get(transferred);
+          assertThat(transferred.group(2)).isEqualTo("789");
+          return engine;
+        });
     assertThat(workerEngine).isNotNull().isNotSameAs(originalEngine);
 
     // The original thread keeps using its own cache, not the worker's engine.

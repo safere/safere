@@ -148,16 +148,14 @@ class PrefilterQuadrantWorkTest {
                   shape.match + filler(size - shape.match.length()),
                   EARLY_HIT_BOUND));
       for (Case c : cases) {
-        ENTRY_POINTS.forEach(
-            (name, entryPoint) -> {
-              long work = work(() -> entryPoint.accept(pattern, c.input()));
-              if (work > c.bound()) {
-                failures.add(
-                    String.format(
-                        "%s, %s, %d chars: %d units, bound %d",
-                        name, c.name(), size, work, c.bound()));
-              }
-            });
+        ENTRY_POINTS.forEach((name, entryPoint) -> {
+          long work = work(() -> entryPoint.accept(pattern, c.input()));
+          if (work > c.bound()) {
+            failures.add(
+                String.format(
+                    "%s, %s, %d chars: %d units, bound %d", name, c.name(), size, work, c.bound()));
+          }
+        });
       }
     }
     assertThat(failures).as("/%s/", shape.regex).isEmpty();

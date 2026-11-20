@@ -61,20 +61,19 @@ class NullableFullMatchDfaTest {
         assertThat(matched).isTrue();
         assertThat(events)
             .singleElement()
-            .satisfies(
-                event -> {
-                  assertThat(event.boundaryStrategy()).as(regex).isEqualTo(MatchStrategy.DFA);
-                  assertThat(event.pattern().analysis().capabilities())
-                      .contains(PatternCapability.DFA_BOUNDARY_SEARCH);
-                  assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
-                  assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
-                  assertThat(event.strategyDecisions())
-                      .doesNotContain(
-                          new StrategyDecision(
-                              MatchStrategy.DFA,
-                              StrategyDisposition.BYPASSED,
-                              StrategyReason.EXACT_NULLABLE_LOOP_SEMANTICS_REQUIRED));
-                });
+            .satisfies(event -> {
+              assertThat(event.boundaryStrategy()).as(regex).isEqualTo(MatchStrategy.DFA);
+              assertThat(event.pattern().analysis().capabilities())
+                  .contains(PatternCapability.DFA_BOUNDARY_SEARCH);
+              assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+              assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
+              assertThat(event.strategyDecisions())
+                  .doesNotContain(
+                      new StrategyDecision(
+                          MatchStrategy.DFA,
+                          StrategyDisposition.BYPASSED,
+                          StrategyReason.EXACT_NULLABLE_LOOP_SEMANTICS_REQUIRED));
+            });
       }
     }
   }

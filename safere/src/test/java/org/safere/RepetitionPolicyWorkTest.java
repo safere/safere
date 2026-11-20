@@ -41,14 +41,13 @@ class RepetitionPolicyWorkTest {
               String input = "a".repeat(length) + (rejects ? "!b" : "b");
               Utf8Input bytes = Utf8Input.trusted(input.getBytes(UTF_8));
               long work =
-                  WorkCounter.countForTesting(
-                      () -> {
-                        if (utf8) {
-                          assertThat(pattern.matcher(bytes).matches()).isEqualTo(!rejects);
-                        } else {
-                          assertThat(pattern.matcher(input).matches()).isEqualTo(!rejects);
-                        }
-                      });
+                  WorkCounter.countForTesting(() -> {
+                    if (utf8) {
+                      assertThat(pattern.matcher(bytes).matches()).isEqualTo(!rejects);
+                    } else {
+                      assertThat(pattern.matcher(input).matches()).isEqualTo(!rejects);
+                    }
+                  });
               assertThat(work).isPositive();
               if (previous > 0) {
                 assertThat(work)
