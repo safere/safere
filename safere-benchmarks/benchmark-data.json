@@ -4821,6 +4821,15 @@
       "shared": true
     },
     {
+      "id": "reverseDfaFind.prose.32768",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "On the 3rd day, the river_guide said: \"Keep left past the mill, then cross at dusk.\" We did; nobody fell in. Supper came later. ",
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
       "id": "quantifiedCapture.nestedGreedy.match.{size}",
       "axes": {
         "size": [
@@ -21447,7 +21456,16 @@
       "expected": {
         "type": "integer",
         "value": 2049
-      }
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "go_regexp",
+            "rust_regex"
+          ],
+          "reason": "Go and Rust native iteration suppresses an empty match immediately after a nonempty match. This workload expects Java's repeated-find sequence"
+        }
+      ]
     },
     {
       "id": "LeadingWildcardBenchmark.find.{leading}.{shape}",
@@ -22190,6 +22208,28 @@
             }
           }
         ]
+      }
+    },
+    {
+      "id": "ReverseDfaFindBenchmark.wordProse.32768",
+      "operation": "findAllCount",
+      "patterns": [
+        "\\b\\w+\\b"
+      ],
+      "inputs": [
+        "reverseDfaFind.prose.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 6144
       }
     },
     {

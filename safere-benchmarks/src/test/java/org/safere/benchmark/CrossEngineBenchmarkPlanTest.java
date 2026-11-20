@@ -30,6 +30,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openjdk.jmh.infra.Blackhole;
+import org.safere.MatchStrategy;
+import org.safere.OperationDiagnostics;
 import org.safere.Pattern;
 import org.safere.PatternCompiledEvent;
 import org.safere.PatternFeature;
@@ -1606,6 +1608,51 @@ class CrossEngineBenchmarkPlanTest {
       try (SpecializedTrialRunner runner = SpecializedTrialRunner.prepare(trial)) {
         runner.run(blackhole);
       }
+    }
+  }
+
+  @Test
+  void reverseDfaProseWorkloadRecoversEveryMatchStartWithTheReverseDfa() {
+    // The workload exists to measure repeated reverse-DFA start recovery. If a faster path takes
+    // over, this fails so the workload can be retargeted instead of silently measuring that path.
+    String workloadId = "ReverseDfaFindBenchmark.wordProse.32768";
+    CrossEngineBenchmarkPlan plan = CrossEngineBenchmarkPlan.load();
+    BenchmarkData data = BenchmarkData.get();
+    List<OperationDiagnostics> events = new ArrayList<>();
+    Pattern.setDiagnostics(
+        new SafeReMatchDiagnostics() {
+          @Override
+          public void onOperationCompleted(OperationDiagnostics event) {
+            events.add(event);
+          }
+        });
+    try {
+      for (RegexEngineVariant variant :
+          List.of(RegexEngineVariant.SAFERE_STRING, RegexEngineVariant.SAFERE_UTF8)) {
+        CrossEngineWorkload workload = plan.resolve(workloadId + "@" + variant.id()).workload();
+        var inputs = variant.prepareInputs(data, workload.inputKeys());
+        try (var compiled = variant.compile(workload.patterns().getFirst())) {
+          events.clear();
+          var matcher = compiled.matcher(inputs.getFirst());
+          int matches = 0;
+          while (matcher.find()) {
+            matches++;
+          }
+          assertThat(matches).as(variant.id()).isEqualTo(6144);
+          assertThat(events).as(variant.id()).hasSize(matches + 1);
+          assertThat(events.stream().mapToInt(OperationDiagnostics::reverseDfaSearchCount).sum())
+              .as(variant.id())
+              .isEqualTo(matches);
+          assertThat(events.subList(0, matches))
+              .as(variant.id())
+              .allSatisfy(event -> {
+                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+                assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
+              });
+        }
+      }
+    } finally {
+      Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
     }
   }
 }
