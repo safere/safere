@@ -80,18 +80,13 @@ class MultilineCrLfDfaCachingTest {
 
   private static Stream<Arguments> reusedDollarCases() {
     return Stream.of("\\W*(?m:$)", "\\s*(?m:$)", "(\\W*)(?m:$)", "\\W*?(?m:$)")
-        .flatMap(
-            regex ->
-                Stream.of("\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029")
-                    .flatMap(
-                        warm ->
-                            Stream.of("\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029")
-                                .flatMap(
-                                    target ->
-                                        Stream.of(30, 500)
-                                            .map(
-                                                length ->
-                                                    Arguments.of(regex, warm, target, length)))));
+        .flatMap(regex ->
+            Stream.of("\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029")
+                .flatMap(warm ->
+                    Stream.of("\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029")
+                        .flatMap(target ->
+                            Stream.of(30, 500)
+                                .map(length -> Arguments.of(regex, warm, target, length)))));
   }
 
   @ParameterizedTest(name = "{0}")

@@ -51,12 +51,10 @@ public final class MemoryBenchmark {
       long bytes =
           switch (workload.operation()) {
             case COMPILE ->
-                measureRetainedSize(
-                    () ->
-                        trial
-                            .variant()
-                            .compileForBenchmark(
-                                workload.patterns().getFirst(), flagSet(workload)));
+                measureRetainedSize(() ->
+                    trial
+                        .variant()
+                        .compileForBenchmark(workload.patterns().getFirst(), flagSet(workload)));
             case DFA_CACHE_GROWTH ->
                 measureDfaCacheGrowth(
                     workload.patterns().getFirst(),

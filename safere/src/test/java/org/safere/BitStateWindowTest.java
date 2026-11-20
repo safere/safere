@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** Priority, context, and work bounds for speculative BitState searches. */
 @DisabledForCrosscheck("uses package-private engine paths and search windows")
@@ -68,6 +70,34 @@ class BitStateWindowTest {
   }
 
   @Test
+  void greedyUnicodeLoopsRetainDeferredCapturesAndRespectWindowEdges() {
+    Prog prog = Pattern.compile("([é😀]*)(😀b|b)").prog();
+    String text = "é😀😀b";
+    for (InputScanner input : scanners(text)) {
+      BitState bs = window(prog, input, 2);
+      assertThat(bs.doSearchWindow(0, 0, true, null)).isNull();
+      assertThat(bs.windowExceeded()).isTrue();
+      bs =
+          BitState.getOrCreate(
+              bs, prog, input, 0, input.length(), 2 * prog.numCaptures(), false, true);
+      int[] expected =
+          Nfa.search(
+              prog,
+              input,
+              0,
+              input.length(),
+              input.length(),
+              0,
+              Nfa.Anchor.ANCHORED,
+              Nfa.MatchKind.FULL_MATCH,
+              prog.numCaptures(),
+              null);
+      assertThat(bs.doSearch(0, input.length(), true)).isEqualTo(expected);
+      assertThat(bs.windowExceeded()).isFalse();
+    }
+  }
+
+  @Test
   void reusedWindowClearsAbortedSearchState() {
     Prog prog = Pattern.compile("a+|a").prog();
     BitState bs = window(prog, new StringInputScanner("a".repeat(1000)), 4);
@@ -113,6 +143,9 @@ class BitStateWindowTest {
             "(a*)(b?)",
             "a\\b|a\\B",
             "(.)*?b",
+            "([a-z]*)(.*?)(b)",
+            "([a-z]*?)([a-z]*)(b)",
+            "([é😀]*)(.*?)(b)",
             "(😀|a)*",
             "[^()]*\\([^()]*\\)",
             "((?:<[^>]*>|[^()]*|\\([^()]*\\))*)\\)");
@@ -222,14 +255,13 @@ class BitStateWindowTest {
           Matcher stringMatcher = pattern.matcher(text);
           Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.trusted(text.getBytes(UTF_8)));
           long work =
-              WorkCounter.countForTesting(
-                  () -> {
-                    int matches = 0;
-                    while (utf8 ? utf8Matcher.find() : stringMatcher.find()) {
-                      matches++;
-                    }
-                    assertThat(matches).isEqualTo(size);
-                  });
+              WorkCounter.countForTesting(() -> {
+                int matches = 0;
+                while (utf8 ? utf8Matcher.find() : stringMatcher.find()) {
+                  matches++;
+                }
+                assertThat(matches).isEqualTo(size);
+              });
           if (previous >= 0) {
             assertThat(work).as("%s, UTF-8=%s", atom, utf8).isLessThan(previous * 3);
           }
@@ -307,7 +339,7 @@ class BitStateWindowTest {
 
   @Test
   void failedRetriesBecomeLessFrequentButStillRecoverAfterSustainedFailures() {
-    Pattern pattern = Pattern.compile(PROTOCOL_LINK_REGEX);
+    Pattern pattern = unhintedPattern(PROTOCOL_LINK_REGEX);
     String longMatch = "[" + "a".repeat(400) + "](customProtocol://<doc_1>) ";
     String shortMatch = "[α😀](customProtocol://<doc_1>) ";
     String text = longMatch.repeat(2000) + shortMatch.repeat(3000);
@@ -369,14 +401,13 @@ class BitStateWindowTest {
       for (int size : List.of(64, 128, 256)) {
         Matcher matcher = matchers(pattern, block.repeat(size)).get(utf8 ? 1 : 0);
         long work =
-            WorkCounter.countForTesting(
-                () -> {
-                  int matches = 0;
-                  while (matcher.find()) {
-                    matches++;
-                  }
-                  assertThat(matches).isEqualTo(size * 34);
-                });
+            WorkCounter.countForTesting(() -> {
+              int matches = 0;
+              while (matcher.find()) {
+                matches++;
+              }
+              assertThat(matches).isEqualTo(size * 34);
+            });
         if (previous >= 0) {
           assertThat(work).as("UTF-8=%s", utf8).isLessThan(previous * 3);
         }
@@ -387,7 +418,7 @@ class BitStateWindowTest {
 
   @Test
   void resetRegionAndPatternChangesClearRetryDelayForBothInputRepresentations() {
-    Pattern pattern = Pattern.compile(PROTOCOL_LINK_REGEX);
+    Pattern pattern = unhintedPattern(PROTOCOL_LINK_REGEX);
     String text = ("[" + "a".repeat(400) + "](customProtocol://<doc_1>) ").repeat(100);
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
     List<OperationDiagnostics> operations = new ArrayList<>();
@@ -403,7 +434,7 @@ class BitStateWindowTest {
           switch (change) {
             case "reset" -> matcher.reset();
             case "region" -> matcher.region(0, text.length());
-            case "pattern" -> matcher.usePattern(Pattern.compile(PROTOCOL_LINK_REGEX + "|Z"));
+            case "pattern" -> matcher.usePattern(unhintedPattern(PROTOCOL_LINK_REGEX + "|Z"));
             default -> throw new AssertionError(change);
           }
           operations.clear();
@@ -419,7 +450,7 @@ class BitStateWindowTest {
 
   @Test
   void repeatedWindowFailuresBackOffUntilResetForBothInputRepresentations() {
-    Pattern pattern = Pattern.compile(PROTOCOL_LINK_REGEX);
+    Pattern pattern = unhintedPattern(PROTOCOL_LINK_REGEX);
     String longMatch = "[" + "a".repeat(400) + "](customProtocol://<doc_1>) ";
     String text = longMatch.repeat(100);
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
@@ -452,7 +483,7 @@ class BitStateWindowTest {
 
   @Test
   void successfulWindowBreaksConsecutiveFailureStreak() {
-    Pattern pattern = Pattern.compile(PROTOCOL_LINK_REGEX);
+    Pattern pattern = unhintedPattern(PROTOCOL_LINK_REGEX);
     String longMatch = "[" + "a".repeat(400) + "](customProtocol://<doc_1>) ";
     String text = longMatch + "[aa](customProtocol://<doc_1>) " + longMatch.repeat(100);
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
@@ -477,7 +508,7 @@ class BitStateWindowTest {
 
   @Test
   void changingPatternOrInputClearsSpeculativeBackoff() {
-    Pattern pattern = Pattern.compile(PROTOCOL_LINK_REGEX);
+    Pattern pattern = unhintedPattern(PROTOCOL_LINK_REGEX);
     String longText = ("[" + "a".repeat(400) + "](customProtocol://<doc_1>) ").repeat(100);
     String shortText = "[aa](customProtocol://<doc_1>) " + "x".repeat(40_000);
     Matcher matcher = pattern.matcher(longText);
@@ -494,12 +525,162 @@ class BitStateWindowTest {
       assertThat(matcher.find()).isTrue();
       assertThat(matcher.find()).isTrue();
       operations.clear();
-      matcher.usePattern(Pattern.compile(PROTOCOL_LINK_REGEX + "|Z"));
+      matcher.usePattern(unhintedPattern(PROTOCOL_LINK_REGEX + "|Z"));
       assertThat(matcher.find()).isTrue();
       assertThat(operations.getFirst().strategyDecisions()).contains(windowFailure());
     } finally {
       Pattern.setDiagnostics(previous);
     }
+  }
+
+  @Test
+  void dfaEndHintLetsExactWindowsReachBeyondTheDefaultSize() {
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      for (String atom : List.of("a", "α", "😀")) {
+        String regex = "(" + atom + "?)*b";
+        String text = atom.repeat(400) + "b" + "q".repeat(40_000);
+        Pattern pattern = Pattern.compile(regex);
+        Pattern exact =
+            Pattern.compile(regex, 0, EnginePathOptions.builder().bitState(false).build());
+        List<Matcher> actual = matchers(pattern, text);
+        List<Matcher> expected = matchers(exact, text);
+        for (int i = 0; i < actual.size(); i++) {
+          operations.clear();
+          assertThat(actual.get(i).find()).isTrue();
+          assertThat(operations.getFirst().boundaryStrategy()).isEqualTo(MatchStrategy.BIT_STATE);
+          assertThat(expected.get(i).find()).isTrue();
+          assertThat(actual.get(i).start()).isEqualTo(expected.get(i).start());
+          assertThat(actual.get(i).end()).isEqualTo(expected.get(i).end());
+        }
+      }
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @Test
+  @Tag("work-counter")
+  void lazyRuneLoopsChargeOnlyRequestedCaptureRestoresAndCountDecodes() {
+    Prog prog = Pattern.compile("x(.*?)z").prog();
+    for (int ncap : new int[] {2, 4}) {
+      for (boolean utf8 : List.of(false, true)) {
+        long shortWork = lazyRuneLoopWork(prog, 100, ncap, utf8);
+        long longWork = lazyRuneLoopWork(prog, 300, ncap, utf8);
+        // Each extra ASCII rune tries ALT, capture, literal and body. Captures add a restore
+        // only when requested. The failed literal and the body each decode one UTF-8 byte.
+        int workPerRune = 4 + (ncap == 4 ? 1 : 0) + (utf8 ? 2 : 0);
+        assertThat(longWork - shortWork)
+            .as("ncap=%s, UTF-8=%s", ncap, utf8)
+            .isEqualTo(200L * workPerRune);
+      }
+    }
+  }
+
+  private static long lazyRuneLoopWork(Prog prog, int repeat, int ncap, boolean utf8) {
+    InputScanner scanner = scanners("x" + "a".repeat(repeat) + "z").get(utf8 ? 1 : 0);
+    BitState engine =
+        BitState.getOrCreate(null, prog, scanner, 0, scanner.length(), ncap, false, false);
+    return WorkCounter.countForTesting(
+        () -> assertThat(engine.doSearch(0, 0, true)).startsWith(0, scanner.length()));
+  }
+
+  @Test
+  void oversizedDfaHintsLeaveSpeculativeWorkBounded() {
+    Pattern pattern = Pattern.compile("(a?)*b");
+    String text = "a".repeat(4_096) + "b" + "q".repeat(40_000);
+    assertThat(BitState.maxTextSize(pattern.prog())).isGreaterThan(4_097);
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      for (Matcher matcher : matchers(pattern, text)) {
+        operations.clear();
+        assertThat(matcher.find()).isTrue();
+        assertThat(matcher.end()).isEqualTo(4_097);
+        assertThat(operations.getFirst().strategyDecisions()).contains(windowFailure());
+        assertThat(operations.getFirst().boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+      }
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @ParameterizedTest(name = "prefix repeats {0}, expected speculative window {1}")
+  @CsvSource({"1023, 2048", "4096, 256"})
+  void failedSpeculationChargesOnlyWorkForTheAllowedWindow(int repeats, int windowSize) {
+    String prefix = "ab".repeat(repeats) + "bc";
+    SafeReMatchDiagnostics previous = Pattern.diagnostics();
+    List<OperationDiagnostics> operations = new ArrayList<>();
+    Pattern.setDiagnostics(recordOperations(operations));
+    try {
+      for (int tailLength : List.of(20_000, 40_000)) {
+        String text = prefix + "q".repeat(tailLength);
+        for (InputScanner scanner : scanners(text)) {
+          Pattern pattern = Pattern.compile("(?:(b?)*?(c|)+)*c");
+          // The hint fits the bitmap, including when it exceeds the separate hint limit.
+          assertThat(BitState.maxTextSize(pattern.prog()))
+              .isBetween(prefix.length(), scanner.length() - 1);
+          Pattern.ThreadCache cache = pattern.getOrCreateThreadCache();
+          Matcher matcher =
+              scanner instanceof Utf8InputScanner utf8
+                  ? new Matcher(pattern, utf8)
+                  : pattern.matcher(text);
+          operations.clear();
+          assertThat(matcher.find()).isTrue();
+          assertThat(operations.getFirst().strategyDecisions()).contains(windowFailure());
+          assertThat(operations.getFirst().boundaryStrategy()).isEqualTo(MatchStrategy.NFA);
+
+          // The NFA restart leaves the failed attempt in the cache with its own step count.
+          BitState attempt = cache.bitState;
+          assertThat(attempt).isNotNull();
+          long allowedWork = window(pattern.prog(), scanner, windowSize).stepBudgetForTesting();
+          assertThat(attempt.stepCountForTesting()).isBetween(1L, allowedWork);
+          assertThat(attempt.stepBudgetForTesting()).isEqualTo(allowedWork);
+          assertThat(matcher.start()).isEqualTo(prefix.length() - 3);
+          assertThat(matcher.end()).isEqualTo(prefix.length());
+        }
+      }
+    } finally {
+      Pattern.setDiagnostics(previous);
+    }
+  }
+
+  @Test
+  void hintedWindowsPreservePriorityCapturesAndReplacement() {
+    for (String regex : List.of("(a?)*b", "(a?|ab)*b", "([ab]?)*z|b", "((a?)*b)+", "(a?)*b\\B")) {
+      Pattern pattern = Pattern.compile(regex);
+      Pattern exact =
+          Pattern.compile(regex, 0, EnginePathOptions.builder().bitState(false).build());
+      for (int length : List.of(255, 256, 257, 400, 30_000)) {
+        String text = "a".repeat(length) + "bz " + "q".repeat(40_000);
+        List<Matcher> actual = matchers(pattern, text);
+        List<Matcher> expected = matchers(exact, text);
+        for (int i = 0; i < actual.size(); i++) {
+          Matcher matcher = actual.get(i);
+          Matcher oracle = expected.get(i);
+          while (oracle.find()) {
+            assertThat(matcher.find()).as("%s, length=%s", regex, length).isTrue();
+            for (int group = 0; group <= matcher.groupCount(); group++) {
+              assertThat(matcher.start(group)).isEqualTo(oracle.start(group));
+              assertThat(matcher.end(group)).isEqualTo(oracle.end(group));
+            }
+          }
+          assertThat(matcher.find()).isFalse();
+        }
+        assertThat(pattern.matcher(text).replaceAll("<$1>"))
+            .isEqualTo(exact.matcher(text).replaceAll("<$1>"));
+        assertThat(pattern.matcher(text).replaceAll("X"))
+            .isEqualTo(exact.matcher(text).replaceAll("X"));
+      }
+    }
+  }
+
+  private static Pattern unhintedPattern(String regex) {
+    // Keep retry/backoff coverage for searches that have no usable DFA end hint.
+    return Pattern.compile(regex, 0, EnginePathOptions.builder().dfa(false).build());
   }
 
   private static SafeReMatchDiagnostics recordOperations(List<OperationDiagnostics> operations) {

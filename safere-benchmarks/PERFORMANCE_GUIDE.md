@@ -42,9 +42,17 @@ Benchmark classes have no `@Fork`, `@Warmup`, or `@Measurement` annotations
 Arguments after the mode flag are passed directly to JMH as benchmark regex
 filters.
 
-**Run benchmarks sequentially.** Concurrent workloads compete for CPU, cache,
-and memory bandwidth, invalidating comparisons. Use the declarative collection
-plan to select generic runners and trials:
+**Reserve the machine for measurement.** Benchmark runners and collection tools
+automatically acquire a shared machine lock before builds and measurements.
+Tests, builds, profiling, fuzzing, and other heavy commands must use
+`./tools/machine-run --label "description" -- COMMAND ...` so they cannot overlap
+benchmarks across sessions or worktrees. Run `./tools/machine-run --status` to
+inspect the owner. See [exclusive machine access](../docs/DEVELOPMENT.md#exclusive-machine-access)
+for cancellation and keeping baseline/candidate measurements in one reservation.
+The lock is cooperative; unrelated commands can still disturb measurements.
+
+Concurrent workloads compete for CPU, cache, and memory bandwidth, invalidating
+comparisons. Use the declarative collection plan to select generic runners and trials:
 
 ```bash
 ./run-java-benchmarks.sh --declared
@@ -127,6 +135,47 @@ build directory. Subsequent runs can use the default disconnected setting.
   group references and quoting rules. If the schema cannot yet express the
   required alternate, extend and validate the schema first; do not add a
   conversion helper in a harness.
+
+### Compilation and first-use measurements
+
+Changes to initialization follow the
+[architecture policy](../docs/ARCHITECTURE.md#compilation-and-initialization-policy).
+Classify each artifact by the APIs, representations, flags, and engine paths that can reach it.
+Check both callers that avoid construction and callers that need the deferred artifact, including
+mixed-feature patterns and fallback after unsuccessful construction.
+
+Keep these measurements separate:
+
+- **Cold initialization:** use fresh JVM forks and state whether timing covers compilation, first
+  execution after untimed compilation, or both. The `--first-compile` mode uses ten single-shot
+  forks and excludes process launch. Report the median and retain per-fork samples alongside the
+  JMH summary. Interleave A/B runs or repeat them in both orders to check drift.
+- **Feature initialization after library loading:** include an ASCII control. To reduce the effect of
+  shared library loading, use a separate fresh-process comparison that first compiles an unrelated
+  ASCII pattern outside timing. Verify that setup leaves the target feature uninitialized. Clearly
+  identify this setup when reporting results because it measures a different first-use boundary.
+- **Warm compilation plus first use of a fresh pattern:** compile inside each timed invocation,
+  then perform the affected operation. Existing `compileAndFind` and `compileAndMatches`
+  declarations cover common cases. Use `compileAndFindGroupPresent` to check capture participation
+  in the same timed invocation. Include any capture or bounds access that triggers additional
+  preparation. A pattern compiled and validated during JMH setup has already lost these first-use
+  costs.
+- **Steady-state execution:** prepare the pattern and exercise the affected path during setup,
+  then measure repeated execution with the same pattern and the same Matcher lifecycle in both
+  revisions. Include both successful and unsuccessful cached construction when applicable.
+
+Use the project runners and their measurement settings. A compile-only improvement or a warmed
+matching result does not establish compile-plus-first-use or first-request latency. Report
+first-use and tail-latency tradeoffs explicitly; do not infer them from mean throughput or hide
+them in an aggregate. Verify safe publication and shared construction under concurrent first use
+with focused tests. For shared static tables, test the affected paths in fresh processes and
+check class-initialization logs for when the tables initialize. Exercise concurrent first use to
+check initialization ordering. For an example, see
+[`CompileInitializationTest` in #1203](https://github.com/safere/safere/pull/1203).
+
+The review and follow-up measurements in
+[#982](https://github.com/safere/safere/pull/982) and
+[#1011](https://github.com/safere/safere/pull/1011) provide concrete precedents.
 
 ### Summary Statistics
 

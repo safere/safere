@@ -1,0 +1,68 @@
+diff --git a/safere-benchmarks/investigations/capture-recovery/PLAN.md b/safere-benchmarks/investigations/capture-recovery/PLAN.md
+index dc7225c..81690c8 100644
+--- a/safere-benchmarks/investigations/capture-recovery/PLAN.md
++++ b/safere-benchmarks/investigations/capture-recovery/PLAN.md
+@@ -23,9 +23,9 @@ by collecting a result.
+    source snapshots for cutoff comparisons, differing only in the eligibility constant.
+    Screen disabled preference (0) against extended preference (2048) on stack lengths 512 and
+    1024, all three operations and both representations, with `text`, `mixed`, `rare`, and
+-   `reject` profiles. Include the simple OnePass family with `text` and `reject` as a control. The
+-   observed prepared OnePass runner handles all three operations at the measured
+-   sizes, bypassing this capture-demand cutoff. Measure production's 512 cutoff around 511/512/513 on stack text and
++   `reject` profiles. Include the simple OnePass family with `text` and `reject`: its `matches()` and
++   `lookingAt()` producers bypass this cutoff, while anchored `find()` still compares
++   BitState against DFA plus OnePass recovery. Measure production's 512 cutoff around 511/512/513 on stack text and
+    rejection. The known 512 path choices correspond to enabled preference at/below 512 and
+    disabled preference above it; do not manufacture duplicate measurements for those cells.
+ 4. Confirm important cutoff tradeoffs with `--long`, retaining their rejection or mixed
+@@ -47,10 +47,3 @@ UTF-8 scheme-extraction cost; rejection controls also vary between runs. Confirm
+ stack-document extraction, scheme extraction, and scheme rejection in both
+ representations with one supplemental long pair, candidate first and baseline
+ second. Keep this cohort separate, preserving the original complete comparisons.
+-
+-The initial cutoff screen shows large extraction/rejection tradeoffs and a
+-representation-dependent mixed-consumption result at 512. Confirm `text`, `mixed`,
+-and `reject` at 512 in both representations and all three operations with a long
+-pair in reversed order (extended preference first, disabled preference second).
+-Profile the current 512 behavior at 512/1024 on String with text and rejection
+-controls for each operation. Profiled timings remain outside comparison tables.
+diff --git a/safere-benchmarks/investigations/capture-recovery/README.md b/safere-benchmarks/investigations/capture-recovery/README.md
+index e5fa65f..fef559e 100644
+--- a/safere-benchmarks/investigations/capture-recovery/README.md
++++ b/safere-benchmarks/investigations/capture-recovery/README.md
+@@ -11,10 +11,9 @@ with multiline mode removed so `^` anchors at the input start. Both diagnostic e
+ omit the end anchor to keep end-anchored reverse probing from bypassing the cutoff
+ at larger sizes. Rejections retain the required literals and some digits, and fail
+ inside the expression. The second expression is a
+-simple whitespace/key/integer parser that serves as a OnePass control. Public
+-operation diagnostics show that the prepared OnePass runner handles all three
+-operations at the measured sizes; changing this capture-demand limit does not
+-change those engine paths. These are constructed
++simple whitespace/key/integer parser that serves as a OnePass control for `matches()`
++and `lookingAt()`. Its anchored `find()` still compares BitState against DFA plus
++OnePass recovery. These are constructed
+ inputs, not application traffic. Whitespace padding produces exact ASCII lengths: String
+ UTF-16 units and UTF-8 bytes agree. The study does not establish a multibyte cutoff.
+ 
+@@ -53,7 +52,7 @@ mvn -pl safere-benchmarks -am -Dbenchmark.investigation=capture-recovery \
+   -Dsurefire.failIfNoSpecifiedTests=false test
+ ```
+ 
+-The regular corpus adds only `CaptureRecoveryBenchmark`: first-frame text extraction (ASCII and a multibyte filename),
++The regular corpus adds only `CaptureRecoveryBenchmark`: first-frame text extraction,
+ one-in-four participation queries, primed scheme rejection, and anchored text extraction
+ at 511/512/513 units. Existing `ApplicationBenchmark.stackTraceExtract` retains the full
+ multi-frame extraction case. The mixed standing case queries capture participation rather
+diff --git a/safere/src/main/java/org/safere/Matcher.java b/safere/src/main/java/org/safere/Matcher.java
+index 505aa4a..86268a5 100644
+--- a/safere/src/main/java/org/safere/Matcher.java
++++ b/safere/src/main/java/org/safere/Matcher.java
+@@ -107,7 +107,7 @@ public final class Matcher implements MatchResult {
+    * inputs BitState can produce the boolean result and all capture bounds in one bounded pass;
+    * larger inputs retain the DFA's scanning advantage.
+    */
+-  private static final int CAPTURE_DEMAND_TEXT_LIMIT = 512;
++  private static final int CAPTURE_DEMAND_TEXT_LIMIT = 0;
+ 
+   private Pattern parentPattern;
+   private CharSequence inputSequence;

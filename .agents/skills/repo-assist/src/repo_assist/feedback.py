@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -99,6 +100,42 @@ def parse_worktrees(output: str) -> list[dict[str, str]]:
   return result
 
 
+def _related_worktrees(
+  checkout: Path,
+  records: list[dict[str, str]],
+  branch: str,
+  remote_head: str,
+  git: Callable[..., str],
+) -> list[str]:
+  """Describe other checkouts for a blocked repair, using only registered worktrees."""
+  common = Path(git(checkout, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
+  common = common.resolve()
+  related = []
+  for record in records:
+    path = Path(record["worktree"])
+    if "bare" in record or "prunable" in record or not path.is_dir():
+      continue
+    try:
+      actual_common = git(path, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+      if Path(actual_common).resolve() != common:
+        continue
+      history = git(path, "reflog", "show", "--format=%gs", "HEAD")
+    except subprocess.CalledProcessError:
+      # A checkout can disappear after enumeration. It cannot qualify for a repair.
+      continue
+    current = record.get("branch", "").removeprefix("refs/heads/")
+    location = f"{path} (on {current})" if current else f"{path} (detached HEAD)"
+    for entry in history.splitlines():
+      if entry.startswith("checkout: moving from "):
+        previous, _, following = entry.removeprefix("checkout: moving from ").partition(" to ")
+        if branch in (previous, following):
+          related.append(f"PR branch history in {location}")
+          break
+    if record.get("HEAD") == remote_head:
+      related.append(f"Published PR commit checked out in {location}")
+  return related
+
+
 def resolve_worktree(
   checkout: Path,
   metadata: dict[str, Any],
@@ -121,7 +158,14 @@ def resolve_worktree(
     raise WorktreeError("PR head repository is unavailable")
   records = parse_worktrees(git(checkout, "worktree", "list", "--porcelain", "-z"))
   matches = [entry for entry in records if entry.get("branch") == f"refs/heads/{branch}"]
-  if len(matches) != 1:
+  if not matches:
+    details = _related_worktrees(checkout, records, branch, remote_head, git)
+    lines = [
+      f"PR branch {branch} is not currently checked out in a registered worktree.",
+      *details,
+    ]
+    raise WorktreeError("\n".join(lines))
+  if len(matches) > 1:
     raise WorktreeError(f"expected one original worktree for the PR branch, found {len(matches)}")
   record = matches[0]
   if "locked" in record or "prunable" in record:
