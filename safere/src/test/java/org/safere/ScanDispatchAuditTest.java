@@ -119,10 +119,9 @@ class ScanDispatchAuditTest {
     Utf8InputScanner scanner = new Utf8InputScanner(LONG_INPUT);
 
     List<ScanEvent> events =
-        ScanAudit.captureForTesting(
-            () ->
-                assertThat(scanner.indexOfCodePointClass(ranges, bitmap0, bitmap1, 0, window))
-                    .isEqualTo(-1));
+        ScanAudit.captureForTesting(() ->
+            assertThat(scanner.indexOfCodePointClass(ranges, bitmap0, bitmap1, 0, window))
+                .isEqualTo(-1));
 
     assertThat(events)
         .containsExactly(
@@ -140,10 +139,9 @@ class ScanDispatchAuditTest {
     Utf8InputScanner scanner = new Utf8InputScanner(LONG_INPUT);
 
     List<ScanEvent> events =
-        captureScan(
-            () ->
-                scanner.indexOfCodePointClass(
-                    new int[] {'z', 'z'}, 0, 1L << ('z' - Long.SIZE), 0, window));
+        captureScan(() ->
+            scanner.indexOfCodePointClass(
+                new int[] {'z', 'z'}, 0, 1L << ('z' - Long.SIZE), 0, window));
 
     assertThat(events).isEmpty();
   }
@@ -161,10 +159,9 @@ class ScanDispatchAuditTest {
     Utf8InputScanner scanner = new Utf8InputScanner(LONG_INPUT);
     long bitmap = (1L << ('X' - 64)) | (1L << ('Z' - 64)) | (1L << ('_' - 64));
     List<ScanEvent> events =
-        captureScan(
-            () ->
-                scanner.indexOfCodePointClass(
-                    new int[] {'X', 'X', 'Z', 'Z', '_', '_'}, 0, bitmap, 0, scanWindow));
+        captureScan(() ->
+            scanner.indexOfCodePointClass(
+                new int[] {'X', 'X', 'Z', 'Z', '_', '_'}, 0, bitmap, 0, scanWindow));
     ScanPath path =
         VectorScanProviders.providerForPolicy(ScanKind.TRIPLE, window) == null
             ? ScanPath.SWAR
@@ -185,10 +182,9 @@ class ScanDispatchAuditTest {
     Utf8InputScanner scanner = new Utf8InputScanner(LONG_INPUT);
 
     List<ScanEvent> events =
-        captureScan(
-            () ->
-                scanner.indexOfCodePointClass(
-                    new int[] {'a', 'a', 'b', 'b', 'c', 'c'}, 0, 0, 0, window));
+        captureScan(() ->
+            scanner.indexOfCodePointClass(
+                new int[] {'a', 'a', 'b', 'b', 'c', 'c'}, 0, 0, 0, window));
 
     assertThat(events)
         .containsExactly(
@@ -275,53 +271,48 @@ class ScanDispatchAuditTest {
     int[] failure = {0, 0, 0};
     int fromNarrow = LONG_INPUT.length - (ignoreCaseMin - 1);
     assertThat(
-            captureScan(
-                () ->
-                    scanner.indexOfIgnoreCase(
-                        "abc", failure, 0, (byte) 'a', (byte) 'A', fromNarrow)))
+            captureScan(() ->
+                scanner.indexOfIgnoreCase("abc", failure, 0, (byte) 'a', (byte) 'A', fromNarrow)))
         .containsExactly(
             consulted(ScanKind.IGNORE_CASE, ignoreCaseMin - 1),
             new ScanEvent(
                 ScanKind.IGNORE_CASE, ScanDirection.FORWARD, ignoreCaseMin - 1, ScanPath.SWAR));
     assertThat(
-            captureScan(
-                () ->
-                    scanner.indexOfPairIgnoreCase(
-                        "abc",
-                        failure,
-                        0,
-                        (byte) 'a',
-                        (byte) 'A',
-                        1,
-                        (byte) 'b',
-                        (byte) 'B',
-                        fromNarrow)))
+            captureScan(() ->
+                scanner.indexOfPairIgnoreCase(
+                    "abc",
+                    failure,
+                    0,
+                    (byte) 'a',
+                    (byte) 'A',
+                    1,
+                    (byte) 'b',
+                    (byte) 'B',
+                    fromNarrow)))
         .containsExactly(
             consulted(ScanKind.IGNORE_CASE, ignoreCaseMin - 1),
             new ScanEvent(
                 ScanKind.IGNORE_CASE, ScanDirection.FORWARD, ignoreCaseMin - 1, ScanPath.SWAR));
     int fromWide = LONG_INPUT.length - ignoreCaseMin;
     assertThat(
-            captureScan(
-                () ->
-                    scanner.indexOfIgnoreCase("abc", failure, 0, (byte) 'a', (byte) 'A', fromWide)))
+            captureScan(() ->
+                scanner.indexOfIgnoreCase("abc", failure, 0, (byte) 'a', (byte) 'A', fromWide)))
         .containsExactly(
             consulted(ScanKind.IGNORE_CASE, ignoreCaseMin),
             new ScanEvent(
                 ScanKind.IGNORE_CASE, ScanDirection.FORWARD, ignoreCaseMin, ScanPath.VECTOR));
     assertThat(
-            captureScan(
-                () ->
-                    scanner.indexOfPairIgnoreCase(
-                        "abc",
-                        failure,
-                        0,
-                        (byte) 'a',
-                        (byte) 'A',
-                        1,
-                        (byte) 'b',
-                        (byte) 'B',
-                        fromWide)))
+            captureScan(() ->
+                scanner.indexOfPairIgnoreCase(
+                    "abc",
+                    failure,
+                    0,
+                    (byte) 'a',
+                    (byte) 'A',
+                    1,
+                    (byte) 'b',
+                    (byte) 'B',
+                    fromWide)))
         .containsExactly(
             consulted(ScanKind.IGNORE_CASE, ignoreCaseMin),
             new ScanEvent(
@@ -334,10 +325,8 @@ class ScanDispatchAuditTest {
     int teddyMin = provider.minimumWindowLength(ScanKind.TEDDY);
     int teddyFromNarrow = LONG_INPUT.length - (teddyMin - 1);
     List<ScanEvent> teddyNarrowEvents =
-        ScanAudit.captureForTesting(
-            () ->
-                assertThat(teddy.findCandidate(scanner, teddyFromNarrow))
-                    .isEqualTo(teddyFromNarrow));
+        ScanAudit.captureForTesting(() ->
+            assertThat(teddy.findCandidate(scanner, teddyFromNarrow)).isEqualTo(teddyFromNarrow));
     assertThat(teddyNarrowEvents)
         .containsExactly(
             consulted(ScanKind.TEDDY, teddyMin - 1),
@@ -373,61 +362,52 @@ class ScanDispatchAuditTest {
 
   @Test
   void captureRejectsUnpairedConsultation() {
-    assertThatThrownBy(
-            () ->
-                ScanAudit.captureForTesting(() -> ScanAudit.recordConsultation(ScanKind.BYTE, 64)))
+    assertThatThrownBy(() ->
+            ScanAudit.captureForTesting(() -> ScanAudit.recordConsultation(ScanKind.BYTE, 64)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("odd number of events");
   }
 
   @Test
   void captureRejectsPathWithoutConsultation() {
-    assertThatThrownBy(
-            () ->
-                ScanAudit.captureForTesting(
-                    () -> {
-                      ScanAudit.record(ScanKind.BYTE, ScanDirection.FORWARD, 64, ScanPath.SWAR);
-                      ScanAudit.record(ScanKind.BYTE, ScanDirection.FORWARD, 64, ScanPath.SWAR);
-                    }))
+    assertThatThrownBy(() ->
+            ScanAudit.captureForTesting(() -> {
+              ScanAudit.record(ScanKind.BYTE, ScanDirection.FORWARD, 64, ScanPath.SWAR);
+              ScanAudit.record(ScanKind.BYTE, ScanDirection.FORWARD, 64, ScanPath.SWAR);
+            }))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("expected ScanPath.CONSULTED");
   }
 
   @Test
   void captureRejectsConsecutiveConsultations() {
-    assertThatThrownBy(
-            () ->
-                ScanAudit.captureForTesting(
-                    () -> {
-                      ScanAudit.recordConsultation(ScanKind.BYTE, 64);
-                      ScanAudit.recordConsultation(ScanKind.BYTE, 64);
-                    }))
+    assertThatThrownBy(() ->
+            ScanAudit.captureForTesting(() -> {
+              ScanAudit.recordConsultation(ScanKind.BYTE, 64);
+              ScanAudit.recordConsultation(ScanKind.BYTE, 64);
+            }))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("consecutive CONSULTED event");
   }
 
   @Test
   void captureRejectsKindMismatchBetweenConsultationAndPath() {
-    assertThatThrownBy(
-            () ->
-                ScanAudit.captureForTesting(
-                    () -> {
-                      ScanAudit.recordConsultation(ScanKind.BYTE, 64);
-                      ScanAudit.record(ScanKind.PAIR, ScanDirection.FORWARD, 64, ScanPath.SWAR);
-                    }))
+    assertThatThrownBy(() ->
+            ScanAudit.captureForTesting(() -> {
+              ScanAudit.recordConsultation(ScanKind.BYTE, 64);
+              ScanAudit.record(ScanKind.PAIR, ScanDirection.FORWARD, 64, ScanPath.SWAR);
+            }))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("does not match path");
   }
 
   @Test
   void captureRejectsWindowLengthMismatchBetweenConsultationAndPath() {
-    assertThatThrownBy(
-            () ->
-                ScanAudit.captureForTesting(
-                    () -> {
-                      ScanAudit.recordConsultation(ScanKind.BYTE, 64);
-                      ScanAudit.record(ScanKind.BYTE, ScanDirection.FORWARD, 128, ScanPath.SWAR);
-                    }))
+    assertThatThrownBy(() ->
+            ScanAudit.captureForTesting(() -> {
+              ScanAudit.recordConsultation(ScanKind.BYTE, 64);
+              ScanAudit.record(ScanKind.BYTE, ScanDirection.FORWARD, 128, ScanPath.SWAR);
+            }))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("does not match path");
   }

@@ -35,16 +35,15 @@ class SmallAsciiClassWorkTest {
             String text = (noise.repeat(gap - 1) + "Z").repeat(matches);
             InputScanner scanner = new StringInputScanner(text);
             long work =
-                WorkCounter.countForTesting(
-                    () -> {
-                      int from = 0;
-                      for (int i = 0; i < matches; i++) {
-                        int found = scanner.indexOfCharClass(info, from);
-                        assertThat(found).isEqualTo((i + 1) * gap - 1);
-                        from = found + 1;
-                      }
-                      assertThat(scanner.indexOfCharClass(info, from)).isEqualTo(-1);
-                    });
+                WorkCounter.countForTesting(() -> {
+                  int from = 0;
+                  for (int i = 0; i < matches; i++) {
+                    int found = scanner.indexOfCharClass(info, from);
+                    assertThat(found).isEqualTo((i + 1) * gap - 1);
+                    from = found + 1;
+                  }
+                  assertThat(scanner.indexOfCharClass(info, from)).isEqualTo(-1);
+                });
             assertThat(work).as("observed %s gap %s", members, gap).isPositive();
             assertThat(work)
                 .as("%s gap %s matches %s", members, gap, matches)
@@ -61,15 +60,14 @@ class SmallAsciiClassWorkTest {
     for (int gap : new int[] {17, 65, 200, 5_000}) {
       String text = ("a".repeat(gap - 1) + "Z").repeat(128);
       long work =
-          WorkCounter.countForTesting(
-              () -> {
-                Matcher matcher = pattern.matcher(text);
-                int matches = 0;
-                while (matcher.find()) {
-                  matches++;
-                }
-                assertThat(matches).isEqualTo(128);
-              });
+          WorkCounter.countForTesting(() -> {
+            Matcher matcher = pattern.matcher(text);
+            int matches = 0;
+            while (matcher.find()) {
+              matches++;
+            }
+            assertThat(matches).isEqualTo(128);
+          });
       assertThat(work).isGreaterThan(text.length());
       assertThat(work).isLessThanOrEqualTo(4L * (2L * text.length() + 64L * 128));
     }
@@ -90,17 +88,16 @@ class SmallAsciiClassWorkTest {
             String text = (noise.repeat(gap - 1) + present).repeat(matches) + suffix;
             InputScanner scanner = new StringInputScanner(text);
             long work =
-                WorkCounter.countForTesting(
-                    () -> {
-                      int from = 0;
-                      for (int i = 0; i < matches; i++) {
-                        int found = scanner.indexOfCharClass(info, from);
-                        assertThat(found).isEqualTo((i + 1) * gap - 1);
-                        from = found + 1;
-                      }
-                      assertThat(scanner.indexOfCharClass(info, from))
-                          .isEqualTo(suffix.isEmpty() ? -1 : text.length() - 1);
-                    });
+                WorkCounter.countForTesting(() -> {
+                  int from = 0;
+                  for (int i = 0; i < matches; i++) {
+                    int found = scanner.indexOfCharClass(info, from);
+                    assertThat(found).isEqualTo((i + 1) * gap - 1);
+                    from = found + 1;
+                  }
+                  assertThat(scanner.indexOfCharClass(info, from))
+                      .isEqualTo(suffix.isEmpty() ? -1 : text.length() - 1);
+                });
             assertThat(work)
                 .as("%s noise %s gap %s suffix '%s'", members, noise, gap, suffix)
                 .isLessThanOrEqualTo(2L * (2L * text.length() + 64L * (matches + 1)));

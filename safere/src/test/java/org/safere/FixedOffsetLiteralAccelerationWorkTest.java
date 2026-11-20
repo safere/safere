@@ -30,16 +30,15 @@ class FixedOffsetLiteralAccelerationWorkTest {
           WorkCounter.countForTesting(
               () -> assertThat(scanner.indexOfCharClass(plan.leadingClass(), 0)).isEqualTo(-1));
       long acceleratedWork =
-          WorkCounter.countForTesting(
-              () -> {
-                int candidate =
-                    utf8
-                        ? Utf8StartAccelerator.findNextCandidate(
-                            pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
-                        : StringStartAccelerator.findNextCandidate(
-                            pattern.stringStartAccelerator(), input, 0, false);
-                assertThat(candidate).isEqualTo(-1);
-              });
+          WorkCounter.countForTesting(() -> {
+            int candidate =
+                utf8
+                    ? Utf8StartAccelerator.findNextCandidate(
+                        pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
+                    : StringStartAccelerator.findNextCandidate(
+                        pattern.stringStartAccelerator(), input, 0, false);
+            assertThat(candidate).isEqualTo(-1);
+          });
       assertThat(acceleratedWork).as(regex).isLessThanOrEqualTo(leadingWork + 128);
     }
   }
@@ -55,16 +54,15 @@ class FixedOffsetLiteralAccelerationWorkTest {
         WorkCounter.countForTesting(
             () -> assertThat(scanner.indexOfAscii('q', 0, scanner.length())).isEqualTo(-1));
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              int candidate =
-                  utf8
-                      ? Utf8StartAccelerator.findNextCandidate(
-                          pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
-                      : StringStartAccelerator.findNextCandidate(
-                          pattern.stringStartAccelerator(), input, 0, false);
-              assertThat(candidate).isEqualTo(-1);
-            });
+        WorkCounter.countForTesting(() -> {
+          int candidate =
+              utf8
+                  ? Utf8StartAccelerator.findNextCandidate(
+                      pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
+                  : StringStartAccelerator.findNextCandidate(
+                      pattern.stringStartAccelerator(), input, 0, false);
+          assertThat(candidate).isEqualTo(-1);
+        });
     assertThat(work).isLessThanOrEqualTo(prefixWork + 256);
   }
 
@@ -74,18 +72,17 @@ class FixedOffsetLiteralAccelerationWorkTest {
     Pattern pattern = Pattern.compile("(?:alpha|beta)=(\\w*)");
     String input = "a________=_______".repeat(2_000);
     long work =
-        WorkCounter.countForTesting(
-            () -> {
-              int candidate =
-                  utf8
-                      ? Utf8StartAccelerator.findNextCandidate(
-                          pattern.utf8StartAccelerator(),
-                          new Utf8InputScanner(input.getBytes(UTF_8)),
-                          0)
-                      : StringStartAccelerator.findNextCandidate(
-                          pattern.stringStartAccelerator(), input, 0, false);
-              assertThat(candidate).isEqualTo(-1);
-            });
+        WorkCounter.countForTesting(() -> {
+          int candidate =
+              utf8
+                  ? Utf8StartAccelerator.findNextCandidate(
+                      pattern.utf8StartAccelerator(),
+                      new Utf8InputScanner(input.getBytes(UTF_8)),
+                      0)
+                  : StringStartAccelerator.findNextCandidate(
+                      pattern.stringStartAccelerator(), input, 0, false);
+          assertThat(candidate).isEqualTo(-1);
+        });
     // One literal pass, two offset checks per hit, and a bounded leading probe.
     // UTF-8 also charges the decoding read at each checked start.
     long offsetWork = (utf8 ? 4L : 2L) * 2_000;

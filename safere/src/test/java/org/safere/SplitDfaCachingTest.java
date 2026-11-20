@@ -53,30 +53,25 @@ class SplitDfaCachingTest {
             new String[] {"[a-z]", "a", "b"},
             new String[] {"[\\x00-y]", "\0", "1"},
             new String[] {"[😀😁]", "😀", "😁"})
-        .flatMap(
-            alphabet ->
-                Stream.of("*", "+", "*?", "{0,3}")
-                    .flatMap(
-                        quantifier ->
-                            Stream.of(false, true)
-                                .flatMap(
-                                    capture -> {
-                                      String body = alphabet[0] + quantifier + alphabet[1];
-                                      String regex = capture ? "(" + body + ")" : body;
-                                      return Stream.of(16, 512)
-                                          .flatMap(
-                                              gap -> {
-                                                String input =
-                                                    alphabet[1]
-                                                        + "~~~"
-                                                        + alphabet[1]
-                                                        + alphabet[2].repeat(2)
-                                                        + "~".repeat(gap)
-                                                        + alphabet[1];
-                                                return Stream.of(-1, 0, 1, 2, 3, 10)
-                                                    .map(
-                                                        limit -> Arguments.of(regex, input, limit));
-                                              });
-                                    })));
+        .flatMap(alphabet ->
+            Stream.of("*", "+", "*?", "{0,3}")
+                .flatMap(quantifier ->
+                    Stream.of(false, true)
+                        .flatMap(capture -> {
+                          String body = alphabet[0] + quantifier + alphabet[1];
+                          String regex = capture ? "(" + body + ")" : body;
+                          return Stream.of(16, 512)
+                              .flatMap(gap -> {
+                                String input =
+                                    alphabet[1]
+                                        + "~~~"
+                                        + alphabet[1]
+                                        + alphabet[2].repeat(2)
+                                        + "~".repeat(gap)
+                                        + alphabet[1];
+                                return Stream.of(-1, 0, 1, 2, 3, 10)
+                                    .map(limit -> Arguments.of(regex, input, limit));
+                              });
+                        })));
   }
 }

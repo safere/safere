@@ -23,11 +23,10 @@ class StringRegionWorkTest {
       assertThat(matcher.find()).isTrue();
       assertThat(matcher.capturesResolved()).isFalse();
       long boundsWork =
-          WorkCounter.countForTesting(
-              () -> {
-                assertThat(matcher.start()).isEqualTo(1);
-                assertThat(matcher.end()).isEqualTo(body.length() + 1);
-              });
+          WorkCounter.countForTesting(() -> {
+            assertThat(matcher.start()).isEqualTo(1);
+            assertThat(matcher.end()).isEqualTo(body.length() + 1);
+          });
       assertThat(boundsWork).isZero();
       long captureWork =
           WorkCounter.countForTesting(() -> assertThat(matcher.group(1)).hasSize(size));
@@ -50,10 +49,9 @@ class StringRegionWorkTest {
               WorkCounter.countWithForwardDfaStepsForTesting(
                   () -> assertThat(pattern.matcher(visible).find()).isEqualTo(matches));
           long region =
-              WorkCounter.countWithForwardDfaStepsForTesting(
-                  () ->
-                      assertThat(pattern.matcher(input).region(2, 2 + visible.length()).find())
-                          .isEqualTo(matches));
+              WorkCounter.countWithForwardDfaStepsForTesting(() ->
+                  assertThat(pattern.matcher(input).region(2, 2 + visible.length()).find())
+                      .isEqualTo(matches));
           assertThat(region)
               .as(
                   "/%s/ size=%s matches=%s against %s independent units",

@@ -1,0 +1,1146 @@
+{
+  "schemaVersion": 2,
+  "configuration": {
+    "collection": {
+      "allocationWorkloadPrefixes": []
+    }
+  },
+  "inputs": [
+    {
+      "id": "realWorldRegex.customProtocolLink.match.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "[Click here](customProtocol://<doc_1>)",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.longMatch.{size}",
+      "axes": {
+        "size": [
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>)",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.falseCandidates.{size}",
+      "axes": {
+        "size": [
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "[x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [x] [Click here](customProtocol://<doc_1>)",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.mixed.{size}",
+      "axes": {
+        "size": [
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "prefixedRepeatToLength",
+        "prefix": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>) [aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>) ",
+        "value": "[Click here](customProtocol://<doc_1>) ",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.unicodeMixed.{size}",
+      "axes": {
+        "size": [
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "prefixedRepeatToLength",
+        "prefix": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>) [aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>) ",
+        "value": "[\u03b1\ud83d\ude00](customProtocol://<doc_1>) ",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.shortThenLong.{size}",
+      "axes": {
+        "size": [
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "prefixedRepeatToLength",
+        "prefix": "[Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) ",
+        "value": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>) ",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.alternating.{size}",
+      "axes": {
+        "size": [
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "prefixedRepeatToLength",
+        "prefix": "",
+        "value": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](customProtocol://<doc_1>) [Click here](customProtocol://<doc_1>) ",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.customProtocolLink.noMatch.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "[Click here](http://google.com)",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.multiInfixLog.match.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "2026-08-27 12:00:00.123 [worker-42] error:[NORMAL] code:200 msg:Operation completed successfully for transaction 987654321\n",
+        "suffix": "2026-08-27 12:00:00.123 [worker-42] error:[CRITICAL] code:500 msg:crash\n",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.multiInfixLog.noMatch.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "2026-08-27 12:00:00.123 [worker-42] error:[NORMAL] code:200 msg:Operation completed successfully for transaction 987654321",
+        "delimiterAlphabet": "\n",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.templateTagMatch.match.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "<template name>content to match</template",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.templateTagMatch.noMatch.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "plain text without template tag",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.fruitSearchQuery.match.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "Here are the apples to show for banana in this session.",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.fruitSearchQuery.noMatch.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "delimitedRepeatToLength",
+        "value": "Orange lemon melon peach pear plum.",
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.fruitMarkupTag.match.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "centerInSpaces",
+        "body": "<Banana>",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "realWorldRegex.fruitMarkupTag.noMatch.{size}",
+      "axes": {
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "recipe": {
+        "kind": "centerInSpaces",
+        "body": "<Orange>",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaEpsilon.words.{size}",
+      "axes": {
+        "size": [
+          1024,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "repeat",
+        "value": "word,",
+        "count": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "graphemePriority.ascii.{size}",
+      "axes": {
+        "size": [
+          256,
+          4096,
+          65536
+        ]
+      },
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "a",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpike.rare.1.{size}",
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "x",
+        "suffix": "aZ",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpike.frequent.1.{size}",
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "a",
+        "suffix": "Z",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpike.rare.4.{size}",
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "x",
+        "suffix": "aaaaZ",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpike.frequent.4.{size}",
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "a",
+        "suffix": "Z",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpike.rare.16.{size}",
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "x",
+        "suffix": "aaaaaaaaaaaaaaaaZ",
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "nfaStateSpike.frequent.16.{size}",
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "a",
+        "suffix": "Z",
+        "length": "{size}"
+      },
+      "shared": true
+    }
+  ],
+  "workloads": [
+    {
+      "id": "RealWorldRegexBenchmark.runBenchmark.templateTagMatch.{matchLabel}.{size}",
+      "operation": "replaceAll",
+      "patterns": [
+        {
+          "java": "(?s)(<template\\s+name\\s*>.*?<\\s*/\\s*template[ \\t]*)([^>]|$)",
+          "alternates": {
+            "rust-regex": {
+              "pattern": "(?s)(<template(?-u:\\s)+name(?-u:\\s)*>.*?<(?-u:\\s)*/(?-u:\\s)*template[ \\t]*)([^>]|$)",
+              "reason": "Rust regex gives \\s Unicode semantics"
+            },
+            "dotnet": {
+              "pattern": "(?s)(<template[ \\t\\n\\x0B\\f\\r]+name[ \\t\\n\\x0B\\f\\r]*>.*?<[ \\t\\n\\x0B\\f\\r]*/[ \\t\\n\\x0B\\f\\r]*template[ \\t]*)([^>]|$)",
+              "reason": ".NET gives \\s Unicode semantics while Java defaults to ASCII"
+            }
+          }
+        }
+      ],
+      "inputs": [
+        "realWorldRegex.templateTagMatch.{matchLabel}.{size}"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "matchLabel": [
+          "match",
+          "noMatch"
+        ],
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "arguments": {
+        "replacement": ""
+      },
+      "requirements": []
+    },
+    {
+      "id": "RealWorldRegexBenchmark.runBenchmark.fruitSearchQuery.{matchLabel}.{size}",
+      "operation": "replaceAll",
+      "patterns": [
+        {
+          "java": "(?is).*\\b(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)\\b.*",
+          "alternates": {
+            "rust-regex": {
+              "pattern": "(?is).*(?-u:\\b)(apples?.*for banana|cherry.*dates?|elderberry lists?|fig lists?|grape lists?)(?-u:\\b).*",
+              "reason": "Rust regex gives word boundaries Unicode semantics"
+            },
+            "dotnet": {
+              "unsupported": true,
+              "reason": ".NET non-backtracking mode cannot express Java's ASCII-only case-insensitive semantics"
+            }
+          }
+        }
+      ],
+      "inputs": [
+        "realWorldRegex.fruitSearchQuery.{matchLabel}.{size}"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "matchLabel": [
+          "match",
+          "noMatch"
+        ],
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "arguments": {
+        "replacement": {
+          "java": "$1",
+          "alternates": {
+            "re2-cpp": {
+              "replacement": "\\1",
+              "reason": "C++ RE2 uses backslash-number capture references"
+            }
+          }
+        }
+      },
+      "requirements": [
+        "numberedReplacement"
+      ]
+    },
+    {
+      "id": "RealWorldRegexBenchmark.runBenchmark.fruitMarkupTag.{matchLabel}.{size}",
+      "operation": "replaceAll",
+      "patterns": [
+        {
+          "java": "^\\s*<(\\QApple\\E|\\QBanana\\E|\\QCherry\\E)>\\s*$",
+          "alternates": {
+            "rust-regex": {
+              "pattern": "^[[:space:]]*<(Apple|Banana|Cherry)>[[:space:]]*$",
+              "reason": "Rust regex lacks Java quoted literals and gives \\s Unicode semantics"
+            },
+            "dotnet": {
+              "pattern": "^[ \\t\\n\\x0B\\f\\r]*<(Apple|Banana|Cherry)>[ \\t\\n\\x0B\\f\\r]*$",
+              "reason": ".NET lacks Java quoted literals and gives \\s Unicode semantics"
+            }
+          }
+        }
+      ],
+      "inputs": [
+        "realWorldRegex.fruitMarkupTag.{matchLabel}.{size}"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "matchLabel": [
+          "match",
+          "noMatch"
+        ],
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      },
+      "arguments": {
+        "replacement": "$1"
+      },
+      "requirements": [
+        "numberedReplacement"
+      ]
+    },
+    {
+      "id": "RealWorldRegexBenchmark.runBenchmark.multiInfixLogCaptures.{matchLabel}.{size}",
+      "operation": "findGroup",
+      "patterns": [
+        ".*error:\\[([A-Z]+)\\]\\s+code:(500)\\s+msg:(crash)"
+      ],
+      "inputs": [
+        "realWorldRegex.multiInfixLog.{matchLabel}.{size}"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "group": 1
+      },
+      "axes": {
+        "matchLabel": [
+          "match",
+          "noMatch"
+        ],
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      }
+    },
+    {
+      "id": "RealWorldRegexBenchmark.runBenchmark.customProtocolLinkReplace.{matchLabel}.{size}",
+      "operation": "replaceAll",
+      "patterns": [
+        "\\[(.*?)]\\(customProtocol://((?:<[^>]*>|[^()]*|\\([^()]*\\))*)\\)"
+      ],
+      "inputs": [
+        "realWorldRegex.customProtocolLink.{matchLabel}.{size}"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "replacement": "[](https://example.com/resolved)"
+      },
+      "requirements": [
+        "numberedReplacement"
+      ],
+      "axes": {
+        "matchLabel": [
+          "match",
+          "noMatch"
+        ],
+        "size": [
+          1000,
+          10000,
+          100000
+        ]
+      }
+    },
+    {
+      "id": "NfaEpsilonBenchmark.wordBoundaries.{size}",
+      "operation": "findGroupPresent",
+      "patterns": [
+        "((?:\\b(?:[a-z]+|[a-z]{2,})\\b[,;])+)"
+      ],
+      "inputs": [
+        "nfaEpsilon.words.{size}"
+      ],
+      "axes": {
+        "size": [
+          1024,
+          32768
+        ]
+      },
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "arguments": {
+        "group": 1
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string"
+          ],
+          "reason": "The JDK backtracking matcher throws StackOverflowError on these long repeated-token inputs."
+        }
+      ]
+    },
+    {
+      "id": "NfaEpsilonBenchmark.nullableAlternatives.{size}",
+      "operation": "findGroupPresent",
+      "patterns": [
+        "^((?:[a-z]?(?:|[,;]))+)$"
+      ],
+      "inputs": [
+        "nfaEpsilon.words.{size}"
+      ],
+      "axes": {
+        "size": [
+          1024,
+          32768
+        ]
+      },
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "arguments": {
+        "group": 1
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string"
+          ],
+          "reason": "The JDK backtracking matcher throws StackOverflowError on these long repeated-token inputs."
+        }
+      ]
+    },
+    {
+      "id": "NfaEpsilonBenchmark.nullableAssertions.{size}",
+      "operation": "matches",
+      "patterns": [
+        "(?:[a-z]?(?:\\b?|[,;]))+"
+      ],
+      "inputs": [
+        "nfaEpsilon.words.{size}"
+      ],
+      "axes": {
+        "size": [
+          1024,
+          32768
+        ]
+      },
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string"
+          ],
+          "reason": "The JDK backtracking matcher throws StackOverflowError on these long repeated-token inputs."
+        }
+      ]
+    },
+    {
+      "id": "GraphemePriorityBenchmark.graphemeFirst.{size}",
+      "axes": {
+        "size": [
+          256,
+          4096
+        ]
+      },
+      "operation": "findAllCount",
+      "patterns": [
+        "(?:\\X|.)"
+      ],
+      "inputs": [
+        "graphemePriority.ascii.{size}"
+      ],
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "These engines do not support the \\X grapheme escape"
+        }
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "GraphemePriorityBenchmark.scalarFirst.{size}",
+      "axes": {
+        "size": [
+          256,
+          4096
+        ]
+      },
+      "operation": "findAllCount",
+      "patterns": [
+        "(?:.|\\X)"
+      ],
+      "inputs": [
+        "graphemePriority.ascii.{size}"
+      ],
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "These engines do not support the \\X grapheme escape"
+        }
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "NfaStateSpikeBenchmark.rare.1.{size}",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?s).*(a)Z.*"
+      ],
+      "inputs": [
+        "nfaStateSpike.rare.1.{size}"
+      ],
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "arguments": {
+        "groups": [
+          1
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 1
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This spike compares SafeRE state storage; quantified capture semantics and long recursive JDK execution have not been validated for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeBenchmark.frequent.1.{size}",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?:(a)|a)+Z"
+      ],
+      "inputs": [
+        "nfaStateSpike.frequent.1.{size}"
+      ],
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "arguments": {
+        "groups": [
+          1
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 1
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This spike compares SafeRE state storage; quantified capture semantics and long recursive JDK execution have not been validated for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeBenchmark.rare.4.{size}",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?s).*(a)(a)(a)(a)Z.*"
+      ],
+      "inputs": [
+        "nfaStateSpike.rare.4.{size}"
+      ],
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "arguments": {
+        "groups": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 4
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This spike compares SafeRE state storage; quantified capture semantics and long recursive JDK execution have not been validated for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeBenchmark.frequent.4.{size}",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?:(a)(a)(a)(a)|a)+Z"
+      ],
+      "inputs": [
+        "nfaStateSpike.frequent.4.{size}"
+      ],
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "arguments": {
+        "groups": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 4
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This spike compares SafeRE state storage; quantified capture semantics and long recursive JDK execution have not been validated for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeBenchmark.rare.16.{size}",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?s).*(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)Z.*"
+      ],
+      "inputs": [
+        "nfaStateSpike.rare.16.{size}"
+      ],
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "arguments": {
+        "groups": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 16
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This spike compares SafeRE state storage; quantified capture semantics and long recursive JDK execution have not been validated for other engines."
+        }
+      ]
+    },
+    {
+      "id": "NfaStateSpikeBenchmark.frequent.16.{size}",
+      "operation": "matchesGroupLengthSum",
+      "patterns": [
+        "(?:(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)|a)+Z"
+      ],
+      "inputs": [
+        "nfaStateSpike.frequent.16.{size}"
+      ],
+      "axes": {
+        "size": [
+          128,
+          32768
+        ]
+      },
+      "arguments": {
+        "groups": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 16
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string",
+            "re2j-string",
+            "re2-ffm-string-conversion",
+            "re2_cpp",
+            "pcre2_jit",
+            "go_regexp",
+            "rust_regex",
+            "dotnet_nonbacktracking"
+          ],
+          "reason": "This spike compares SafeRE state storage; quantified capture semantics and long recursive JDK execution have not been validated for other engines."
+        }
+      ]
+    }
+  ]
+}

@@ -82,22 +82,20 @@ final class ExhaustiveUtils {
     AtomicInteger testCount = new AtomicInteger();
 
     allRegexps.parallelStream()
-        .forEach(
-            regexp -> {
-              List<TestResult> localFailures = new ArrayList<>();
-              for (String text : strings) {
-                testCount.addAndGet(testPair(regexp, text, config.flags(), localFailures));
+        .forEach(regexp -> {
+          List<TestResult> localFailures = new ArrayList<>();
+          for (String text : strings) {
+            testCount.addAndGet(testPair(regexp, text, config.flags(), localFailures));
 
-                if (config.testLongText()) {
-                  testCount.addAndGet(
-                      testPair(
-                          regexp, Config.LONG_TEXT_PREFIX + text, config.flags(), localFailures));
-                }
-              }
-              if (!localFailures.isEmpty()) {
-                failures.addAll(localFailures);
-              }
-            });
+            if (config.testLongText()) {
+              testCount.addAndGet(
+                  testPair(regexp, Config.LONG_TEXT_PREFIX + text, config.flags(), localFailures));
+            }
+          }
+          if (!localFailures.isEmpty()) {
+            failures.addAll(localFailures);
+          }
+        });
 
     if (!failures.isEmpty()) {
       int show = Math.min(failures.size(), 50);

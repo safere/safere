@@ -60,11 +60,10 @@ class Utf8LinearTimeTest {
     for (String regex : List.of("[aé😀]*", "[aé😀]+", "[^a]+")) {
       Pattern pattern = Pattern.compile(regex);
       Utf8Input replacement = Utf8Input.validated(new byte[] {'x'});
-      assertFourXInputStaysNearLinear(
-          size -> {
-            Utf8Input input = Utf8Input.trusted("aé😀!".repeat(size).getBytes(UTF_8));
-            pattern.matcher(input).replaceAll((bytes, offset, length) -> {}, replacement);
-          });
+      assertFourXInputStaysNearLinear(size -> {
+        Utf8Input input = Utf8Input.trusted("aé😀!".repeat(size).getBytes(UTF_8));
+        pattern.matcher(input).replaceAll((bytes, offset, length) -> {}, replacement);
+      });
     }
   }
 
@@ -73,12 +72,10 @@ class Utf8LinearTimeTest {
     for (String terminal : List.of("END", "[0-9]")) {
       Pattern pattern = Pattern.compile("^([a-z]+)" + terminal + "\\z");
       String suffix = terminal.equals("END") ? "END" : "5";
-      assertLargeFourXInputStaysNearLinear(
-          size -> {
-            Utf8Input input =
-                Utf8Input.validated(("a".repeat(size) + "!a" + suffix).getBytes(UTF_8));
-            assertThat(pattern.find(input)).isFalse();
-          });
+      assertLargeFourXInputStaysNearLinear(size -> {
+        Utf8Input input = Utf8Input.validated(("a".repeat(size) + "!a" + suffix).getBytes(UTF_8));
+        assertThat(pattern.find(input)).isFalse();
+      });
     }
   }
 
