@@ -1,4 +1,4 @@
 interface:
   display_name: "Repo Assist"
   short_description: "Brief SafeRE PR reviews, feedback, and next actions"
-  default_prompt: "Use $repo-assist to use the SafeRE repository skill to review contributor PRs, summarize issue activity and PR coverage, assess feedback on my PRs with local commits in their original worktrees, and write a short action report with linked evidence, omitting the open-issue backlog, without pushing or commenting."
+  default_prompt: "Use $repo-assist to review contributor PRs locally, push verified main merges and fixes to my open PRs, and write a short briefing with linked reviews and recent issue activity."
