@@ -85,17 +85,16 @@ class UnicodeTableGeneratorOptionsTest {
             "InCB_Linker",
             "InCB_Consonant",
             "InCB_Extend");
-    tables.forEach(
-        (name, ranges) -> {
-          assertThat(ranges).as(name).isNotEmpty();
-          for (int i = 0; i < ranges.length; i++) {
-            assertThat(ranges[i]).hasSize(2);
-            assertThat(ranges[i][0]).isBetween(0, ranges[i][1]);
-            assertThat(ranges[i][1]).isLessThanOrEqualTo(Character.MAX_CODE_POINT);
-            if (i > 0) {
-              assertThat(ranges[i][0]).isGreaterThan(ranges[i - 1][1] + 1);
-            }
-          }
-        });
+    tables.forEach((name, ranges) -> {
+      assertThat(ranges).as(name).isNotEmpty();
+      for (int i = 0; i < ranges.length; i++) {
+        assertThat(ranges[i]).hasSize(2);
+        assertThat(ranges[i][0]).isBetween(0, ranges[i][1]);
+        assertThat(ranges[i][1]).isLessThanOrEqualTo(Character.MAX_CODE_POINT);
+        if (i > 0) {
+          assertThat(ranges[i][0]).isGreaterThan(ranges[i - 1][1] + 1);
+        }
+      }
+    });
   }
 }

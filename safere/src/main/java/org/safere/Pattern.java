@@ -767,7 +767,7 @@ public final class Pattern implements Serializable {
       return result.matched();
     }
     return Nfa.search(
-            prog,
+            nfaProg(prog),
             scanner,
             searchStart,
             length,
@@ -880,7 +880,7 @@ public final class Pattern implements Serializable {
         MatchStrategy.DFA, StrategyDisposition.FALLBACK, StrategyReason.DFA_BUDGET_EXCEEDED);
     boolean matched =
         Nfa.search(
-                prog,
+                nfaProg(prog),
                 scanner,
                 searchStart,
                 length,
@@ -903,6 +903,25 @@ public final class Pattern implements Serializable {
       diagnostics.participate(strategy, StrategyRole.START_ACCELERATION);
     }
     if (utf8StartAccelerator instanceof Utf8StartAccelerator.LeadingExpansion le
+        && le.wideLeadingClass()
+        && le.minRepetition() == 0
+        && !le.hasLeadingAssertions()
+        && le.inner() instanceof Utf8StartAccelerator.Literal) {
+      // Preserve the wide expansion's short-input decline to avoid adding literal-scan setup
+      // to native verification. Nearby hits below retain its minimum profitable skip too.
+      if (scanner.length() < MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP) {
+        return 0;
+      }
+      // Existence does not need the expanded match start. Every match has a suffix at or after
+      // the first inner literal, and that suffix is itself a match with zero leading repetitions.
+      // Keep the full scanner so assertions retain their input context. One ordinary search from
+      // this candidate verifies the tail and handles later candidates without repeated probes.
+      int candidate = le.findInnerCandidate(scanner, 0);
+      if (candidate >= 0) {
+        // Leave nearby hits to the forward search, as in wide leading expansion.
+        return candidate < MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP ? 0 : candidate;
+      }
+    } else if (utf8StartAccelerator instanceof Utf8StartAccelerator.LeadingExpansion le
         && le.canVerifyAtInner()) {
       int innerMatch = le.findInnerCandidate(scanner, 0);
       if (innerMatch >= 0) {
@@ -1130,7 +1149,7 @@ public final class Pattern implements Serializable {
     }
     boolean matched =
         Nfa.search(
-                prog,
+                nfaProg(prog),
                 scanner,
                 start,
                 scanner.length(),
@@ -1485,7 +1504,7 @@ public final class Pattern implements Serializable {
       return result.matched();
     }
     return Nfa.search(
-            prog,
+            nfaProg(prog),
             scanner,
             searchStart,
             length,
@@ -1733,6 +1752,19 @@ public final class Pattern implements Serializable {
       }
     }
     return p;
+  }
+
+  /**
+   * Reuses the shared flat program when already prepared and suitable for scalar NFA execution.
+   * This accessor never prepares an artifact: paths that bypass DFA preparation keep the graph
+   * interpreter, as do programs requiring progress or grapheme state.
+   */
+  Prog nfaProg(Prog source) {
+    if (source != prog || !source.supportsFlatNfa()) {
+      return source;
+    }
+    Prog prepared = flatProg;
+    return prepared != null ? prepared : source;
   }
 
   Prog flatDfaProg() {

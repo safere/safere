@@ -496,29 +496,26 @@ class MatcherStateMachineTraceTest {
     public Stream<String> resultsWithMutation(Mutation mutation) {
       return matcher
           .results()
-          .map(
-              result -> {
-                mutation.apply(this);
-                return result.group();
-              });
+          .map(result -> {
+            mutation.apply(this);
+            return result.group();
+          });
     }
 
     @Override
     public String replaceAllWithMutation(Mutation mutation) {
-      return matcher.replaceAll(
-          result -> {
-            mutation.apply(this);
-            return "x";
-          });
+      return matcher.replaceAll(result -> {
+        mutation.apply(this);
+        return "x";
+      });
     }
 
     @Override
     public String replaceFirstWithMutation(Mutation mutation) {
-      return matcher.replaceFirst(
-          result -> {
-            mutation.apply(this);
-            return "x";
-          });
+      return matcher.replaceFirst(result -> {
+        mutation.apply(this);
+        return "x";
+      });
     }
   }
 
@@ -633,29 +630,26 @@ class MatcherStateMachineTraceTest {
     public Stream<String> resultsWithMutation(Mutation mutation) {
       return matcher
           .results()
-          .map(
-              result -> {
-                mutation.apply(this);
-                return result.group();
-              });
+          .map(result -> {
+            mutation.apply(this);
+            return result.group();
+          });
     }
 
     @Override
     public String replaceAllWithMutation(Mutation mutation) {
-      return matcher.replaceAll(
-          result -> {
-            mutation.apply(this);
-            return "x";
-          });
+      return matcher.replaceAll(result -> {
+        mutation.apply(this);
+        return "x";
+      });
     }
 
     @Override
     public String replaceFirstWithMutation(Mutation mutation) {
-      return matcher.replaceFirst(
-          result -> {
-            mutation.apply(this);
-            return "x";
-          });
+      return matcher.replaceFirst(result -> {
+        mutation.apply(this);
+        return "x";
+      });
     }
   }
 
