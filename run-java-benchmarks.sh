@@ -55,6 +55,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/tools/machine-lock.sh"
 BENCHMARK_JAR="$SCRIPT_DIR/safere-benchmarks/target/benchmarks.jar"
 BENCHMARK_CORPUS="$SCRIPT_DIR/safere-benchmarks/target/benchmark-corpus"
 BENCHMARK_DATA_DIR="$SCRIPT_DIR/safere-benchmarks"
@@ -66,8 +67,8 @@ DEFAULT_BENCHMARK_REGEX="^(?!org\\.safere\\.benchmark\\.(CrosscheckOverheadBench
 STANDARD_OPTS="-f 2 -wi 2 -w 500ms -i 5 -r 500ms"
 LONG_OPTS="-f 2 -wi 3 -w 1 -i 5 -r 1"
 SMOKE_OPTS="-f 0 -wi 1 -w 1 -i 1 -r 1"
-FIRST_COMPILE_OPTS="-f 10 -wi 0 -i 1 -r 1 -bm ss"
-COLD_START_SMOKE_OPTS="-f 1 -wi 0 -i 1 -r 1 -bm ss"
+FIRST_COMPILE_OPTS="-f 10 -wi 0 -i 1 -r 1 -bm ss -foe true"
+COLD_START_SMOKE_OPTS="-f 1 -wi 0 -i 1 -r 1 -bm ss -foe true"
 
 # Generic options for workloads whose declarations require no-fork execution.
 NO_FORK_STANDARD_OPTS="-f 0 -wi 2 -w 500ms -i 5 -r 500ms"
@@ -207,6 +208,8 @@ if [ "$DECLARED" = true ]; then
     esac
   done
 fi
+
+safere_reserve_machine
 
 if [ "$MODE" = "first-compile" ]; then
   JMH_OPTS="$FIRST_COMPILE_OPTS"

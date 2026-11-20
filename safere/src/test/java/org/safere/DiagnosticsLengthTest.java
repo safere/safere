@@ -146,16 +146,15 @@ class DiagnosticsLengthTest {
         .hasSize(4)
         .anySatisfy(event -> assertThat(event.auxiliaryStrategies()).isNotEmpty())
         .anySatisfy(event -> assertThat(event.strategyDecisions()).isNotEmpty())
-        .allSatisfy(
-            event -> {
-              assertThat(event.captureStrategy()).isNotEqualTo(MatchStrategy.LENGTH);
-              assertThat(event.auxiliaryStrategies())
-                  .extracting(StrategyParticipation::strategy)
-                  .doesNotContain(MatchStrategy.LENGTH);
-              assertThat(event.strategyDecisions())
-                  .extracting(StrategyDecision::strategy)
-                  .doesNotContain(MatchStrategy.LENGTH);
-            });
+        .allSatisfy(event -> {
+          assertThat(event.captureStrategy()).isNotEqualTo(MatchStrategy.LENGTH);
+          assertThat(event.auxiliaryStrategies())
+              .extracting(StrategyParticipation::strategy)
+              .doesNotContain(MatchStrategy.LENGTH);
+          assertThat(event.strategyDecisions())
+              .extracting(StrategyDecision::strategy)
+              .doesNotContain(MatchStrategy.LENGTH);
+        });
   }
 
   @Tag("work-counter")

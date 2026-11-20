@@ -14,8 +14,10 @@ measurement boundary requires different JMH or process machinery.
 
 `run-java-benchmarks.sh` obtains each runner's trial parameter values from the plan. No-fork
 scheduling therefore depends on the `noFork` constraint, not on a benchmark family or class-name
-substring. Cold-start setup resolves a declaration but does not compile its pattern before the
-single measured invocation.
+substring. Cold-start setup resolves the declaration and prepares any inputs. It compiles
+untimed for a first-use-only operation. In a compile-only or compile-plus-first-use operation,
+the target pattern compiles in the single timed invocation. The optional `precompileAscii`
+constraint adds one untimed compilation of an unrelated ASCII literal to the setup.
 
 The C++, Go, and Rust runners execute native `singleShotColdStart` rows in a fresh child for
 each sample (one for smoke, five for a normal trial). The parent selects the exact pattern from

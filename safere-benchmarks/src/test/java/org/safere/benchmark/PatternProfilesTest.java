@@ -77,115 +77,109 @@ class PatternProfilesTest {
 
   @Test
   void rejectsMalformedAndDuplicateAlternates() {
-    assertThatThrownBy(
-            () ->
-                PatternProfiles.parse(
-                    JsonParser.parseString(
-                        """
-                        {"Rust": []}
-                        """)))
+    assertThatThrownBy(() ->
+            PatternProfiles.parse(
+                JsonParser.parseString(
+                    """
+                    {"Rust": []}
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Invalid benchmark pattern profile ID: Rust");
 
-    assertThatThrownBy(
-            () ->
-                PatternProfiles.parse(
-                    JsonParser.parseString(
-                        """
-                        {
-                          "alternate-engine": [
-                            {"java": "x", "alternate": "y", "reason": "first"},
-                            {"java": "x", "alternate": "z", "reason": "second"}
-                          ]
-                        }
-                        """)))
+    assertThatThrownBy(() ->
+            PatternProfiles.parse(
+                JsonParser.parseString(
+                    """
+                    {
+                      "alternate-engine": [
+                        {"java": "x", "alternate": "y", "reason": "first"},
+                        {"java": "x", "alternate": "z", "reason": "second"}
+                      ]
+                    }
+                    """)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Pattern profile alternate-engine repeats Java pattern: x");
   }
 
   @Test
   void rejectsTopLevelAndConflictingInlineAlternates() {
-    assertThatThrownBy(
-            () ->
-                PatternProfiles.normalizeInline(
-                    JsonParser.parseString(
-                            """
-                            {"patternProfiles": {}}
-                            """)
-                        .getAsJsonObject()))
+    assertThatThrownBy(() ->
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(
+                        """
+                        {"patternProfiles": {}}
+                        """)
+                    .getAsJsonObject()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("benchmark-data.json must define syntax alternates next to their Java values");
 
-    assertThatThrownBy(
-            () ->
-                PatternProfiles.normalizeInline(
-                    JsonParser.parseString(
-                            """
-                            {
-                              "first": {
-                                "pattern": {
-                                  "java": "x",
-                                  "alternates": {
-                                    "re2": {"pattern": "y", "reason": "first"}
-                                  }
-                                }
-                              },
-                              "second": {
-                                "pattern": {
-                                  "java": "x",
-                                  "alternates": {
-                                    "re2": {"pattern": "z", "reason": "second"}
-                                  }
-                                }
+    assertThatThrownBy(() ->
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(
+                        """
+                        {
+                          "first": {
+                            "pattern": {
+                              "java": "x",
+                              "alternates": {
+                                "re2": {"pattern": "y", "reason": "first"}
                               }
                             }
-                            """)
-                        .getAsJsonObject()))
+                          },
+                          "second": {
+                            "pattern": {
+                              "java": "x",
+                              "alternates": {
+                                "re2": {"pattern": "z", "reason": "second"}
+                              }
+                            }
+                          }
+                        }
+                        """)
+                    .getAsJsonObject()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Conflicting re2 alternates for Java pattern: x");
   }
 
   @Test
   void rejectsAlternateWhoseKindDoesNotMatchContainingField() {
-    assertThatThrownBy(
-            () ->
-                PatternProfiles.normalizeInline(
-                    JsonParser.parseString(
-                            """
-                            {
-                              "pattern": {
-                                "java": "x",
-                                "alternates": {
-                                  "rust-regex": {
-                                    "replacement": "y",
-                                    "reason": "wrong kind"
-                                  }
-                                }
+    assertThatThrownBy(() ->
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(
+                        """
+                        {
+                          "pattern": {
+                            "java": "x",
+                            "alternates": {
+                              "rust-regex": {
+                                "replacement": "y",
+                                "reason": "wrong kind"
                               }
                             }
-                            """)
-                        .getAsJsonObject()))
+                          }
+                        }
+                        """)
+                    .getAsJsonObject()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Inline benchmark pattern definition contains replacement alternate");
 
-    assertThatThrownBy(
-            () ->
-                PatternProfiles.normalizeInline(
-                    JsonParser.parseString(
-                            """
-                            {
-                              "replacement": {
-                                "java": "x",
-                                "alternates": {
-                                  "rust-regex": {
-                                    "pattern": "y",
-                                    "reason": "wrong kind"
-                                  }
-                                }
+    assertThatThrownBy(() ->
+            PatternProfiles.normalizeInline(
+                JsonParser.parseString(
+                        """
+                        {
+                          "replacement": {
+                            "java": "x",
+                            "alternates": {
+                              "rust-regex": {
+                                "pattern": "y",
+                                "reason": "wrong kind"
                               }
                             }
-                            """)
-                        .getAsJsonObject()))
+                          }
+                        }
+                        """)
+                    .getAsJsonObject()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Inline benchmark replacement definition contains pattern alternate");
   }

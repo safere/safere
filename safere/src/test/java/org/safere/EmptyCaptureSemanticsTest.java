@@ -64,18 +64,13 @@ class EmptyCaptureSemanticsTest {
                 .lazyCaptureExtraction(false)
                 .build());
     return operands.stream()
-        .flatMap(
-            operand ->
-                repeats.stream()
-                    .flatMap(
-                        repeat ->
-                            Stream.of("", "?", "+")
-                                .flatMap(
-                                    mode ->
-                                        engines.stream()
-                                            .map(
-                                                engine ->
-                                                    Arguments.of(operand, repeat, mode, engine)))));
+        .flatMap(operand ->
+            repeats.stream()
+                .flatMap(repeat ->
+                    Stream.of("", "?", "+")
+                        .flatMap(mode ->
+                            engines.stream()
+                                .map(engine -> Arguments.of(operand, repeat, mode, engine)))));
   }
 
   @ParameterizedTest(name = "[{index}] {0}{1}{2}")

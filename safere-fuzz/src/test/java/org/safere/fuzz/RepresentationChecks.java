@@ -84,25 +84,23 @@ final class RepresentationChecks {
       ByteArrayOutputStream actualOutput = new ByteArrayOutputStream();
       ByteArrayOutputStream expectedOutput = new ByteArrayOutputStream();
       Class<?> actualFailure =
-          replacementFailure(
-              () -> {
-                if (all) {
-                  actual.replaceAll(actualOutput::write, template);
-                } else {
-                  actual.replaceFirst(actualOutput::write, template);
-                }
-              });
+          replacementFailure(() -> {
+            if (all) {
+              actual.replaceAll(actualOutput::write, template);
+            } else {
+              actual.replaceFirst(actualOutput::write, template);
+            }
+          });
       Class<?> expectedFailure =
-          replacementFailure(
-              () -> {
-                expected.reset();
-                if (expected.find()) {
-                  do {
-                    expected.appendReplacement(expectedOutput::write, template);
-                  } while (all && expected.find());
-                }
-                expected.appendTail(expectedOutput::write);
-              });
+          replacementFailure(() -> {
+            expected.reset();
+            if (expected.find()) {
+              do {
+                expected.appendReplacement(expectedOutput::write, template);
+              } while (all && expected.find());
+            }
+            expected.appendTail(expectedOutput::write);
+          });
       if (actualFailure != expectedFailure
           || !Arrays.equals(actualOutput.toByteArray(), expectedOutput.toByteArray())) {
         throw new AssertionError("UTF-8 replacement output or exception differs: " + context);

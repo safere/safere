@@ -116,13 +116,12 @@ class MatcherDeferredCaptureStateTest {
     try (ExecutorService worker = Executors.newSingleThreadExecutor()) {
       Object workerEngine =
           worker
-              .submit(
-                  () -> {
-                    assertThat(transferred.find()).isTrue();
-                    Object borrowedEngine = engineField.get(transferred);
-                    assertThat(transferred.group(2)).isEqualTo("789");
-                    return borrowedEngine;
-                  })
+              .submit(() -> {
+                assertThat(transferred.find()).isTrue();
+                Object borrowedEngine = engineField.get(transferred);
+                assertThat(transferred.group(2)).isEqualTo("789");
+                return borrowedEngine;
+              })
               .get();
       assertThat(workerEngine).isNotNull().isNotSameAs(engineField.get(retained));
     }
