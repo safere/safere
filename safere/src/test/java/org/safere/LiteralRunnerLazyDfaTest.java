@@ -118,14 +118,13 @@ class LiteralRunnerLazyDfaTest {
         List<Future<Boolean>> results = new ArrayList<>();
         for (int i = 0; i < threads; i++) {
           results.add(
-              executor.submit(
-                  () -> {
-                    start.await();
-                    return !pattern.matcher(text).matches()
-                        && !pattern.matcher(text).lookingAt()
-                        && pattern.matcher("cherry").matches()
-                        && pattern.find(Utf8Input.trusted(text.getBytes(UTF_8)));
-                  }));
+              executor.submit(() -> {
+                start.await();
+                return !pattern.matcher(text).matches()
+                    && !pattern.matcher(text).lookingAt()
+                    && pattern.matcher("cherry").matches()
+                    && pattern.find(Utf8Input.trusted(text.getBytes(UTF_8)));
+              }));
         }
         start.countDown();
         for (Future<Boolean> result : results) {
@@ -139,10 +138,9 @@ class LiteralRunnerLazyDfaTest {
 
   private static Stream<Arguments> sharedArtifacts() {
     return Stream.of("hello", "apple|banana|cherry", "needle".repeat(256))
-        .flatMap(
-            regex ->
-                Stream.of("program", "DFA program", "setup")
-                    .map(artifact -> Arguments.of(regex, artifact)));
+        .flatMap(regex ->
+            Stream.of("program", "DFA program", "setup")
+                .map(artifact -> Arguments.of(regex, artifact)));
   }
 
   @ParameterizedTest
@@ -160,17 +158,16 @@ class LiteralRunnerLazyDfaTest {
       List<Future<Object>> results = new ArrayList<>();
       for (int i = 0; i < threads; i++) {
         results.add(
-            executor.submit(
-                () -> {
-                  ready.countDown();
-                  start.await();
-                  return switch (artifact) {
-                    case "program" -> pattern.flatProg();
-                    case "DFA program" -> pattern.flatDfaProg();
-                    case "setup" -> pattern.forwardDfaSetup();
-                    default -> throw new AssertionError(artifact);
-                  };
-                }));
+            executor.submit(() -> {
+              ready.countDown();
+              start.await();
+              return switch (artifact) {
+                case "program" -> pattern.flatProg();
+                case "DFA program" -> pattern.flatDfaProg();
+                case "setup" -> pattern.forwardDfaSetup();
+                default -> throw new AssertionError(artifact);
+              };
+            }));
       }
       ready.await();
       start.countDown();

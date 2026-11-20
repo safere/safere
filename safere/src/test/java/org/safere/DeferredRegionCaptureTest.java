@@ -166,13 +166,11 @@ class DeferredRegionCaptureTest {
             "(a+?)$",
             "^(a+?)$",
             "(a+?)\\z")
-        .flatMap(
-            regex ->
-                Stream.of(Engine.values())
-                    .flatMap(
-                        engine ->
-                            Stream.of(Operation.values())
-                                .map(operation -> Arguments.of(regex, engine, operation))));
+        .flatMap(regex ->
+            Stream.of(Engine.values())
+                .flatMap(engine ->
+                    Stream.of(Operation.values())
+                        .map(operation -> Arguments.of(regex, engine, operation))));
   }
 
   @ParameterizedTest(name = "{0} {1} {2}")

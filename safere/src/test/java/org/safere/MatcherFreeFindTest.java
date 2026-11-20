@@ -29,27 +29,19 @@ class MatcherFreeFindTest {
 
   static Stream<Arguments> innerLiteralSearchCases() {
     return Stream.of(false, true)
-        .flatMap(
-            diagnostics ->
-                Stream.of("zz[^;]*qq", "zz[a-z]*qq")
-                    .flatMap(
-                        regex ->
-                            Stream.of(61, 62, 63, 100, 509, 510, 511)
-                                .flatMap(
-                                    length ->
-                                        Stream.of("", "qq", ";qq")
-                                            .flatMap(
-                                                suffix ->
-                                                    Stream.of("", "\uD83D\uDE00")
-                                                        .map(
-                                                            prefix ->
-                                                                Arguments.of(
-                                                                    diagnostics,
-                                                                    regex,
-                                                                    prefix
-                                                                        + "zz"
-                                                                        + "x".repeat(length)
-                                                                        + suffix))))));
+        .flatMap(diagnostics ->
+            Stream.of("zz[^;]*qq", "zz[a-z]*qq")
+                .flatMap(regex ->
+                    Stream.of(61, 62, 63, 100, 509, 510, 511)
+                        .flatMap(length ->
+                            Stream.of("", "qq", ";qq")
+                                .flatMap(suffix ->
+                                    Stream.of("", "\uD83D\uDE00")
+                                        .map(prefix ->
+                                            Arguments.of(
+                                                diagnostics,
+                                                regex,
+                                                prefix + "zz" + "x".repeat(length) + suffix))))));
   }
 
   @ParameterizedTest

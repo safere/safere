@@ -264,7 +264,7 @@ Supported operations are grouped below. Names are exact JSON values.
 |---|---|
 | Matching | `matches`, `find`, `lookingAt`, `findAllCount`, `findAllLengthSum`, `findAllGroupLengthSum`, `matchesCorpus`, `matchesGroupLengthSum`, `findGroupPresent`, `findGroup`, `captureGroups` |
 | Replacement and splitting | `replaceFirst`, `replaceAll`, `replaceAllLengthSum`, `appendReplacement`, `manualReplaceAll`, `split`, `splitLengthSum` |
-| Compilation and matcher state | `compile`, `compileAndFind`, `compileAndMatches`, `findRotatingUtf16`, `compileAndFindRotatingUtf16`, `matcherConstruction`, `matcherResetFind`, `matcherRegionFind`, `matcherRegionMatches`, `matcherRegionTokenize`, `findInWindow` |
+| Compilation and matcher state | `compile`, `compileAndFind`, `compileAndFindGroupPresent`, `compileAndMatches`, `findRotatingUtf16`, `compileAndFindRotatingUtf16`, `matcherConstruction`, `matcherResetFind`, `matcherRegionFind`, `matcherRegionMatches`, `matcherRegionTokenize`, `findInWindow` |
 | Pattern collections | `patternSetCompile`, `patternSetFind`, `patternSetMatches` |
 | UTF-8 | `utf8CaptureBounds`, `utf8DecodeFind`, `utf8Replacement` |
 | Diagnostics and memory | `analyzePattern`, `cachedAnalysis`, `compileAndAnalyze`, `dfaCacheGrowth`, `diagnosticsFind` |
@@ -358,8 +358,10 @@ Generic runner selection and the boundary of each unusual mode are documented in
 
 Timing units are `nanoseconds`, `microseconds`, `milliseconds`, or `bytes`.
 Constraints are `noFork`, `freshProcessPerInvocation`, `retainState`,
-`prematerializedInput`, and `allocationProfile`. Incompatible combinations,
+`prematerializedInput`, `allocationProfile`, and `precompileAscii`. Incompatible combinations,
 such as `noFork` with a fresh process per invocation, are rejected.
+`precompileAscii` requires `singleShotColdStart` with `compileAndFindGroupPresent`.
+Each fork compiles an unrelated ASCII literal during setup.
 
 Pathological workloads use `averageTime` plus `noFork`; the scheduler must not
 infer that policy from a class or workload name.

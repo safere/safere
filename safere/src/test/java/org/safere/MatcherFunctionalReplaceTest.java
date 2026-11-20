@@ -124,13 +124,11 @@ class MatcherFunctionalReplaceTest {
     Pattern p = Pattern.compile("a");
     Matcher m = p.matcher("aa");
 
-    assertThatThrownBy(
-            () ->
-                m.replaceAll(
-                    result -> {
-                      m.find();
-                      return "x";
-                    }))
+    assertThatThrownBy(() ->
+            m.replaceAll(result -> {
+              m.find();
+              return "x";
+            }))
         .isInstanceOf(ConcurrentModificationException.class);
   }
 
@@ -143,13 +141,11 @@ class MatcherFunctionalReplaceTest {
     Pattern p = Pattern.compile("a");
     Matcher m = p.matcher("aa");
 
-    assertThatThrownBy(
-            () ->
-                m.replaceFirst(
-                    result -> {
-                      m.find();
-                      return "x";
-                    }))
+    assertThatThrownBy(() ->
+            m.replaceFirst(result -> {
+              m.find();
+              return "x";
+            }))
         .isInstanceOf(ConcurrentModificationException.class);
   }
 }

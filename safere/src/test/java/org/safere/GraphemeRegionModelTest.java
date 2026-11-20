@@ -157,13 +157,12 @@ class GraphemeRegionModelTest {
     StringBuilder builder = new StringBuilder();
     value
         .codePoints()
-        .forEach(
-            cp -> {
-              if (!builder.isEmpty()) {
-                builder.append(' ');
-              }
-              builder.append(String.format("U+%04X", cp));
-            });
+        .forEach(cp -> {
+          if (!builder.isEmpty()) {
+            builder.append(' ');
+          }
+          builder.append(String.format("U+%04X", cp));
+        });
     return builder.toString();
   }
 
