@@ -105,13 +105,10 @@ class RegionAssertionCompositionTest {
             new Rule("input start anchor", "^.", "a" + EMOJI, 1, 2, false, -1, -1),
             new Rule("multiline input start", "(?m:^.)", "\n" + EMOJI, 1, 2, false, 2, 2));
     return rules.stream()
-        .flatMap(
-            rule ->
-                Stream.of(false, true)
-                    .flatMap(
-                        transparent ->
-                            Stream.of(false, true)
-                                .map(full -> Arguments.of(rule, transparent, full))));
+        .flatMap(rule ->
+            Stream.of(false, true)
+                .flatMap(transparent ->
+                    Stream.of(false, true).map(full -> Arguments.of(rule, transparent, full))));
   }
 
   @ParameterizedTest(name = "{0}, transparent={1}, full={2}")

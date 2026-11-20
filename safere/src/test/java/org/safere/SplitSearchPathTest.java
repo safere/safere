@@ -61,10 +61,8 @@ class SplitSearchPathTest {
             "foo\n",
             "");
     return regexes.stream()
-        .flatMap(
-            regex ->
-                Stream.of(0, Pattern.CASE_INSENSITIVE)
-                    .flatMap(
-                        flags -> inputs.stream().map(input -> Arguments.of(regex, flags, input))));
+        .flatMap(regex ->
+            Stream.of(0, Pattern.CASE_INSENSITIVE)
+                .flatMap(flags -> inputs.stream().map(input -> Arguments.of(regex, flags, input))));
   }
 }

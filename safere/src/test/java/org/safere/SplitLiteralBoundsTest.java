@@ -38,33 +38,27 @@ class SplitLiteralBoundsTest {
     // Refs #1050. Include unanchored and case-sensitive controls, both absolute anchors,
     // successful delimiters, and short prefixes ending at supplementary code point boundaries.
     return Stream.of("a", "abc", "a😀b")
-        .flatMap(
-            literal ->
-                Stream.of("", "^", "\\A")
-                    .flatMap(
-                        anchor ->
+        .flatMap(literal ->
+            Stream.of("", "^", "\\A")
+                .flatMap(anchor ->
+                    Stream.of(
+                            0,
+                            Pattern.CASE_INSENSITIVE,
+                            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+                        .flatMap(flags ->
                             Stream.of(
-                                    0,
-                                    Pattern.CASE_INSENSITIVE,
-                                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
-                                .flatMap(
-                                    flags ->
-                                        Stream.of(
-                                                "",
-                                                "a",
-                                                "ab",
-                                                "AB",
-                                                "a😀",
-                                                "abc",
-                                                "ABC",
-                                                "AbCtail",
-                                                "a😀b",
-                                                "A😀Btail",
-                                                "xabc",
-                                                "xA😀B")
-                                            .map(
-                                                input ->
-                                                    Arguments.of(
-                                                        anchor + literal, flags, input)))));
+                                    "",
+                                    "a",
+                                    "ab",
+                                    "AB",
+                                    "a😀",
+                                    "abc",
+                                    "ABC",
+                                    "AbCtail",
+                                    "a😀b",
+                                    "A😀Btail",
+                                    "xabc",
+                                    "xA😀B")
+                                .map(input -> Arguments.of(anchor + literal, flags, input)))));
   }
 }

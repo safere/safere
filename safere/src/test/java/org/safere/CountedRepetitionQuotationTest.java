@@ -59,20 +59,18 @@ class CountedRepetitionQuotationTest {
 
   static Stream<String> countsWithEmptyQuotes() {
     return Stream.of("{02}", "{12}", "{1,2}", "{01,03}", "{01,}", "{00,02}")
-        .flatMap(
-            count ->
-                Stream.of(EMPTY_QUOTE, EMPTY_QUOTE.repeat(3))
-                    .flatMap(
-                        gap -> {
-                          Stream.Builder<String> variants = Stream.builder();
-                          StringBuilder allGaps = new StringBuilder("{");
-                          for (int i = 1; i < count.length(); i++) {
-                            variants.add(count.substring(0, i) + gap + count.substring(i));
-                            allGaps.append(gap).append(count.charAt(i));
-                          }
-                          variants.add(allGaps.toString());
-                          return variants.build();
-                        }));
+        .flatMap(count ->
+            Stream.of(EMPTY_QUOTE, EMPTY_QUOTE.repeat(3))
+                .flatMap(gap -> {
+                  Stream.Builder<String> variants = Stream.builder();
+                  StringBuilder allGaps = new StringBuilder("{");
+                  for (int i = 1; i < count.length(); i++) {
+                    variants.add(count.substring(0, i) + gap + count.substring(i));
+                    allGaps.append(gap).append(count.charAt(i));
+                  }
+                  variants.add(allGaps.toString());
+                  return variants.build();
+                }));
   }
 
   @ParameterizedTest

@@ -61,15 +61,13 @@ class MatcherResultsStreamTest {
     Pattern p = Pattern.compile("a");
     Matcher m = p.matcher("aa");
 
-    assertThatThrownBy(
-            () ->
-                m.results()
-                    .map(
-                        result -> {
-                          m.find();
-                          return result.group();
-                        })
-                    .collect(Collectors.toList()))
+    assertThatThrownBy(() ->
+            m.results()
+                .map(result -> {
+                  m.find();
+                  return result.group();
+                })
+                .collect(Collectors.toList()))
         .isInstanceOf(ConcurrentModificationException.class);
   }
 }

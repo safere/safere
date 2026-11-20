@@ -752,10 +752,8 @@ sealed interface Utf8StartAccelerator {
         return new ExcludedSet(
             Arrays.stream(excluded).filter(cp -> cp < 0x80).toArray(),
             Arrays.stream(excluded)
-                .filter(
-                    cp ->
-                        cp >= 0x80
-                            && (cp > Character.MAX_VALUE || !Character.isSurrogate((char) cp)))
+                .filter(cp ->
+                    cp >= 0x80 && (cp > Character.MAX_VALUE || !Character.isSurrogate((char) cp)))
                 .mapToObj(cp -> Character.toString(cp).getBytes(StandardCharsets.UTF_8))
                 .toArray(byte[][]::new));
       }

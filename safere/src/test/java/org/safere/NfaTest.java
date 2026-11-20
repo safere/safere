@@ -322,15 +322,14 @@ class NfaTest {
       assertTimeoutPreemptively(
           Duration.ofSeconds(10),
           () ->
-              runOnSmallStack(
-                  () -> {
-                    int[] m = anchoredSearch(pattern, "a");
-                    assertThat(m).isNotNull();
-                    assertThat(m[0]).isEqualTo(0);
-                    assertThat(m[1]).isEqualTo(1);
-                    assertThat(m[2]).isEqualTo(0);
-                    assertThat(m[3]).isEqualTo(1);
-                  }));
+              runOnSmallStack(() -> {
+                int[] m = anchoredSearch(pattern, "a");
+                assertThat(m).isNotNull();
+                assertThat(m[0]).isEqualTo(0);
+                assertThat(m[1]).isEqualTo(1);
+                assertThat(m[2]).isEqualTo(0);
+                assertThat(m[3]).isEqualTo(1);
+              }));
     }
   }
 

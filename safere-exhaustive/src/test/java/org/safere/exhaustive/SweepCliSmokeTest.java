@@ -116,12 +116,11 @@ class SweepCliSmokeTest {
     Path outputDir = tempDir.resolve("zero-width-empty-high-start");
 
     String output =
-        captureOutput(
-            () ->
-                ZeroWidthQuantifierDivergenceSweep.main(
-                    new String[] {
-                      "--range=" + Long.MAX_VALUE + ":", "--threads=2", "--output-dir=" + outputDir
-                    }));
+        captureOutput(() ->
+            ZeroWidthQuantifierDivergenceSweep.main(
+                new String[] {
+                  "--range=" + Long.MAX_VALUE + ":", "--threads=2", "--output-dir=" + outputDir
+                }));
 
     assertThat(output).contains("checked=0");
     assertCompactOutput(outputDir);
@@ -132,10 +131,9 @@ class SweepCliSmokeTest {
     Path outputDir = tempDir.resolve("grapheme-clamped-progress");
 
     String output =
-        captureOutput(
-            () ->
-                GraphemeClusterDivergenceSweep.main(
-                    new String[] {"--range=:10", "--threads=3", "--output-dir=" + outputDir}));
+        captureOutput(() ->
+            GraphemeClusterDivergenceSweep.main(
+                new String[] {"--range=:10", "--threads=3", "--output-dir=" + outputDir}));
 
     assertThat(output).contains("generated=10");
     assertThat(Files.readString(outputDir.resolve("progress.json")))
@@ -772,10 +770,9 @@ class SweepCliSmokeTest {
         """);
 
     assertThat(
-            catchThrowable(
-                () ->
-                    GraphemeClusterDivergenceSweep.main(
-                        replayArgs(outputDir, replayFile, "--unknown-stratified-samples=2"))))
+            catchThrowable(() ->
+                GraphemeClusterDivergenceSweep.main(
+                    replayArgs(outputDir, replayFile, "--unknown-stratified-samples=2"))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("unknown argument: --unknown-stratified-samples=2");
   }
