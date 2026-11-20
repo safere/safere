@@ -68,7 +68,7 @@
     <!-- Extra production checks for the published library only; tools may print and exit. -->
     <error-prone.library-checks></error-prone.library-checks>
     <error-prone.extra-checks></error-prone.extra-checks>
-    <google-java-format.version>1.35.0</google-java-format.version>
+    <google-java-format.version>2.0.0</google-java-format.version>
     <pmd.version>7.29.0</pmd.version>
     <spotless.version>3.11.0</spotless.version>
   </properties>
@@ -129,6 +129,7 @@
               <style>GOOGLE</style>
               <reflowLongStrings>true</reflowLongStrings>
               <formatJavadoc>true</formatJavadoc>
+              <cleanup>true</cleanup>
             </googleJavaFormat>
             <removeUnusedImports/>
           </java>

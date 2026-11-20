@@ -187,6 +187,10 @@ surprising, or important comparisons.
 
 Read the [performance guide](safere-benchmarks/PERFORMANCE_GUIDE.md) for collection
 scope, workload syntax, profiling commands, statistics, and artifact requirements.
+For initialization changes, follow the
+[compilation and initialization policy](docs/ARCHITECTURE.md#compilation-and-initialization-policy)
+and its first-use measurement requirements. Classify API/path reachability before deferring work;
+a compile-only gain is insufficient evidence.
 Use the [write-benchmark-report skill](.agents/skills/write-benchmark-report/SKILL.md)
 for collections and published reports. Performance PRs must include measured
 before/after results and their improvement or regression in the PR description.

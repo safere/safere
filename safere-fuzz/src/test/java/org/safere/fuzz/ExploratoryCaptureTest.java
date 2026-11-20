@@ -60,11 +60,10 @@ final class ExploratoryCaptureTest {
     assertThatThrownBy(
             () -> FuzzSupport.compileOrSkip(regex, 0).matcher("ab").replaceFirst("${item}"))
         .isInstanceOf(AssertionError.class);
-    assertThatThrownBy(
-            () ->
-                FuzzSupport.compileOrSkip(regex, 0)
-                    .matcher("ab")
-                    .replaceAll(result -> result.group(1) == null ? "empty" : "captured"))
+    assertThatThrownBy(() ->
+            FuzzSupport.compileOrSkip(regex, 0)
+                .matcher("ab")
+                .replaceAll(result -> result.group(1) == null ? "empty" : "captured"))
         .isInstanceOf(AssertionError.class);
   }
 }
