@@ -28,8 +28,9 @@ field in the state schema. Include:
    Link directly to the standalone copy/paste review and the full review/evidence. The checkpoint
    helper inserts these links. Do not embed the long author review or repeat benchmark tables.
 5. `## Your PRs With Review Feedback`: a compact table of current actionable feedback and newly
-   useful approvals. Explain disagreements, draft holds and blocked repairs. Group routine
-   approvals when clearer. Preserve reviewer-owned Done cells; link the complete per-request record.
+   useful approvals. Summarize verified authored PR pushes, including merge-only updates. Explain
+   disagreements, draft holds, blocked updates, and unpublished repairs. Group routine approvals
+   when clearer. Preserve reviewer-owned Done cells and link the complete per-request record.
 6. `## Issue Activity`: only new or meaningfully changed issues, changed decisions and uncovered
    requirements that matter now. Group related issues around the same PR or decision. Omit
    inactive backlog, mechanical metadata-only changes with no implication, historical PR lists,
