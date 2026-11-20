@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -347,6 +348,64 @@ class DiagnosticsTest {
             assertThat(event.reverseDfaSearchCount()).isEqualTo(2);
           }
         });
+  }
+
+  private static Stream<Arguments> endAnchoredEntryPointCases() {
+    String prefix = "!".repeat(1400);
+    String shortCandidate = prefix + "marker" + "a".repeat(26);
+    String longCandidate = prefix + "marker" + "a".repeat(90);
+    return Stream.of(
+        Arguments.of("proved end", "marker[a-z]*\\z", longCandidate, false, false),
+        Arguments.of("reverse rejection", "marker[a-z]*\\z", prefix + "nomatch", false, false),
+        Arguments.of(
+            "short contextual candidate", "\\b(marker)([a-z]*)\\z", shortCandidate, false, false),
+        Arguments.of(
+            "long contextual candidate", "\\b(marker)([a-z]*)\\z", longCandidate, true, true),
+        // Boolean verification can use the forward DFA for ambiguous ends.
+        // Matcher needs exact matching to preserve endpoint priority.
+        Arguments.of("dollar with LF", "(?s)(marker)(.+?)$", longCandidate + "\n", false, true),
+        Arguments.of("Z with CRLF", "(?s)(marker)(.+?)\\Z", longCandidate + "\r\n", false, true));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("endAnchoredEntryPointCases")
+  void endAnchoredEntryPointsAgreeOnResultsAndReverseDfaParticipation(
+      String scenario, String regex, String input, boolean matcherForward, boolean booleanForward) {
+    // Enabling diagnostics would make the String predicate delegate to Matcher.find().
+    Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
+    boolean expected = java.util.regex.Pattern.compile(regex).matcher(input).find();
+    Utf8Input utf8 = Utf8Input.validated(input.getBytes(UTF_8));
+
+    assertEndAnchoredEntryPoint(
+        "Matcher.find()",
+        regex,
+        pattern -> pattern.matcher(input).find(),
+        expected,
+        matcherForward);
+    assertEndAnchoredEntryPoint(
+        "asPredicate()",
+        regex,
+        pattern -> pattern.asPredicate().test(input),
+        expected,
+        booleanForward);
+    assertEndAnchoredEntryPoint(
+        "Pattern.find(Utf8Input)", regex, pattern -> pattern.find(utf8), expected, booleanForward);
+  }
+
+  private static void assertEndAnchoredEntryPoint(
+      String entryPoint,
+      String regex,
+      Predicate<Pattern> find,
+      boolean expected,
+      boolean expectedForward) {
+    // Give each entry point a fresh pattern and retain its cache through the assertion.
+    Pattern pattern = Pattern.compile(regex);
+    Pattern.ThreadCache cache = pattern.getOrCreateThreadCache();
+    assertThat(find.test(pattern)).as("%s result", entryPoint).isEqualTo(expected);
+    assertThat(cache.reverseDfa).as("%s reverse DFA participation", entryPoint).isNotNull();
+    assertThat(cache.forwardFirstMatchDfa != null || cache.forwardLongestMatchDfa != null)
+        .as("%s forward DFA participation", entryPoint)
+        .isEqualTo(expectedForward);
   }
 
   @Test
