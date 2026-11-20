@@ -124,17 +124,16 @@ class CompactDivergenceLogsTest {
     }
 
     assertThat(
-            catchThrowable(
-                () ->
-                    new CompactDivergenceLogs(
-                        tempDir,
-                        "control-escape",
-                        0,
-                        100,
-                        100,
-                        1,
-                        List.of("UNKNOWN"),
-                        List.of(DivergenceStatus.UNKNOWN))))
+            catchThrowable(() ->
+                new CompactDivergenceLogs(
+                    tempDir,
+                    "control-escape",
+                    0,
+                    100,
+                    100,
+                    1,
+                    List.of("UNKNOWN"),
+                    List.of(DivergenceStatus.UNKNOWN))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("output directory already contains a compact sweep archive");
   }
@@ -182,10 +181,9 @@ class CompactDivergenceLogsTest {
     }
 
     assertThat(
-            catchThrowable(
-                () ->
-                    CompactDivergenceExpander.main(
-                        new String[] {"--input-dir=" + tempDir, "--sample-limit=2"})))
+            catchThrowable(() ->
+                CompactDivergenceExpander.main(
+                    new String[] {"--input-dir=" + tempDir, "--sample-limit=2"})))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("compact log case count does not match current sweep");
   }

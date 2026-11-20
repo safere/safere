@@ -34,19 +34,18 @@ public final class CompileInitializationProbe {
       List<Future<Boolean>> results = new ArrayList<>();
       for (int i = 0; i < 8; i++) {
         results.add(
-            executor.submit(
-                () -> {
-                  start.await();
-                  Pattern pattern = Pattern.compile(regex);
-                  Matcher matcher = pattern.matcher("aé");
-                  Utf8Matcher utf8Matcher = pattern.matcher(input);
-                  return matcher.find()
-                      && matcher.start(1) == 0
-                      && matcher.end(1) == 1
-                      && utf8Matcher.find()
-                      && utf8Matcher.start(1) == 0
-                      && utf8Matcher.end(1) == 1;
-                }));
+            executor.submit(() -> {
+              start.await();
+              Pattern pattern = Pattern.compile(regex);
+              Matcher matcher = pattern.matcher("aé");
+              Utf8Matcher utf8Matcher = pattern.matcher(input);
+              return matcher.find()
+                  && matcher.start(1) == 0
+                  && matcher.end(1) == 1
+                  && utf8Matcher.find()
+                  && utf8Matcher.start(1) == 0
+                  && utf8Matcher.end(1) == 1;
+            }));
       }
       start.countDown();
       for (Future<Boolean> result : results) {

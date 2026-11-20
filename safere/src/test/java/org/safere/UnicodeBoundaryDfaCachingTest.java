@@ -66,20 +66,14 @@ class UnicodeBoundaryDfaCachingTest {
 
   static Stream<Arguments> cases() {
     return Stream.of("α", "中", "\u0301", "\u0660", "\u200c")
-        .flatMap(
-            word ->
-                Stream.of("\\b", "\\B", "(?:(?-U:\\b)|\\B)")
-                    .flatMap(
-                        boundary ->
-                            Stream.of("", "x".repeat(300))
-                                .flatMap(
-                                    prefix ->
-                                        Stream.of(
-                                            Arguments.of(
-                                                "(?U)." + boundary,
-                                                prefix + " " + word + "`\u180e"),
-                                            Arguments.of(
-                                                "(?U)" + boundary + ".",
-                                                prefix + " " + word + "`\u180e")))));
+        .flatMap(word ->
+            Stream.of("\\b", "\\B", "(?:(?-U:\\b)|\\B)")
+                .flatMap(boundary ->
+                    Stream.of("", "x".repeat(300))
+                        .flatMap(prefix ->
+                            Stream.of(
+                                Arguments.of("(?U)." + boundary, prefix + " " + word + "`\u180e"),
+                                Arguments.of(
+                                    "(?U)" + boundary + ".", prefix + " " + word + "`\u180e")))));
   }
 }

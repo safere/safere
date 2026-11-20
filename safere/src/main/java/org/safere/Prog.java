@@ -48,6 +48,7 @@ final class Prog {
   private boolean hasGraphemeClusterInstruction;
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
+  private boolean flatNfaSupported;
 
   /** Creates an empty program. */
   public Prog() {}
@@ -138,6 +139,14 @@ final class Prog {
     hasGraphemeClusterInstruction = computeHasGraphemeClusterInstruction();
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
+    flatNfaSupported = !hasGraphemeSemantics;
+    for (Inst inst : instArray) {
+      if (inst.op == InstOp.ALT_MATCH
+          || inst.op == InstOp.LOOP_ENTER
+          || inst.op == InstOp.PROGRESS_CHECK) {
+        flatNfaSupported = false;
+      }
+    }
     lineStartUnixLines = true;
     for (Inst inst : instArray) {
       if (inst.op == InstOp.EMPTY_WIDTH && (inst.arg & EmptyOp.BEGIN_LINE) != 0) {
@@ -402,16 +411,22 @@ final class Prog {
     final CaptureRune[] captureRunes;
     final LoopEntry[] loopEntries;
     final Inst[] captureProgressChecks;
+    final Inst[] greedyRunes;
+    final LazyRuneLoop[] lazyRuneLoops;
 
     BitStateAnalysis(
         boolean[] epsilonCycleAlts,
         CaptureRune[] captureRunes,
         LoopEntry[] loopEntries,
-        Inst[] captureProgressChecks) {
+        Inst[] captureProgressChecks,
+        Inst[] greedyRunes,
+        LazyRuneLoop[] lazyRuneLoops) {
       this.epsilonCycleAlts = epsilonCycleAlts;
       this.captureRunes = captureRunes;
       this.loopEntries = loopEntries;
       this.captureProgressChecks = captureProgressChecks;
+      this.greedyRunes = greedyRunes;
+      this.lazyRuneLoops = lazyRuneLoops;
     }
   }
 
@@ -443,6 +458,67 @@ final class Prog {
     return bitStateAnalysis().captureProgressChecks;
   }
 
+  /**
+   * Returns consuming bodies of simple greedy loops, or null when none exist. Each body is the
+   * ALT's preferred branch and consumes one rune before jumping directly back to that ALT.
+   */
+  Inst[] greedyRunes() {
+    return bitStateAnalysis().greedyRunes;
+  }
+
+  private Inst[] computeGreedyRunes(boolean[] reachable) {
+    Inst[] runes = null;
+    for (int i = 0; i < size(); i++) {
+      Inst alt = inst(i);
+      if (reachable[i] && (alt.opCode == InstOp.OP_ALT || alt.opCode == InstOp.OP_ALT_MATCH)) {
+        Inst rune = inst(alt.out);
+        if ((rune.opCode == InstOp.OP_CHAR_RANGE || rune.opCode == InstOp.OP_CHAR_CLASS)
+            && rune.out == i) {
+          if (runes == null) {
+            runes = new Inst[size()];
+          }
+          runes[i] = rune;
+        }
+      }
+    }
+    return runes;
+  }
+
+  /** Returns simple lazy character loops with a literal exit, or null if none exist. */
+  LazyRuneLoop[] lazyRuneLoops() {
+    return bitStateAnalysis().lazyRuneLoops;
+  }
+
+  private LazyRuneLoop[] computeLazyRuneLoops(boolean[] reachable) {
+    LazyRuneLoop[] loops = null;
+    for (int i = 0; i < size(); i++) {
+      Inst alt = inst(i);
+      if (!reachable[i] || alt.op != InstOp.ALT) {
+        continue;
+      }
+      Inst rune = inst(alt.out1);
+      if ((rune.op != InstOp.CHAR_RANGE && rune.op != InstOp.CHAR_CLASS) || rune.out != i) {
+        continue;
+      }
+      int exit = alt.out;
+      for (int steps = 0; steps < size(); steps++) {
+        Inst next = inst(exit);
+        if (next.op == InstOp.CAPTURE || next.op == InstOp.NOP) {
+          exit = next.out;
+          continue;
+        }
+        if (next.op == InstOp.CHAR_RANGE && next.lo == next.hi && next.lo < 128 && !next.foldCase) {
+          if (loops == null) {
+            loops = new LazyRuneLoop[size()];
+          }
+          loops[i] = new LazyRuneLoop(rune, next.lo, alt.out);
+        }
+        break;
+      }
+    }
+    return loops;
+  }
+
   private BitStateAnalysis bitStateAnalysis() {
     BitStateAnalysis result = bitStateAnalysis;
     if (result == null) {
@@ -453,7 +529,9 @@ final class Prog {
               computeEpsilonCycleAlts(reachable),
               captures,
               computeLoopEntries(reachable, captures),
-              computeCaptureProgressChecks(reachable));
+              computeCaptureProgressChecks(reachable),
+              computeGreedyRunes(reachable),
+              computeLazyRuneLoops(reachable));
       bitStateAnalysis = result;
     }
     return result;
@@ -661,6 +739,12 @@ final class Prog {
     copy.flatten();
     copy.freeze();
     return copy;
+  }
+
+  /** Whether ordinary scalar NFA execution can use this program's flattened representation. */
+  boolean supportsFlatNfa() {
+    // The compiler assigns loop registers after freeze().
+    return flatNfaSupported && numLoopRegs == 0;
   }
 
   public void flatten() {

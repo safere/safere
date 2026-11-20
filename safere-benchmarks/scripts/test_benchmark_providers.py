@@ -141,6 +141,8 @@ class BenchmarkProviderRunnerTest(unittest.TestCase):
                     self.assertEqual("@safere-utf8-vector" in parameters, vector)
                     if "noFork" in args[-1]:
                         self.assertEqual(args[args.index("-f") + 1], "0")
+                    if "coldStart" in args[-1]:
+                        self.assertEqual(args[args.index("-foe") + 1], "true")
 
     def test_focused_vector_run_does_not_require_cold_start_trials(self):
         result, measurements = self.run_wrapper("run-java-benchmarks.sh", arguments=[

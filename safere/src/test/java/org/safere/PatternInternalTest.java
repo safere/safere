@@ -60,15 +60,14 @@ class PatternInternalTest {
     try (var executor = Executors.newFixedThreadPool(workers)) {
       for (int worker = 0; worker < workers; worker++) {
         futures.add(
-            executor.submit(
-                () -> {
-                  start.await();
-                  Prog reverseDfaProg = pattern.flatReverseDfaProg();
-                  Matcher matcher = pattern.matcher(input);
-                  assertThat(matcher.find()).isTrue();
-                  assertThat(matcher.group()).isEqualTo(match);
-                  return List.of(pattern.reverseProg(), reverseDfaProg, pattern.reverseDfaSetup());
-                }));
+            executor.submit(() -> {
+              start.await();
+              Prog reverseDfaProg = pattern.flatReverseDfaProg();
+              Matcher matcher = pattern.matcher(input);
+              assertThat(matcher.find()).isTrue();
+              assertThat(matcher.group()).isEqualTo(match);
+              return List.of(pattern.reverseProg(), reverseDfaProg, pattern.reverseDfaSetup());
+            }));
       }
       List<Object> shared = futures.getFirst().get();
       for (Future<List<Object>> future : futures) {
@@ -216,16 +215,15 @@ class PatternInternalTest {
     try (var executor = Executors.newFixedThreadPool(workers)) {
       for (int worker = 0; worker < workers; worker++) {
         futures.add(
-            executor.submit(
-                () -> {
-                  start.await();
-                  OnePass onePass = pattern.onePass();
-                  assertThat(pattern.matcher(input).matches()).isTrue();
-                  assertThat(pattern.matcher(input + " tail").lookingAt()).isTrue();
-                  assertThat(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))).matches())
-                      .isTrue();
-                  return onePass;
-                }));
+            executor.submit(() -> {
+              start.await();
+              OnePass onePass = pattern.onePass();
+              assertThat(pattern.matcher(input).matches()).isTrue();
+              assertThat(pattern.matcher(input + " tail").lookingAt()).isTrue();
+              assertThat(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))).matches())
+                  .isTrue();
+              return onePass;
+            }));
       }
       OnePass shared = futures.getFirst().get();
       assertThat(shared).isNotNull();
@@ -674,9 +672,8 @@ class PatternInternalTest {
     Pattern p4 = Pattern.compile("(?:a\uD83D|za\uD83D\uDE00|banana)");
     assertThat(findRejectPlan(p4, MultiAnchorDescriptor.RejectPlan.DisjointLiterals.class))
         .isNotNull()
-        .satisfies(
-            plan ->
-                assertThat(plan.literals()).containsExactly("a\uD83D", "za\uD83D\uDE00", "banana"));
+        .satisfies(plan ->
+            assertThat(plan.literals()).containsExactly("a\uD83D", "za\uD83D\uDE00", "banana"));
   }
 
   @Test
@@ -701,9 +698,8 @@ class PatternInternalTest {
                 Pattern.compile("(?:apple|banana|cherry|orange)\\d"),
                 MultiAnchorDescriptor.RejectPlan.DisjointLiterals.class))
         .isNotNull()
-        .satisfies(
-            plan ->
-                assertThat(plan.literals()).containsExactly("apple", "banana", "cherry", "orange"));
+        .satisfies(plan ->
+            assertThat(plan.literals()).containsExactly("apple", "banana", "cherry", "orange"));
     assertThat(
             findRejectPlan(
                 Pattern.compile("(?:apple|banana|cherry|orange|papaya)\\d"),
