@@ -54,6 +54,9 @@ public final class Pattern implements Serializable {
   private static final int MIN_END_ANCHORED_PROBE_UNITS = 64;
   // Short inputs retain the forward path to avoid reverse-search setup overhead.
   private static final int MIN_REVERSE_FIRST_LEN = 1024;
+
+  // Avoid another DFA setup for tiny unproved candidates; longer ones benefit from its scan.
+  private static final int MIN_DFA_END_VERIFICATION_UNITS = 64;
   // A competitive literal start accelerator runs before the find reject prefilter only on inputs
   // shorter than this, where the separate prefilter call dominates. Longer inputs keep the
   // single-pass reject prefilter first.
@@ -209,6 +212,12 @@ public final class Pattern implements Serializable {
 
   private transient volatile Prog flatReverseProg;
   private transient volatile Prog flatReverseDfaProg;
+
+  /**
+   * Set before publishing the volatile reverse DFA program. Readers that have not acquired the
+   * program may observe false and conservatively use forward verification.
+   */
+  private transient boolean contextFreeReverseLanguage;
 
   /** DFA setup built once alongside the final {@link #flatReverseDfaProg}. */
   private transient volatile Dfa.Setup reverseDfaSetup;
@@ -653,11 +662,11 @@ public final class Pattern implements Serializable {
    * #asPredicate()}) can answer for this pattern.
    *
    * <p>Those paths use cheap checks followed by the forward first-match DFA or an end-anchored
-   * reverse search, with exact NFA verification and fallback. Patterns with grapheme semantics or
-   * loop registers use a matcher instead, so they get its full strategy sequence.
+   * reverse search, with exact verification and fallback. Patterns with grapheme semantics or loop
+   * registers use a matcher instead, so they get its full strategy sequence.
    */
   private boolean canFindWithoutMatcher() {
-    return enginePathOptions.dfa() && !prog.hasGraphemeSemantics() && prog.numLoopRegs() == 0;
+    return enginePathOptions.dfa() && supportsForwardDfa(prog);
   }
 
   boolean findWithDiagnostics(Utf8InputScanner scanner) {
@@ -960,8 +969,9 @@ public final class Pattern implements Serializable {
    * accepted candidate for existence-only matching. Returns {@code -1} for a proven rejection,
    * {@link #END_ANCHORED_SEARCH_DEFERRED} when the probe needs rejection and start acceleration
    * before one full retry, or {@link #END_ANCHORED_SEARCH_FALLBACK} when ordinary search is
-   * required. A proposed start still requires exact matching; failure to verify it must fall back
-   * to ordinary search.
+   * required. A proposed start requires exact verification unless {@link
+   * #endAnchoredStartHasExactEnd} proves its bounds; failed verification falls back to ordinary
+   * search.
    */
   int endAnchoredSearchStart(
       InputScanner scanner,
@@ -1083,9 +1093,8 @@ public final class Pattern implements Serializable {
   }
 
   /**
-   * Returns whether a match starts at {@code start}. Uses BitState when the remaining input fits
-   * its bitmap, as {@code Matcher}'s end-anchored verification does, and the NFA otherwise or when
-   * BitState exceeds its work budget.
+   * Verifies an accepted reverse candidate. A proved fixed end needs no new scan. Other candidates
+   * use the same forward-DFA gate as {@code Matcher}, followed by BitState or NFA fallback.
    */
   private boolean findAt(InputScanner scanner, int start) {
     return findAt(scanner, start, null);
@@ -1093,6 +1102,30 @@ public final class Pattern implements Serializable {
 
   private boolean findAt(InputScanner scanner, int start, DiagnosticAccumulator diagnostics) {
     int length = scanner.length();
+    if (endAnchoredStartHasExactEnd(scanner)) {
+      if (diagnostics != null) {
+        diagnostics.participate(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+        diagnostics.boundary(MatchStrategy.DFA);
+      }
+      return true;
+    }
+    if (shouldUseDfaEndVerification(length - start) && forwardDfaSupported()) {
+      if (diagnostics != null) {
+        diagnostics.participate(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+        diagnostics.incrementForwardDfaSearchCount();
+      }
+      Dfa.SearchResult result = forwardFirstMatchDfa().doSearch(scanner, start, true, false);
+      if (result != null) {
+        if (diagnostics != null) {
+          diagnostics.boundary(MatchStrategy.DFA);
+        }
+        return result.matched();
+      }
+      if (diagnostics != null) {
+        diagnostics.decision(
+            MatchStrategy.DFA, StrategyDisposition.FALLBACK, StrategyReason.DFA_BUDGET_EXCEEDED);
+      }
+    }
     int maxBitStateLen = BitState.maxTextSize(prog);
     if (enginePathOptions.bitState() && maxBitStateLen >= 0 && length - start <= maxBitStateLen) {
       if (diagnostics != null) {
@@ -1137,6 +1170,53 @@ public final class Pattern implements Serializable {
       diagnostics.boundary(MatchStrategy.NFA);
     }
     return matched;
+  }
+
+  /**
+   * Whether an accepted reverse candidate proves exact bounds without a forward pass. The proof
+   * applies independently of candidate length; inner captures still require the exact engine.
+   *
+   * <p>For programs containing only consumers and ordinary epsilon transitions, reversing a
+   * successful path preserves recognition. Span callers have already requested the longest
+   * unambiguous reverse result to establish the leftmost start; Boolean callers need only an
+   * accepting path. With a single allowed end, every forward accepting path at that start has the
+   * same group-zero bounds, regardless of greediness or alternation priority. Captures can
+   * therefore be resolved later against the original program and these exact bounds. Internal
+   * assertions, progress guards, graphemes and alternate dollar endpoints retain forward
+   * verification. The reverse program's volatile publication makes its language proof visible.
+   */
+  boolean endAnchoredStartHasExactEnd(InputScanner scanner) {
+    return contextFreeReverseLanguage && hasUniqueEndAnchoredEndpoint(scanner);
+  }
+
+  /** Returns whether the end anchor has only one eligible endpoint on this input. */
+  boolean hasUniqueEndAnchoredEndpoint(InputScanner scanner) {
+    return !prog.dollarAnchorEnd()
+        || scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), scanner.length()) < 0;
+  }
+
+  /** Keeps short unproved candidates on BitState and avoids NFA work on longer ones. */
+  boolean shouldUseDfaEndVerification(int inputUnits) {
+    return inputUnits >= MIN_DFA_END_VERIFICATION_UNITS;
+  }
+
+  private static boolean hasContextFreeLanguage(Prog program) {
+    for (int i = 0; i < program.size(); i++) {
+      switch (program.inst(i).opCode) {
+        case InstOp.OP_ALT,
+            InstOp.OP_ALT_MATCH,
+            InstOp.OP_CHAR_RANGE,
+            InstOp.OP_CAPTURE,
+            InstOp.OP_MATCH,
+            InstOp.OP_NOP,
+            InstOp.OP_FAIL,
+            InstOp.OP_CHAR_CLASS -> {}
+        default -> {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   static int[] literalFailure(byte[] literal) {
@@ -1716,7 +1796,10 @@ public final class Pattern implements Serializable {
   }
 
   private static boolean supportsForwardDfa(Prog p) {
-    return p != null && !p.hasGraphemeSemantics() && p.numLoopRegs() == 0;
+    return p != null
+        && !p.hasGraphemeSemantics()
+        && !p.hasPreviousMatchEnd()
+        && p.numLoopRegs() == 0;
   }
 
   Dfa forwardFirstMatchDfa() {
@@ -1801,6 +1884,7 @@ public final class Pattern implements Serializable {
         && !astAnalysis.hasNullableAlt()
         && prog.numLoopRegs() == 0
         && !prog.hasGraphemeSemantics()
+        && !prog.hasPreviousMatchEnd()
         && prog.numCaptures() <= OnePass.MAX_CAPTURE_GROUPS;
   }
 
@@ -1970,7 +2054,7 @@ public final class Pattern implements Serializable {
    * end-anchored reverse-first rejection).
    */
   boolean canUseReverseDfa() {
-    return !prog.anchorStart() && !matchDescriptor.hasFindFastPath();
+    return !prog.anchorStart() && !prog.hasPreviousMatchEnd() && !matchDescriptor.hasFindFastPath();
   }
 
   /**
@@ -2187,6 +2271,8 @@ public final class Pattern implements Serializable {
               frp = flatReverseProg();
             }
             reverseDfaSetup = Dfa.buildSetup(frp);
+            contextFreeReverseLanguage =
+                hasContextFreeLanguage(prog) && hasContextFreeLanguage(frp);
             flatReverseDfaProg = frp;
           }
         }
@@ -2374,6 +2460,10 @@ public final class Pattern implements Serializable {
       features.add(PatternFeature.GRAPHEME);
       limitations.add(PatternLimitation.GRAPHEME_REQUIRES_EXACT_ENGINE);
     }
+    if (prog.hasPreviousMatchEnd()) {
+      features.add(PatternFeature.PREVIOUS_MATCH_BOUNDARY);
+      limitations.add(PatternLimitation.PREVIOUS_MATCH_BOUNDARY_REQUIRES_EXACT_ENGINE);
+    }
     if ((flags & CASE_INSENSITIVE) != 0) {
       features.add(PatternFeature.CASE_INSENSITIVE);
     }
@@ -2394,7 +2484,7 @@ public final class Pattern implements Serializable {
     if (canOnePassSubmatch()) {
       capabilities.add(PatternCapability.ONE_PASS_CAPTURE_EXTRACTION);
     }
-    if (enginePathOptions.dfa() && !prog.hasGraphemeSemantics()) {
+    if (enginePathOptions.dfa() && !prog.hasGraphemeSemantics() && !prog.hasPreviousMatchEnd()) {
       capabilities.add(PatternCapability.DFA_BOUNDARY_SEARCH);
       if (prog.numLoopRegs() > 0) {
         capabilities.add(PatternCapability.DFA_REJECT_PREFILTER);
@@ -2606,6 +2696,7 @@ public final class Pattern implements Serializable {
             BEGIN_LINE,
             END_LINE,
             BEGIN_TEXT,
+            PREVIOUS_MATCH_END,
             END_TEXT,
             WORD_BOUNDARY,
             NO_WORD_BOUNDARY,
