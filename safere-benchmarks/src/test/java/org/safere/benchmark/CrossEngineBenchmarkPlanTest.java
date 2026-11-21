@@ -30,7 +30,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openjdk.jmh.infra.Blackhole;
-import org.safere.MatchStrategy;
 import org.safere.OperationDiagnostics;
 import org.safere.Pattern;
 import org.safere.PatternCompiledEvent;
@@ -1643,12 +1642,13 @@ class CrossEngineBenchmarkPlanTest {
           assertThat(events.stream().mapToInt(OperationDiagnostics::reverseDfaSearchCount).sum())
               .as(variant.id())
               .isEqualTo(matches);
-          assertThat(events.subList(0, matches))
-              .as(variant.id())
-              .allSatisfy(event -> {
-                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
-                assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
-              });
+          // A Boolean find may defer its bounds until the next find. Each prefix can
+          // therefore be missing at most one reverse search, even though the total is exact.
+          int reverseSearches = 0;
+          for (int index = 0; index < matches; index++) {
+            reverseSearches += events.get(index).reverseDfaSearchCount();
+            assertThat(reverseSearches).as(variant.id()).isBetween(index, index + 1);
+          }
         }
       }
     } finally {

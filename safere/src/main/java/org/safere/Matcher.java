@@ -452,6 +452,16 @@ public final class Matcher implements MatchResult {
   private int deferredMatchEnd;
   private boolean deferredEndMatch;
 
+  // Existence is proved, but the prioritized match has not yet been selected.
+  private boolean deferredFind;
+  // Bounds demand disables both bounded probes and nullable-loop existence deferral, including
+  // across reset(). In particular, repeating unrestricted witnesses at short preferred matches
+  // could rescan overlapping suffixes. This latch does not imply inner-capture demand.
+  private boolean findBoundsObserved;
+
+  // Bound the extra work when a Boolean-only search is subsequently asked for exact bounds.
+  private static final int EARLY_EXISTENCE_WINDOW = 256;
+
   /** Opaque input view retained only until the current region match is consumed or discarded. */
   private InputScanner deferredRegionScanner;
 
@@ -599,6 +609,7 @@ public final class Matcher implements MatchResult {
     deferredMatchStart = 0;
     deferredMatchEnd = 0;
     deferredEndMatch = false;
+    deferredFind = false;
     deferredRegionScanner = null;
     deferredRegionOffset = 0;
   }
@@ -632,7 +643,7 @@ public final class Matcher implements MatchResult {
   private void rememberPreviousMatchEnd() {
     if (hasMatch) {
       if (!groupZeroResolved) {
-        resolveCaptures();
+        resolveMatchBounds();
       }
       previousMatchEnd = groups[1];
     }
@@ -1579,7 +1590,7 @@ public final class Matcher implements MatchResult {
 
   private boolean advanceSearchPositionAfterPreviousMatch() {
     if (!groupZeroResolved) {
-      resolveCaptures();
+      resolveMatchBounds();
     }
     searchFrom = groups[1];
     if (groups[0] == groups[1]) {
@@ -2018,6 +2029,9 @@ public final class Matcher implements MatchResult {
       return applyFailedMatchResult();
     }
 
+    // A deferred existence result already selected this safe search lower bound. Reuse it
+    // rather than repeating prefix acceleration when exact bounds are requested.
+    boolean selectingDeferredFind = deferredFind;
     // Reset deferred-capture state; DFA sandwich path may set it to false.
     clearDeferredCaptureState();
 
@@ -2076,8 +2090,8 @@ public final class Matcher implements MatchResult {
     // check to [effectiveStart, length].
     int effectiveStart = searchFrom;
     boolean literalPrefixCandidateStart = false;
-    boolean startPositionPreselected = false;
-    if (options.startAcceleration() && !prog.anchorStart()) {
+    boolean startPositionPreselected = selectingDeferredFind;
+    if (!selectingDeferredFind && options.startAcceleration() && !prog.anchorStart()) {
       if (scanner instanceof Utf8InputScanner utf8Scanner) {
         Utf8StartAccelerator accelerator = parentPattern.utf8StartAccelerator();
         if (accelerator != null && startAccelerationAllowed(searchFrom, accelerator.policy())) {
@@ -2157,6 +2171,12 @@ public final class Matcher implements MatchResult {
       fwdResult = null;
     } else {
       diagnosticParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER);
+      if (!findBoundsObserved) {
+        int existence = probeFindExistence(scanner, effectiveStart, regionActive, prog, options);
+        if (existence >= 0) {
+          return existence != 0;
+        }
+      }
       fwdResult =
           searchForwardDfa(
               dfa(false),
@@ -2314,6 +2334,22 @@ public final class Matcher implements MatchResult {
     }
 
     if (fwdResult != null && fwdResult.matched() && prog.numLoopRegs() > 0) {
+      if (!regionActive
+          && !findBoundsObserved
+          && !replacementNeedsCaptures
+          && !parentPattern.innerCapturesObserved()
+          && options.lazyCaptureExtraction()) {
+        // Removing unnecessary empty iterations preserves existence, including assertions,
+        // but does not select the same prioritized path. Retain the original lower bound and
+        // full input end; the witness endpoint must not constrain exact selection later.
+        // This proves existence, not preferred bounds. The DFA remains auxiliary until an
+        // exact selection engine can claim boundary authority.
+        applyDeferredMatchResult(
+            effectiveStart, scanner.length(), prog.numCaptures(), false, false);
+        capturesResolved = false;
+        deferredFind = true;
+        return true;
+      }
       diagnosticDecision(
           MatchStrategy.DFA,
           StrategyDisposition.BYPASSED,
@@ -2357,6 +2393,55 @@ public final class Matcher implements MatchResult {
     } else {
       return applyDeferredMatchResult(result[0], result[1], prog.numCaptures(), true, false);
     }
+  }
+
+  /** Returns -1 when exact selection is needed, otherwise the Boolean search result. */
+  private int probeFindExistence(
+      InputScanner scanner,
+      int effectiveStart,
+      boolean regionActive,
+      Prog prog,
+      EnginePathOptions options) {
+    if (!regionActive
+        && !prog.anchorStart()
+        && prog.numLoopRegs() == 0
+        // The native DFA activates guarded-gap narrowing after failed candidates. A separate
+        // scalar probe would repeat that failed prefix without the existing acceleration.
+        && !parentPattern.hasInnerLiteralSearch()
+        && parentPattern.matchDescriptor().minMatchLength() <= EARLY_EXISTENCE_WINDOW
+        && scanner.length() - effectiveStart > 2 * EARLY_EXISTENCE_WINDOW
+        && options.lazyCaptureExtraction()
+        && !replacementNeedsCaptures
+        && !parentPattern.innerCapturesObserved()) {
+      releaseEnginesOwnedByOtherThread();
+      Dfa forward = parentPattern.forwardExistenceDfa(threadCache());
+      Dfa.SearchResult probe =
+          forward.searchWithEarlyExistence(
+              scanner,
+              effectiveStart,
+              startBackoff,
+              effectiveStart + Math.min(EARLY_EXISTENCE_WINDOW, scanner.length() - effectiveStart));
+      startBackoff = forward.startBackoff();
+      if (diagnosticOperation != null) {
+        diagnosticOperation.accumulator().incrementForwardDfaSearchCount();
+        diagnosticDfaBudget(probe);
+      }
+      if (probe != null && probe.matched()) {
+        // This proves existence, not preferred bounds. The DFA remains auxiliary until an
+        // exact selection engine can claim boundary authority.
+        applyDeferredMatchResult(
+            effectiveStart, scanner.length(), prog.numCaptures(), false, false);
+        capturesResolved = false;
+        deferredFind = true;
+        return 1;
+      }
+      if (probe != null && !probe.scanLimitReached()) {
+        diagnosticBoundary(MatchStrategy.DFA);
+        applyFailedMatchResult();
+        return 0;
+      }
+    }
+    return -1;
   }
 
   private static boolean canVerifyLeadingExpansion(StringStartAccelerator accelerator) {
@@ -3279,11 +3364,11 @@ public final class Matcher implements MatchResult {
   public int start(int group) {
     checkMatch();
     checkGroup(group);
-    if (group != 0 || !groupZeroResolved) {
-      if (group != 0) {
-        recordInnerCaptureDemand();
-      }
+    if (group != 0) {
+      recordInnerCaptureDemand();
       resolveCaptures();
+    } else if (!groupZeroResolved) {
+      resolveMatchBounds();
     }
     return groups[2 * group];
   }
@@ -3314,11 +3399,11 @@ public final class Matcher implements MatchResult {
   public int end(int group) {
     checkMatch();
     checkGroup(group);
-    if (group != 0 || !groupZeroResolved) {
-      if (group != 0) {
-        recordInnerCaptureDemand();
-      }
+    if (group != 0) {
+      recordInnerCaptureDemand();
       resolveCaptures();
+    } else if (!groupZeroResolved) {
+      resolveMatchBounds();
     }
     return groups[2 * group + 1];
   }
@@ -3510,8 +3595,8 @@ public final class Matcher implements MatchResult {
     ReplacementSegment[] compiledTemplate = template.get();
     boolean needsCaptures = template.needsCaptures();
     do {
-      if (needsCaptures && !groupZeroResolved) {
-        resolveCaptures();
+      if (deferredFind || (needsCaptures && !groupZeroResolved)) {
+        resolveMatchBounds();
       }
       int matchStart = groupZeroResolved ? groups[0] : deferredMatchStart;
       int matchEnd = groupZeroResolved ? groups[1] : deferredMatchEnd;
@@ -4569,6 +4654,9 @@ public final class Matcher implements MatchResult {
   @Override
   public String toString() {
     String lastMatch = "";
+    if (hasMatch && deferredFind) {
+      resolveMatchBounds();
+    }
     if (hasMatch && groups[0] >= 0 && groups[1] >= groups[0]) {
       lastMatch = text.substring(groups[0], groups[1]);
     }
@@ -4600,7 +4688,7 @@ public final class Matcher implements MatchResult {
     boolean preservedGroupZero = hasMatch;
     if (hasMatch) {
       if (!groupZeroResolved) {
-        resolveCaptures();
+        resolveMatchBounds();
       }
       int prevStart = groups[0];
       int prevEnd = groups[1];
@@ -4701,7 +4789,8 @@ public final class Matcher implements MatchResult {
   // ---------------------------------------------------------------------------
 
   /**
-   * Resolves deferred capture groups. Called lazily when the user accesses any group (e.g., {@code
+   * Resolves a deferred existence result through the ordinary exact-selection pipeline, then
+   * resolves any remaining deferred capture groups. Called lazily on group access (e.g., {@code
    * group(0)}, {@code start(1)}) or when a full snapshot is needed ({@code toMatchResult()}). Runs
    * the submatch engine (OnePass or BitState/NFA) anchored at the DFA-determined match start,
    * bounded by the DFA's match end. For {@code find()}, it does not force the match to extend to
@@ -4713,10 +4802,35 @@ public final class Matcher implements MatchResult {
     if (capturesResolved) {
       return;
     }
+    resolveDeferredFind();
     if (deferredRegionScanner == null) {
       resolveCapturesOnInput(activeScanner());
     } else {
       resolveRegionCaptures();
+    }
+  }
+
+  /** Selects exact group-zero bounds while leaving inner captures lazy when possible. */
+  private void resolveMatchBounds() {
+    resolveDeferredFind();
+    if (!groupZeroResolved) {
+      resolveCaptures();
+    }
+  }
+
+  private void resolveDeferredFind() {
+    if (deferredFind) {
+      // Neither an early probe nor an unguarded nullable-loop witness selects preferred bounds.
+      // Use the original pipeline once with the full input and original assertion context.
+      // The latch prevents another existence-only pass, including after reset().
+      int savedSearchFrom = searchFrom;
+      searchFrom = deferredMatchStart;
+      findBoundsObserved = true;
+      try {
+        doFindCore(false);
+      } finally {
+        searchFrom = savedSearchFrom;
+      }
     }
   }
 
