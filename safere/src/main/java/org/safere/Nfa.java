@@ -505,6 +505,25 @@ final class Nfa {
       MatchKind kind,
       int nsubmatch,
       GraphemeSupport.Context graphemeContext) {
+    EngineContext context =
+        EngineContext.create(
+            prog,
+            text,
+            startPos,
+            searchLimit,
+            endPos,
+            consumeRegionStart,
+            boundaryRegionStart,
+            boundaryEndPos,
+            anchorEndPos,
+            emptyAnchorStartPos,
+            emptyAnchorEndPos,
+            graphemeContext);
+    return search(prog, context, anchor, kind, nsubmatch);
+  }
+
+  static int[] search(
+      Prog prog, EngineContext context, Anchor anchor, MatchKind kind, int nsubmatch) {
     if (prog.start() == 0) {
       return null;
     }
@@ -524,22 +543,8 @@ final class Nfa {
     // We always need at least capture[0..1] to track the match boundaries.
     int ncapture = 2 * Math.max(nsubmatch, 1);
 
-    EngineContext context =
-        EngineContext.create(
-            prog,
-            text,
-            startPos,
-            searchLimit,
-            endPos,
-            consumeRegionStart,
-            boundaryRegionStart,
-            boundaryEndPos,
-            anchorEndPos,
-            emptyAnchorStartPos,
-            emptyAnchorEndPos,
-            graphemeContext);
     Nfa nfa = new Nfa(prog, context, ncapture, longestMode, endmatch);
-    return nfa.runSearch(anchored, kind, nsubmatch, endPos);
+    return nfa.runSearch(anchored, kind, nsubmatch, context.endPos());
   }
 
   /**
@@ -901,8 +906,8 @@ final class Nfa {
       // zero-width iterations, while fresh entries reset only their own loop's register.
       //
       // ALT and CAPTURE can be revisited by a final empty iteration with different captures.
-      // With progress loops, NOP and EMPTY_WIDTH are memoized after expansion: a nested visit
-      // can carry changed loop progress and must reach the final empty iteration, but later visits
+      // With progress loops, NOP and assertions are memoized after expansion. A nested visit can
+      // carry changed loop progress and must reach the final empty iteration, but later visits
       // after completion are redundant. Marking them before expansion loses the loop exit;
       // omitting memoization entirely enumerates the paths through optional epsilon chains.
       // Without progress loops, marking on entry is sufficient and avoids completion bookkeeping.
@@ -910,7 +915,10 @@ final class Nfa {
           && ip.op != InstOp.LOOP_ENTER
           && ip.op != InstOp.ALT
           && ip.op != InstOp.CAPTURE
-          && ((ip.op != InstOp.NOP && ip.op != InstOp.EMPTY_WIDTH) || prog.numLoopRegs() == 0)) {
+          && ((ip.op != InstOp.NOP
+                  && ip.op != InstOp.EMPTY_WIDTH
+                  && ip.op != InstOp.PREVIOUS_MATCH_END)
+              || prog.numLoopRegs() == 0)) {
         if (q.hasGraphemeSemantics) {
           long visitKey = visitKey(ip, instructionId, text, pos, pos);
           if (!q.visitedGrapheme.add(visitKey)) {
@@ -922,7 +930,9 @@ final class Nfa {
           }
           q.visitedInst[instructionId] = q.visitedGeneration;
         }
-      } else if (ip.op == InstOp.NOP || ip.op == InstOp.EMPTY_WIDTH) {
+      } else if (ip.op == InstOp.NOP
+          || ip.op == InstOp.EMPTY_WIDTH
+          || ip.op == InstOp.PREVIOUS_MATCH_END) {
         if (isExpansionComplete(q, instructionId, text, pos)) {
           continue;
         }
@@ -954,6 +964,17 @@ final class Nfa {
             stack.pushRestore(ip.arg, opos);
           }
           id = ip.out;
+        }
+
+        case InstOp.OP_PREVIOUS_MATCH_END -> {
+          if (pos == context.previousMatchEnd()) {
+            if (prog.numLoopRegs() > 0) {
+              stack.pushCompletion(instructionId);
+            }
+            id = ip.out;
+          } else if (prog.numLoopRegs() > 0) {
+            markExpansionComplete(q, instructionId, text, pos);
+          }
         }
 
         case InstOp.OP_EMPTY_WIDTH -> {
