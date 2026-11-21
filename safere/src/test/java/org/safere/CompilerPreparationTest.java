@@ -5,6 +5,7 @@
 
 package org.safere;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Field;
@@ -147,6 +148,30 @@ class CompilerPreparationTest {
     assertReverseDfaPrepared(pattern, regex, true);
   }
 
+  @Test
+  void reverseDfaFirstUsePreservesCaptureBoundsInBothRepresentations() throws Exception {
+    String regex = "([a-z]+)ing\\b";
+    Pattern stringPattern = Pattern.compile(regex);
+    Pattern utf8Pattern = Pattern.compile(regex);
+    String input = "élan running today";
+
+    Matcher stringMatcher = stringPattern.matcher(input);
+    assertThat(stringMatcher.find()).isTrue();
+    assertThat(stringMatcher.group()).isEqualTo("running");
+    assertThat(stringMatcher.group(1)).isEqualTo("runn");
+    assertThat(stringMatcher.start(1)).isEqualTo(5);
+    assertThat(stringMatcher.end(1)).isEqualTo(9);
+    assertReverseDfaPrepared(stringPattern, regex, true);
+
+    Utf8Matcher utf8Matcher = utf8Pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+    assertThat(utf8Matcher.find()).isTrue();
+    assertThat(utf8Matcher.start()).isEqualTo(6);
+    assertThat(utf8Matcher.end()).isEqualTo(13);
+    assertThat(utf8Matcher.start(1)).isEqualTo(6);
+    assertThat(utf8Matcher.end(1)).isEqualTo(10);
+    assertReverseDfaPrepared(utf8Pattern, regex, true);
+  }
+
   /**
    * The {@code CompileBenchmark.compileAndFind{WordZ,Ing,Decimal}{Match,NoMatch}} workloads in
    * {@code benchmark-data.json} measure both sides of building the reverse DFA program on first
@@ -171,7 +196,7 @@ class CompilerPreparationTest {
 
   private static void assertReverseDfaPrepared(Pattern pattern, String regex, boolean prepared)
       throws ReflectiveOperationException {
-    for (String name : new String[] {"reverseProg", "flatReverseDfaProg", "reverseDfaSetup"}) {
+    for (String name : new String[] {"flatReverseDfaProg", "reverseDfaSetup"}) {
       assertThat(field(pattern, name) != null).as("%s for %s", name, regex).isEqualTo(prepared);
     }
   }
@@ -189,7 +214,7 @@ class CompilerPreparationTest {
     Prog dfa = pattern.flatReverseDfaProg();
     Dfa.Setup setup = pattern.reverseDfaSetup();
     assertThat(dfa.numLoopRegs()).isZero();
-    assertThat(pattern.flatReverseProg().numLoopRegs()).isPositive();
+    assertThat(Compiler.compile(pattern.ast(), true).numLoopRegs()).isPositive();
     assertThat(pattern.reverseDfaSetup()).isSameAs(setup);
     Dfa.Setup expected = Dfa.buildSetup(dfa);
     assertThat(setup.boundaries()).containsExactly(expected.boundaries());
