@@ -48,6 +48,7 @@ final class Prog {
   private boolean hasGraphemeClusterInstruction;
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
+  private boolean hasEmptyWidth;
   private boolean hasPreviousMatchEnd;
   private boolean flatNfaSupported;
 
@@ -87,6 +88,7 @@ final class Prog {
     this.hasGraphemeClusterInstruction = other.hasGraphemeClusterInstruction;
     this.hasWordBoundary = other.hasWordBoundary;
     this.hasTextAnchor = other.hasTextAnchor;
+    this.hasEmptyWidth = other.hasEmptyWidth;
     this.hasPreviousMatchEnd = other.hasPreviousMatchEnd;
   }
 
@@ -141,9 +143,11 @@ final class Prog {
     hasGraphemeClusterInstruction = computeHasGraphemeClusterInstruction();
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
+    hasEmptyWidth = false;
     hasPreviousMatchEnd = false;
     flatNfaSupported = !hasGraphemeSemantics;
     for (Inst inst : instArray) {
+      hasEmptyWidth |= inst.op == InstOp.EMPTY_WIDTH;
       hasPreviousMatchEnd |= inst.op == InstOp.PREVIOUS_MATCH_END;
       if (inst.op == InstOp.ALT_MATCH
           || inst.op == InstOp.LOOP_ENTER
@@ -151,6 +155,7 @@ final class Prog {
         flatNfaSupported = false;
       }
     }
+    hasEmptyWidth |= hasPreviousMatchEnd;
     flatNfaSupported &= !hasPreviousMatchEnd;
     lineStartUnixLines = true;
     for (Inst inst : instArray) {
@@ -284,6 +289,11 @@ final class Prog {
    */
   public boolean hasWordBoundary() {
     return hasWordBoundary;
+  }
+
+  /** Returns whether the program contains an assertion, excluding stripped outer anchors. */
+  boolean hasEmptyWidth() {
+    return hasEmptyWidth;
   }
 
   /** Returns whether execution needs the operation's fixed previous-match boundary. */
