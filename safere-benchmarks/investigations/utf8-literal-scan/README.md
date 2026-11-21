@@ -24,6 +24,10 @@ Use `--long` to confirm close or important comparisons. Keep raw measurements an
 Controls cover setup and short-tail costs, early/late/absent literals, scaling, dense endpoint
 candidates, verification-budget fallback, multibyte text and literals, prefix acceleration,
 capture bounds, repeated finds, replacement, single-byte dispatch, and long-literal dispatch.
-These paths can regress through changes to filtering, verification, or shared scan selection.
+`denseFailedCandidates` places one false candidate every nine bytes: its
+first and last bytes agree with `catapult`, and the interior differs. These
+candidates exercise full verification without exhausting its work budget.
+The original `denseEnds` fixture has no endpoint candidates and serves as
+a filter-only control.
 The capture-bounds operation uses `SpecializedBenchmark`; all other controls use
 `CrossEngineBenchmark`.

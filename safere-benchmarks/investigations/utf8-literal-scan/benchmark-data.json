@@ -119,6 +119,15 @@
       "shared": true
     },
     {
+      "id": "denseFailedCandidates",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "cxxxxxxt ",
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
       "id": "fallbackMiss",
       "recipe": {
         "kind": "repeatToLength",
@@ -537,6 +546,33 @@
         "value": false
       },
       "inputRepresentationReason": "Exercises the default UTF-8 literal scanner on pre-existing bytes."
+    },
+    {
+      "id": "Utf8LiteralScan.denseFailedCandidates",
+      "operation": "find",
+      "patterns": [
+        "catapult"
+      ],
+      "inputs": [
+        "denseFailedCandidates"
+      ],
+      "inputRepresentations": [
+        "preexistingUtf8"
+      ],
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "inputRepresentationReason": "Exercises dense false positives in default UTF-8 literal verification."
     },
     {
       "id": "Utf8LiteralScan.fallbackMiss",
