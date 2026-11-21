@@ -23,5 +23,7 @@ public enum PatternFeature {
   PROGRESS_CHECK,
   START_ANCHOR,
   END_ANCHOR,
-  CAPTURES_IN_QUANTIFIER
+  CAPTURES_IN_QUANTIFIER,
+  /** A previous-match boundary assertion ({@code \G}). */
+  PREVIOUS_MATCH_BOUNDARY
 }
