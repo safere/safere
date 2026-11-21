@@ -495,8 +495,8 @@ final class FuzzSupport {
       StringBuilder safeRe = new StringBuilder();
       StringBuilder jdk = new StringBuilder();
       lastReplacement = replacement;
-      boolean completed =
-          assertSameReplacementOutcome(
+      ReplacementOutcome outcome =
+          replacementOutcome(
               "appendReplacement",
               replacement,
               () -> {
@@ -510,18 +510,20 @@ final class FuzzSupport {
                     () -> jdkMatcher.appendReplacement(jdk, replacement));
                 return jdk.toString();
               });
-      if (completed) {
+      if (outcome.completed()) {
         output.append(safeRe);
+      } else {
+        assertSameRejectedAppendDestination(outcome, safeRe, jdk, false);
       }
-      return completed;
+      return outcome.completed();
     }
 
     boolean appendReplacement(StringBuffer output, String replacement) {
       StringBuffer safeRe = new StringBuffer();
       StringBuffer jdk = new StringBuffer();
       lastReplacement = replacement;
-      boolean completed =
-          assertSameReplacementOutcome(
+      ReplacementOutcome outcome =
+          replacementOutcome(
               "appendReplacement",
               replacement,
               () -> {
@@ -535,10 +537,39 @@ final class FuzzSupport {
                     () -> jdkMatcher.appendReplacement(jdk, replacement));
                 return jdk.toString();
               });
-      if (completed) {
+      if (outcome.completed()) {
         output.append(safeRe);
+      } else {
+        assertSameRejectedAppendDestination(outcome, safeRe, jdk, true);
       }
-      return completed;
+      return outcome.completed();
+    }
+
+    /**
+     * After both engines reject a replacement, compares their destinations where the JDK's outcome
+     * is defined by its rollback rule. OpenJDK rolls back an {@link IllegalArgumentException}, so
+     * both destinations must be unchanged. Both overloads keep the partial output on an {@link
+     * IndexOutOfBoundsException}; SafeRE matches that for {@link StringBuilder}, but its {@link
+     * StringBuffer} overload leaves the destination unchanged, so that combination is not compared.
+     */
+    private void assertSameRejectedAppendDestination(
+        ReplacementOutcome outcome, CharSequence safeRe, CharSequence jdk, boolean stringBuffer) {
+      RuntimeException safeReRejection = outcome.safeReRejection();
+      RuntimeException jdkRejection = outcome.jdkRejection();
+      if (!jdkOracleAvailable || safeReRejection == null || jdkRejection == null) {
+        return;
+      }
+      boolean rolledBack =
+          safeReRejection instanceof IllegalArgumentException
+              && jdkRejection instanceof IllegalArgumentException;
+      boolean partialBuilderOutput =
+          !stringBuffer
+              && safeReRejection instanceof IndexOutOfBoundsException
+              && jdkRejection instanceof IndexOutOfBoundsException;
+      if (rolledBack || partialBuilderOutput) {
+        assertSame(
+            "appendReplacement destination after rejection", safeRe.toString(), jdk.toString());
+      }
     }
 
     void appendTail(StringBuilder output) {
@@ -607,26 +638,39 @@ final class FuzzSupport {
         String replacement,
         StringOperation safeReOperation,
         StringOperation jdkOperation) {
+      return replacementOutcome(operation, replacement, safeReOperation, jdkOperation).completed();
+    }
+
+    /**
+     * Runs a replacement operation on both engines and asserts that they agree. A result that is
+     * not completed carries both engines' expected rejections, or none when the JDK oracle is
+     * unavailable.
+     */
+    private ReplacementOutcome replacementOutcome(
+        String operation,
+        String replacement,
+        StringOperation safeReOperation,
+        StringOperation jdkOperation) {
       OperationResult<String> safeRe = OperationResult.capture(safeReOperation);
       if (!jdkOracleAvailable) {
-        return false;
+        return ReplacementOutcome.UNAVAILABLE;
       }
       OperationResult<String> jdk = OperationResult.capture(jdkOperation);
       if (!jdkOracleAvailable) {
-        return false;
+        return ReplacementOutcome.UNAVAILABLE;
       }
       if (safeRe.throwable() == null && jdk.throwable() == null) {
         assertSame(operation, replacement, safeRe.value(), jdk.value());
         if (operation.equals("replaceAll") || operation.equals("replaceAll(function)")) {
           assertExhaustedReplacementState();
         }
-        return true;
+        return ReplacementOutcome.COMPLETED;
       }
       if (safeRe.throwable() != null
           && jdk.throwable() != null
           && isExpectedReplacementException(safeRe.throwable())
           && isExpectedReplacementException(jdk.throwable())) {
-        return false;
+        return new ReplacementOutcome(false, safeRe.throwable(), jdk.throwable());
       }
       throw divergence(operation, replacement, safeRe.describe(), jdk.describe());
     }
@@ -717,6 +761,16 @@ final class FuzzSupport {
       }
       return result.value();
     }
+  }
+
+  /**
+   * The agreed outcome of a replacement operation: completed, rejected by both engines with the
+   * given expected exceptions, or unknown because the JDK oracle was unavailable.
+   */
+  private record ReplacementOutcome(
+      boolean completed, RuntimeException safeReRejection, RuntimeException jdkRejection) {
+    static final ReplacementOutcome COMPLETED = new ReplacementOutcome(true, null, null);
+    static final ReplacementOutcome UNAVAILABLE = new ReplacementOutcome(false, null, null);
   }
 
   private record OperationResult<T>(T value, RuntimeException throwable) {

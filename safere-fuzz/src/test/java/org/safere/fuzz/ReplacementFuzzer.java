@@ -13,6 +13,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 public final class ReplacementFuzzer {
+  private static final List<String> PARTIAL_OUTPUT_PATTERNS =
+      List.of("(?<part>x)", "(x)(?<part>y)?");
+  private static final List<String> PARTIAL_OUTPUT_PREFIXES =
+      List.of("", "lit", "$0", "$1", "${part}", "lit$1");
+  private static final List<String> MALFORMED_REPLACEMENT_SUFFIXES =
+      List.of("\\", "$", "$9", "$x", "${", "${}", "${nope}", "${part");
 
   @Test
   void terminalEmptyReplacementState() {
@@ -44,6 +50,26 @@ public final class ReplacementFuzzer {
         pattern.matcher(input).replaceFirst(replacement);
         appendReplacementLoop(pattern, input, replacement, false);
         appendReplacementLoop(pattern, input, replacement, true);
+      }
+    }
+  }
+
+  @Test
+  void rejectedReplacementAfterPartialOutput() {
+    // Each template fails after literal text or a valid group reference has been expanded, so the
+    // oracle compares destinations after an IllegalArgumentException rollback and after an
+    // IndexOutOfBoundsException that keeps partial output.
+    for (String regex : PARTIAL_OUTPUT_PATTERNS) {
+      FuzzSupport.CompiledPattern pattern = FuzzSupport.compileOrSkip(regex, 0);
+      assertThat(pattern).isNotNull();
+      for (String prefix : PARTIAL_OUTPUT_PREFIXES) {
+        for (String suffix : MALFORMED_REPLACEMENT_SUFFIXES) {
+          String replacement = prefix + suffix;
+          for (String input : List.of("axb", "xyax", "")) {
+            appendReplacementLoop(pattern, input, replacement, false);
+            appendReplacementLoop(pattern, input, replacement, true);
+          }
+        }
       }
     }
   }
@@ -121,6 +147,19 @@ public final class ReplacementFuzzer {
       flags = 0;
       input = "a" + data.consumeString(8);
       replacement = nonAsciiDigitReplacement(data);
+    } else if (data.consumeBoolean()) {
+      // A malformed suffix after literal text or a valid group reference makes the expansion fail
+      // after writing partial output, which must be rolled back only as the JDK does.
+      regex = data.pickValue(PARTIAL_OUTPUT_PATTERNS);
+      flags = 0;
+      StringBuilder text = new StringBuilder();
+      int length = data.consumeInt(0, 16);
+      for (int i = 0; i < length; i++) {
+        text.append(data.pickValue(List.of("x", "y", "a", "xy")));
+      }
+      input = text.toString();
+      replacement =
+          data.pickValue(PARTIAL_OUTPUT_PREFIXES) + data.pickValue(MALFORMED_REPLACEMENT_SUFFIXES);
     } else {
       regex = data.consumeString(256);
       flags = FuzzSupport.consumeFlags(data);
@@ -132,8 +171,12 @@ public final class ReplacementFuzzer {
       return;
     }
 
+    boolean useStringBuffer = data.consumeBoolean();
     FuzzSupport.MatcherPair replaceAllMatcher = pattern.matcher(input);
     if (!replaceAllMatcher.replaceAll(replacement)) {
+      // A rejected template may still produce partial output before the append loop reaches the
+      // invalid part, so check the destination after rejection on a fresh matcher.
+      appendReplacementLoop(pattern, input, replacement, useStringBuffer);
       return;
     }
     replaceAllMatcher.reset();
@@ -141,11 +184,12 @@ public final class ReplacementFuzzer {
 
     FuzzSupport.MatcherPair replaceFirstMatcher = pattern.matcher(input);
     if (!replaceFirstMatcher.replaceFirst(replacement)) {
+      appendReplacementLoop(pattern, input, replacement, useStringBuffer);
       return;
     }
     replaceFirstMatcher.hasReplacementMatchState();
 
-    appendReplacementLoop(pattern, input, replacement, data.consumeBoolean());
+    appendReplacementLoop(pattern, input, replacement, useStringBuffer);
   }
 
   /**
