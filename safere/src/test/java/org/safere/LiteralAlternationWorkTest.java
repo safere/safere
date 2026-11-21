@@ -130,6 +130,21 @@ class LiteralAlternationWorkTest {
     }
   }
 
+  @Test
+  void regionSearchWorkIsIndependentOfTheBackingStringTail() {
+    Pattern pattern = Pattern.compile("north|south|east|west|upper|lower|front|back");
+    for (String filler : new String[] {"x", "n"}) {
+      String text = "north " + filler.repeat(4_096) + "back";
+      int regionEnd = text.length() - 1;
+      Matcher small = pattern.matcher(text).region(6, regionEnd);
+      Matcher large = pattern.matcher(text + "x".repeat(1_048_576)).region(6, regionEnd);
+      long smallWork = WorkCounter.countForTesting(() -> assertThat(small.find()).isFalse());
+      long largeWork = WorkCounter.countForTesting(() -> assertThat(large.find()).isFalse());
+      assertThat(smallWork).isPositive();
+      assertThat(largeWork).as(filler).isEqualTo(smallWork);
+    }
+  }
+
   private static long work(Pattern pattern, String text) {
     return WorkCounter.countForTesting(() -> assertThat(pattern.matcher(text).find()).isTrue());
   }
