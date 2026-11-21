@@ -207,13 +207,10 @@ public final class Pattern implements Serializable {
   private transient volatile Dfa.Setup forwardDfaSetup;
 
   /**
-   * Reverse-compiled program for backward DFA matching. Computed on first use: only unanchored
-   * {@code find()} operations whose forward DFA search finds a match, and end-anchored searches
-   * over long inputs, need it.
+   * Flattened program for backward DFA matching. Computed on first use: only unanchored {@code
+   * find()} operations whose forward DFA search finds a match, and end-anchored searches over long
+   * inputs, need it.
    */
-  private transient volatile Prog reverseProg;
-
-  private transient volatile Prog flatReverseProg;
   private transient volatile Prog flatReverseDfaProg;
 
   /**
@@ -2205,43 +2202,6 @@ public final class Pattern implements Serializable {
     return multiAnchor;
   }
 
-  /**
-   * Returns the reverse-compiled program for backward DFA matching, compiling it on first access.
-   *
-   * <p>Like the other lazily built artifacts, the volatile fast path serves initialized readers and
-   * the synchronized slow path builds the program once under concurrent first use.
-   */
-  Prog reverseProg() {
-    Prog rp = reverseProg;
-    if (rp == null) {
-      synchronized (this) {
-        rp = reverseProg;
-        if (rp == null) {
-          rp = Compiler.compile(ast, true);
-          reverseProg = rp;
-        }
-      }
-    }
-    return rp;
-  }
-
-  Prog flatReverseProg() {
-    Prog frp = flatReverseProg;
-    if (frp == null) {
-      synchronized (this) {
-        frp = flatReverseProg;
-        if (frp == null) {
-          Prog rp = reverseProg();
-          if (rp != null) {
-            frp = rp.flattenedCopy();
-            flatReverseProg = frp;
-          }
-        }
-      }
-    }
-    return frp;
-  }
-
   Prog flatReverseDfaProg() {
     Prog frp = flatReverseDfaProg;
     if (frp == null) {
@@ -2249,24 +2209,17 @@ public final class Pattern implements Serializable {
       synchronized (this) {
         frp = flatReverseDfaProg;
         if (frp == null) {
-          // Prepare once under the lock rather than retaining the tree after construction.
           Compiler.Prepared prepared = Compiler.prepare(ast);
-          Prog rp = reverseProg;
-          if (rp == null) {
-            rp = Compiler.compile(prepared, true);
-            reverseProg = rp;
-          }
-          if (rp != null) {
-            if (rp.numLoopRegs() > 0) {
-              Prog dfaRp = Compiler.compileForDfa(prepared, true);
-              if (dfaRp != null) {
-                frp = dfaRp.flattenedCopy();
-              } else {
-                frp = flatReverseProg();
+          Prog graph = Compiler.compile(prepared, true);
+          if (graph != null) {
+            if (graph.numLoopRegs() > 0) {
+              Prog dfaGraph = Compiler.compileForDfa(prepared, true);
+              if (dfaGraph != null) {
+                graph = dfaGraph;
               }
-            } else {
-              frp = flatReverseProg();
             }
+            // The reverse DFA executes only the flattened program.
+            frp = graph.flattenedCopy();
             reverseDfaSetup = Dfa.buildSetup(frp);
             contextFreeReverseLanguage =
                 hasContextFreeLanguage(prog) && hasContextFreeLanguage(frp);
