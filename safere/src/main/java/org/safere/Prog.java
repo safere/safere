@@ -49,6 +49,7 @@ final class Prog {
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
   private boolean hasEmptyWidth;
+  private boolean hasPreviousMatchEnd;
   private boolean flatNfaSupported;
 
   /** Creates an empty program. */
@@ -88,6 +89,7 @@ final class Prog {
     this.hasWordBoundary = other.hasWordBoundary;
     this.hasTextAnchor = other.hasTextAnchor;
     this.hasEmptyWidth = other.hasEmptyWidth;
+    this.hasPreviousMatchEnd = other.hasPreviousMatchEnd;
   }
 
   /** Returns the instruction at the given index. Must be called after {@link #freeze()}. */
@@ -142,17 +144,21 @@ final class Prog {
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
     hasEmptyWidth = false;
+    hasPreviousMatchEnd = false;
     flatNfaSupported = !hasGraphemeSemantics;
     for (Inst inst : instArray) {
+      hasEmptyWidth |= inst.op == InstOp.EMPTY_WIDTH;
+      hasPreviousMatchEnd |= inst.op == InstOp.PREVIOUS_MATCH_END;
       if (inst.op == InstOp.ALT_MATCH
           || inst.op == InstOp.LOOP_ENTER
           || inst.op == InstOp.PROGRESS_CHECK) {
         flatNfaSupported = false;
       }
     }
+    hasEmptyWidth |= hasPreviousMatchEnd;
+    flatNfaSupported &= !hasPreviousMatchEnd;
     lineStartUnixLines = true;
     for (Inst inst : instArray) {
-      hasEmptyWidth |= inst.opCode == InstOp.OP_EMPTY_WIDTH;
       if (inst.op == InstOp.EMPTY_WIDTH && (inst.arg & EmptyOp.BEGIN_LINE) != 0) {
         lineStartUnixLines = false;
         break;
@@ -288,6 +294,11 @@ final class Prog {
   /** Returns whether the program contains an assertion, excluding stripped outer anchors. */
   boolean hasEmptyWidth() {
     return hasEmptyWidth;
+  }
+
+  /** Returns whether execution needs the operation's fixed previous-match boundary. */
+  boolean hasPreviousMatchEnd() {
+    return hasPreviousMatchEnd;
   }
 
   boolean hasTextAnchor() {
@@ -644,7 +655,14 @@ final class Prog {
           addSuccessor(inst.out, reachable, stack);
           addSuccessor(inst.out1, reachable, stack);
         }
-        case NOP, CAPTURE, LOOP_ENTER, EMPTY_WIDTH, CHAR_RANGE, CHAR_CLASS, GRAPHEME_CLUSTER ->
+        case NOP,
+            CAPTURE,
+            LOOP_ENTER,
+            EMPTY_WIDTH,
+            PREVIOUS_MATCH_END,
+            CHAR_RANGE,
+            CHAR_CLASS,
+            GRAPHEME_CLUSTER ->
             addSuccessor(inst.out, reachable, stack);
         default -> {
           // MATCH and FAIL terminate.
@@ -685,7 +703,7 @@ final class Prog {
         addEpsilonSuccessor(inst.out, reachable, visited, stack);
         addEpsilonSuccessor(inst.out1, reachable, visited, stack);
       }
-      case NOP, CAPTURE, LOOP_ENTER, EMPTY_WIDTH -> {
+      case NOP, CAPTURE, LOOP_ENTER, EMPTY_WIDTH, PREVIOUS_MATCH_END -> {
         addEpsilonSuccessor(inst.out, reachable, visited, stack);
       }
       default -> {
@@ -871,7 +889,13 @@ final class Prog {
           stack.add(out1);
           nextId = out;
         }
-        case CHAR_RANGE, CHAR_CLASS, CAPTURE, LOOP_ENTER, EMPTY_WIDTH, GRAPHEME_CLUSTER -> {
+        case CHAR_RANGE,
+            CHAR_CLASS,
+            CAPTURE,
+            LOOP_ENTER,
+            EMPTY_WIDTH,
+            PREVIOUS_MATCH_END,
+            GRAPHEME_CLUSTER -> {
           int out = inst.out;
           if (rootmap[out] == -1) {
             rootmap[out] = roots.size();
@@ -953,6 +977,7 @@ final class Prog {
             CAPTURE,
             LOOP_ENTER,
             EMPTY_WIDTH,
+            PREVIOUS_MATCH_END,
             GRAPHEME_CLUSTER,
             PROGRESS_CHECK,
             MATCH,
@@ -1040,7 +1065,13 @@ final class Prog {
           newInst.out1 = rootmap[inst.out1];
           flat.add(newInst);
         }
-        case CAPTURE, LOOP_ENTER, EMPTY_WIDTH, CHAR_RANGE, CHAR_CLASS, GRAPHEME_CLUSTER -> {
+        case CAPTURE,
+            LOOP_ENTER,
+            EMPTY_WIDTH,
+            PREVIOUS_MATCH_END,
+            CHAR_RANGE,
+            CHAR_CLASS,
+            GRAPHEME_CLUSTER -> {
           Inst newInst = new Inst(inst);
           newInst.out = rootmap[inst.out];
           flat.add(newInst);
