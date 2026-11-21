@@ -5,6 +5,7 @@
 
 package org.safere;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
@@ -39,6 +40,46 @@ class EndAnchorRegionCompatibilityMatrixTest {
             scenario.anchoringBounds(),
             regexCase.flags())
         .isEqualTo(jdkTrace);
+  }
+
+  @ParameterizedTest(name = "[{index}] {0}")
+  @MethodSource("longFinalTerminatorCases")
+  void reluctantTailPrefersTheEarliestEligibleEnd(
+      String anchor, String terminator, int prefixLength, String tail, int flags) {
+    String regex = "(?s)" + tail + anchor;
+    String input = "a".repeat(prefixLength) + "cx" + terminator;
+    java.util.regex.Matcher jdk = java.util.regex.Pattern.compile(regex, flags).matcher(input);
+    Pattern pattern = Pattern.compile(regex, flags);
+    Matcher stringMatcher = pattern.matcher(input);
+    Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8)));
+
+    while (jdk.find()) {
+      assertThat(stringMatcher.find()).isTrue();
+      assertThat(utf8Matcher.find()).isTrue();
+      assertThat(stringMatcher.start()).isEqualTo(jdk.start());
+      assertThat(stringMatcher.end()).isEqualTo(jdk.end());
+      assertThat(utf8Matcher.start())
+          .isEqualTo(input.substring(0, jdk.start()).getBytes(UTF_8).length);
+      assertThat(utf8Matcher.end()).isEqualTo(input.substring(0, jdk.end()).getBytes(UTF_8).length);
+    }
+    assertThat(stringMatcher.find()).isFalse();
+    assertThat(utf8Matcher.find()).isFalse();
+  }
+
+  private static Stream<Arguments> longFinalTerminatorCases() {
+    List<Arguments> cases = new ArrayList<>();
+    for (String anchor : List.of("$", "\\Z", "\\z")) {
+      for (String terminator : List.of("", "\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029")) {
+        for (int length : List.of(1_024, 1_500)) {
+          for (String tail : List.of(".*c.+?", ".*c(.+?)")) {
+            for (int flags : List.of(0, Pattern.UNIX_LINES)) {
+              cases.add(Arguments.of(anchor, terminator, length, tail, flags));
+            }
+          }
+        }
+      }
+    }
+    return cases.stream();
   }
 
   private static Stream<Arguments> endAnchorRegionCases() {
