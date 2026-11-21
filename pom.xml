@@ -68,6 +68,8 @@
     <!-- Extra production checks for the published library only; tools may print and exit. -->
     <error-prone.library-checks></error-prone.library-checks>
     <error-prone.extra-checks></error-prone.extra-checks>
+    <!-- Spotless provisions this version at execution time. The prepare-maven-cache
+         job runs Spotless so the shared Maven cache includes the formatter. -->
     <google-java-format.version>2.0.0</google-java-format.version>
     <pmd.version>7.29.0</pmd.version>
     <spotless.version>3.11.0</spotless.version>
