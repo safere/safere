@@ -6,25 +6,93 @@
 package org.safere.benchmark;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openjdk.jmh.infra.Blackhole;
 
 class BenchmarkOperationTest {
+  @Test
+  void utf8CaptureTextDecodesNativeBoundsIncludingBorrowedViewOffsets() {
+    byte[] storage = "!!é😀 tail??".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    RegexEngineVariant.RegexInput input =
+        RegexEngineVariant.utf8Input(storage, 2, storage.length - 4);
+    try (RegexEngineVariant.CompiledRegex pattern =
+        RegexEngineVariant.SAFERE_UTF8.compile("(é)(😀)(x)?()")) {
+      RegexEngineVariant.MatchCursor cursor = pattern.matcher(input);
+      assertThatThrownBy(() -> cursor.group(1)).isInstanceOf(IllegalStateException.class);
+      assertThat(cursor.find()).isTrue();
+      assertThat(cursor.group(0)).isEqualTo("é😀");
+      assertThat(cursor.group(1)).isEqualTo("é");
+      assertThat(cursor.group(2)).isEqualTo("😀");
+      assertThat(cursor.start(2)).isEqualTo(2);
+      assertThat(cursor.end(2)).isEqualTo(6);
+      assertThat(cursor.group(3)).isNull();
+      assertThat(cursor.group(4)).isEmpty();
+      assertThatThrownBy(() -> cursor.group(5)).isInstanceOf(IndexOutOfBoundsException.class);
+      cursor.reset();
+      assertThat(cursor.find()).isTrue();
+      assertThat(cursor.group(0)).isEqualTo("é😀");
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(
       value = RegexEngineVariant.class,
-      names = {"SAFERE_STRING", "SAFERE_UTF8", "JDK_STRING"})
-  void tokenizerAdvancesInNativeCoordinatesAndCanReuseItsMatcher(RegexEngineVariant variant) {
+      names = {"SAFERE_STRING", "JDK_STRING"})
+  void functionalReplacementConsumesLiteralCaptureTextAndHandlesNonparticipation(
+      RegexEngineVariant variant) {
+    for (String regex : List.of("(.)", "(x)?y")) {
+      String inputText = regex.equals("(.)") ? "$\\" : "y";
+      String expected = regex.equals("(.)") ? inputText : "";
+      var input = new RegexEngineVariant.StringRegexInput(inputText);
+      try (var compiled = variant.compile(regex)) {
+        Object actual =
+            BenchmarkOperation.REPLACE_ALL_FUNCTION.execute(
+                variant,
+                List.of(regex),
+                List.of(compiled),
+                List.of(input),
+                new int[] {1},
+                null,
+                0,
+                new DeclarativeBenchmarkPlan.MatcherLifecycle(
+                    DeclarativeBenchmarkPlan.MatcherReuse.NONE, List.of()),
+                null,
+                0,
+                0,
+                null);
+        assertThat(actual).isEqualTo(expected);
+      }
+    }
+  }
+
+  static Stream<Arguments> tokenizerModes() {
+    return Stream.of(
+            RegexEngineVariant.SAFERE_STRING,
+            RegexEngineVariant.SAFERE_UTF8,
+            RegexEngineVariant.JDK_STRING)
+        .flatMap(variant ->
+            Stream.of(null, "", "regionBounds", "independent")
+                .map(mode -> Arguments.of(variant, mode)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("tokenizerModes")
+  void tokenizerAdvancesInNativeCoordinatesAndCanReuseItsMatcher(
+      RegexEngineVariant variant, String mode) {
     RegexEngineVariant.RegexInput input =
         variant == RegexEngineVariant.SAFERE_UTF8
-            ? new RegexEngineVariant.Utf8RegexInput(
-                org.safere.Utf8Input.validated(
-                    "é 12 é ".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+            ? RegexEngineVariant.utf8Input(
+                "é 12 é ".getBytes(java.nio.charset.StandardCharsets.UTF_8))
             : new RegexEngineVariant.StringRegexInput("é 12 é ");
     try (RegexEngineVariant.CompiledRegex pattern = variant.compile("[^ ]+| +")) {
       BenchmarkOperation operation = BenchmarkOperation.MATCHER_REGION_TOKENIZE;
@@ -44,7 +112,7 @@ class BenchmarkOperationTest {
                   null,
                   0,
                   0,
-                  "integer"))
+                  mode))
           .isEqualTo(6);
       BenchmarkOperation.BenchmarkTask task =
           operation.bind(
@@ -59,7 +127,7 @@ class BenchmarkOperationTest {
               null,
               0,
               0,
-              "integer");
+              mode);
       Blackhole blackhole =
           new Blackhole(
               "Today's password is swordfish. I understand instantiating Blackholes directly is"

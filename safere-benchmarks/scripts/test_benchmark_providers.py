@@ -55,6 +55,7 @@ class BenchmarkProviderRunnerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             shutil.copyfile(ROOT / wrapper, root / wrapper)
+            shutil.copytree(ROOT / "tools", root / "tools")
             if investigation:
                 study = root / "safere-benchmarks" / "investigations" / investigation
                 (study / "src/main/java").mkdir(parents=True)
@@ -74,6 +75,7 @@ class BenchmarkProviderRunnerTest(unittest.TestCase):
             calls_file = root / "calls.jsonl"
             env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
                        JAVA_CALLS=str(calls_file))
+            env["SAFERE_MACHINE_LOCK_FILE"] = str(root / "machine.lock")
             if fail_vector:
                 env["FAIL_VECTOR"] = "1"
             result = subprocess.run([os.environ.get("SAFERE_BENCHMARK_TEST_BASH", "/bin/bash"),
@@ -139,6 +141,8 @@ class BenchmarkProviderRunnerTest(unittest.TestCase):
                     self.assertEqual("@safere-utf8-vector" in parameters, vector)
                     if "noFork" in args[-1]:
                         self.assertEqual(args[args.index("-f") + 1], "0")
+                    if "coldStart" in args[-1]:
+                        self.assertEqual(args[args.index("-foe") + 1], "true")
 
     def test_focused_vector_run_does_not_require_cold_start_trials(self):
         result, measurements = self.run_wrapper("run-java-benchmarks.sh", arguments=[

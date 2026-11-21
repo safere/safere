@@ -96,20 +96,18 @@ class DfaStartAccelerationBackoffTest {
         Pattern.compile(REGEX).matcher(Utf8Input.validated((dense + sparse).getBytes(UTF_8)));
 
     WorkCounter.StartAccelerationWork denseWork =
-        WorkCounter.countStartAccelerationForTesting(
-            () -> {
-              for (int i = 0; i < DENSE_COUNT; i++) {
-                assertThat(utf8 ? utf8Matcher.find() : matcher.find()).isTrue();
-              }
-            });
+        WorkCounter.countStartAccelerationForTesting(() -> {
+          for (int i = 0; i < DENSE_COUNT; i++) {
+            assertThat(utf8 ? utf8Matcher.find() : matcher.find()).isTrue();
+          }
+        });
     WorkCounter.StartAccelerationWork sparseWork =
-        WorkCounter.countStartAccelerationForTesting(
-            () -> {
-              for (int i = 0; i < sparseCount; i++) {
-                assertThat(utf8 ? utf8Matcher.find() : matcher.find()).isTrue();
-              }
-              assertThat(utf8 ? utf8Matcher.find() : matcher.find()).isFalse();
-            });
+        WorkCounter.countStartAccelerationForTesting(() -> {
+          for (int i = 0; i < sparseCount; i++) {
+            assertThat(utf8 ? utf8Matcher.find() : matcher.find()).isTrue();
+          }
+          assertThat(utf8 ? utf8Matcher.find() : matcher.find()).isFalse();
+        });
 
     assertThat(denseWork.largestQuarantine()).isEqualTo(POLICY.maxQuarantineWindow());
     // At most one maximal quarantine window, carried over from the dense input, runs without

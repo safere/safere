@@ -928,9 +928,8 @@ final class DeclarativeBenchmarkPlan {
     TrialExclusion {
       engineIds = List.copyOf(engineIds);
       Map<String, Set<ParameterValue>> copied = new LinkedHashMap<>();
-      when.forEach(
-          (axis, values) ->
-              copied.put(axis, Collections.unmodifiableSet(new LinkedHashSet<>(values))));
+      when.forEach((axis, values) ->
+          copied.put(axis, Collections.unmodifiableSet(new LinkedHashSet<>(values))));
       when = Collections.unmodifiableMap(copied);
     }
 
@@ -1125,26 +1124,24 @@ final class DeclarativeBenchmarkPlan {
             List<String> values = new ArrayList<>();
             value
                 .getAsJsonArray()
-                .forEach(
-                    item -> {
-                      if (!isString(item)) {
-                        throw new IllegalArgumentException();
-                      }
-                      values.add(item.getAsString());
-                    });
+                .forEach(item -> {
+                  if (!isString(item)) {
+                    throw new IllegalArgumentException();
+                  }
+                  values.add(item.getAsString());
+                });
             yield new RecipeStringList(values);
           }
           case INTEGER_LIST -> {
             List<Integer> values = new ArrayList<>();
             value
                 .getAsJsonArray()
-                .forEach(
-                    item -> {
-                      if (!isIntegerPrimitive(item)) {
-                        throw new IllegalArgumentException();
-                      }
-                      values.add(item.getAsBigDecimal().intValueExact());
-                    });
+                .forEach(item -> {
+                  if (!isIntegerPrimitive(item)) {
+                    throw new IllegalArgumentException();
+                  }
+                  values.add(item.getAsBigDecimal().intValueExact());
+                });
             yield new RecipeIntegerList(values);
           }
         };
@@ -1205,10 +1202,9 @@ final class DeclarativeBenchmarkPlan {
         Map<String, ParameterValue> parameters, String inputId, String argumentName) {
       return new RecipeStringList(
           values.stream()
-              .map(
-                  value ->
-                      DeclarativeBenchmarkPlan.substituteValue(
-                          value, parameters, inputId + " recipe " + argumentName))
+              .map(value ->
+                  DeclarativeBenchmarkPlan.substituteValue(
+                      value, parameters, inputId + " recipe " + argumentName))
               .toList());
     }
   }
@@ -1461,11 +1457,10 @@ final class DeclarativeBenchmarkPlan {
           List<Integer> codePoints = integers(arguments, "codePoints");
           if (codePoints.isEmpty()
               || codePoints.stream()
-                  .anyMatch(
-                      codePoint ->
-                          !Character.isValidCodePoint(codePoint)
-                              || (codePoint >= Character.MIN_SURROGATE
-                                  && codePoint <= Character.MAX_SURROGATE))) {
+                  .anyMatch(codePoint ->
+                      !Character.isValidCodePoint(codePoint)
+                          || (codePoint >= Character.MIN_SURROGATE
+                              && codePoint <= Character.MAX_SURROGATE))) {
             throw new IllegalArgumentException(
                 "randomCodePoints recipe requires valid Unicode scalar codePoints");
           }
@@ -1612,6 +1607,8 @@ final class DeclarativeBenchmarkPlan {
     CAPTURE_GROUPS("captureGroups", false, true, Feature.MATCHES, Feature.CAPTURE_TEXT),
     REPLACE_FIRST("replaceFirst", false, true, Feature.REPLACE),
     REPLACE_ALL("replaceAll", false, true, Feature.REPLACE),
+    REPLACE_ALL_FUNCTION(
+        "replaceAllFunction", false, true, Feature.REPLACE, Feature.FUNCTIONAL_REPLACEMENT),
     REPLACE_ALL_LENGTH_SUM("replaceAllLengthSum", false, true, Feature.REPLACE),
     APPEND_REPLACEMENT("appendReplacement", false, true, Feature.REPLACE),
     MANUAL_REPLACE_ALL(
@@ -1620,7 +1617,11 @@ final class DeclarativeBenchmarkPlan {
     SPLIT_LENGTH_SUM("splitLengthSum", false, true, Feature.SPLIT),
     COMPILE("compile", false, false),
     COMPILE_AND_FIND("compileAndFind", false, true, Feature.FIND),
+    COMPILE_AND_FIND_GROUP_PRESENT(
+        "compileAndFindGroupPresent", false, true, Feature.FIND, Feature.CAPTURE_PARTICIPATION),
     COMPILE_AND_MATCHES("compileAndMatches", false, true, Feature.MATCHES),
+    COMPILE_AND_FIND_GROUP("compileAndFindGroup", false, true, Feature.FIND, Feature.CAPTURE_TEXT),
+    COMPILE_AND_REPLACE_ALL("compileAndReplaceAll", false, true, Feature.REPLACE),
     FIND_ROTATING_UTF16("findRotatingUtf16", false, false, Feature.FIND),
     COMPILE_AND_FIND_ROTATING_UTF16("compileAndFindRotatingUtf16", false, false, Feature.FIND),
     MATCHER_CONSTRUCTION("matcherConstruction", false, true, Feature.UTF8_INPUT),
@@ -1733,6 +1734,12 @@ final class DeclarativeBenchmarkPlan {
         throw new IllegalArgumentException(
             id + " operation " + jsonName + " is incompatible with compileOnly mode");
       }
+      if (measurement.constraints().contains(ExecutionConstraint.PRECOMPILE_ASCII)
+          && (measurement.mode() != MeasurementMode.SINGLE_SHOT_COLD_START
+              || this != COMPILE_AND_FIND_GROUP_PRESENT)) {
+        throw new IllegalArgumentException(
+            id + " precompileAscii requires singleShotColdStart and compileAndFindGroupPresent");
+      }
     }
 
     EnumSet<Feature> requiredFeatures() {
@@ -1747,6 +1754,7 @@ final class DeclarativeBenchmarkPlan {
             FIND_GROUP_PRESENT,
             FIND_SAMPLED_GROUP,
             COMPILE_AND_FIND,
+            COMPILE_AND_FIND_GROUP_PRESENT,
             COMPILE_AND_MATCHES,
             FIND_ROTATING_UTF16,
             COMPILE_AND_FIND_ROTATING_UTF16,
@@ -1773,7 +1781,14 @@ final class DeclarativeBenchmarkPlan {
             UTF8_CAPTURE_BOUNDS,
             UTF8_REPLACEMENT ->
             consumption == ResultConsumption.INTEGER;
-        case FIND_GROUP, REPLACE_FIRST, REPLACE_ALL, APPEND_REPLACEMENT, MANUAL_REPLACE_ALL ->
+        case FIND_GROUP,
+            COMPILE_AND_FIND_GROUP,
+            COMPILE_AND_REPLACE_ALL,
+            REPLACE_FIRST,
+            REPLACE_ALL,
+            REPLACE_ALL_FUNCTION,
+            APPEND_REPLACEMENT,
+            MANUAL_REPLACE_ALL ->
             consumption == ResultConsumption.STRING;
         case CAPTURE_GROUPS ->
             consumption == ResultConsumption.STRING || consumption == ResultConsumption.STRING_LIST;
@@ -1805,8 +1820,14 @@ final class DeclarativeBenchmarkPlan {
                 RecipeValueType.INTEGER,
                 "mode",
                 RecipeValueType.STRING);
-        case FIND_GROUP_PRESENT, FIND_GROUP -> Map.of("group", RecipeValueType.INTEGER);
+        case FIND_GROUP_PRESENT,
+            FIND_GROUP,
+            COMPILE_AND_FIND_GROUP_PRESENT,
+            COMPILE_AND_FIND_GROUP,
+            REPLACE_ALL_FUNCTION ->
+            Map.of("group", RecipeValueType.INTEGER);
         case REPLACE_FIRST,
+            COMPILE_AND_REPLACE_ALL,
             REPLACE_ALL,
             REPLACE_ALL_LENGTH_SUM,
             APPEND_REPLACEMENT,
@@ -1839,8 +1860,14 @@ final class DeclarativeBenchmarkPlan {
             Set.of("groups");
         case UTF8_CAPTURE_BOUNDS -> Set.of("groups", "expectedBounds");
         case FIND_SAMPLED_GROUP -> Set.of("group", "count", "mode");
-        case FIND_GROUP_PRESENT, FIND_GROUP -> Set.of("group");
+        case FIND_GROUP_PRESENT,
+            FIND_GROUP,
+            COMPILE_AND_FIND_GROUP_PRESENT,
+            COMPILE_AND_FIND_GROUP,
+            REPLACE_ALL_FUNCTION ->
+            Set.of("group");
         case REPLACE_FIRST,
+            COMPILE_AND_REPLACE_ALL,
             REPLACE_ALL,
             REPLACE_ALL_LENGTH_SUM,
             APPEND_REPLACEMENT,
@@ -2233,6 +2260,7 @@ final class DeclarativeBenchmarkPlan {
   enum ExecutionConstraint implements JsonNamed {
     NO_FORK("noFork"),
     FRESH_PROCESS_PER_INVOCATION("freshProcessPerInvocation"),
+    PRECOMPILE_ASCII("precompileAscii"),
     RETAIN_STATE("retainState"),
     PREMATERIALIZED_INPUT("prematerializedInput"),
     ALLOCATION_PROFILE("allocationProfile");
@@ -2435,13 +2463,12 @@ final class DeclarativeBenchmarkPlan {
         List<String> result = new ArrayList<>();
         value
             .getAsJsonArray()
-            .forEach(
-                item -> {
-                  if (!isString(item)) {
-                    throw new IllegalArgumentException();
-                  }
-                  result.add(item.getAsString());
-                });
+            .forEach(item -> {
+              if (!isString(item)) {
+                throw new IllegalArgumentException();
+              }
+              result.add(item.getAsString());
+            });
         return List.copyOf(result);
       } catch (RuntimeException exception) {
         throw new IllegalArgumentException(

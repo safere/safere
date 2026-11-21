@@ -1,0 +1,18 @@
+Capture recovery follow-up: preserved investigation results
+
+Stack-document extraction takes about 14-15% less time on String and 15-17% less
+on UTF-8 in both long comparisons against pinned main
+4ead777e87f9209c2d9dc06fb958a23bd01349be. The UTF-8 scheme cases cost about 4% more
+on this host. Variation in controls limits conclusions about the full cohort.
+
+Keep 512 to bound work and bitmap size on rejected searches. Hit rate and capture
+consumption drive the tradeoff across the measured sizes.
+
+The adapter enables the standing multi-frame extraction workload on SafeRE UTF-8.
+The larger cutoff protocol stays opt-in. Runtime adoption is proposed separately.
+
+Full readable writeup: README.md
+Complete recovery scores/errors: recovery-table.md
+Complete cutoff screen/boundaries: cutoff-table.md
+Long cutoff confirmation: cutoff-long-table.md
+Raw output, exact commands/sources, path audits, and checksums are adjacent.

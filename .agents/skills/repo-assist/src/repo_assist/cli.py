@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from repo_assist.activity import collect_activity
-from repo_assist.feedback import collect_feedback, resolve_worktree
+from repo_assist.feedback import WorktreeError, collect_feedback, resolve_worktree
 from repo_assist.github import GitHub
 
 
@@ -252,7 +252,13 @@ def authored_worktree(args: argparse.Namespace) -> int:
   state_path = args.root / "state.json"
   state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
   checkpoint = state.get("authoredPrFeedback", {}).get(str(args.number))
-  result = resolve_worktree(args.checkout.expanduser(), metadata, checkpoint)
+  try:
+    result = resolve_worktree(
+      args.checkout.expanduser(), metadata, checkpoint, allow_behind=args.allow_behind
+    )
+  except WorktreeError as error:
+    print(error, file=sys.stderr)
+    return 1
   if github.authored_pr_metadata(args.number, login, trusted) != metadata:
     raise RuntimeError("authored PR changed during worktree discovery; retry")
   print(json.dumps(result, indent=2))
@@ -313,6 +319,9 @@ def parser() -> argparse.ArgumentParser:
   original = commands.add_parser("authored-worktree")
   original.add_argument("number", type=int)
   original.add_argument("--checkout", type=Path, required=True)
+  original.add_argument(
+    "--allow-behind", action="store_true", help="also report a clean branch that can fast-forward"
+  )
   original.set_defaults(func=authored_worktree)
   state = commands.add_parser("state-path")
   state.set_defaults(func=path_command, path_kind="state")

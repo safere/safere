@@ -303,6 +303,9 @@ func prepare(entry planEntry) func() any {
 	case "splitLengthSum":
 		return func() any { return splitLengthSum(re, text, limit) }
 	case "findGroupPresent":
+		if group == 0 {
+			return func() any { return re.FindStringIndex(text) != nil }
+		}
 		return func() any {
 			match := re.FindStringSubmatchIndex(text)
 			offset := group * 2

@@ -34,11 +34,132 @@ harness implementation and validation. See
 and
 [`safere-benchmarks/DECLARATIVE_COLLECTION.md`](DECLARATIVE_COLLECTION.md).
 
+UTF-8 capture-text operations decode only the requested byte range during timing.
+The generic adapter retains the original input storage and its logical-view offset;
+input encoding remains outside timing. Capture-participation operations use bounds
+without decoding. This enables UTF-8 variants of existing text-extraction workloads
+as well as the focused `CaptureRecoveryBenchmark` standing cases. See the
+[capture-recovery investigation](investigations/capture-recovery/README.md) for the
+larger opt-in cutoff study.
+
+`ReverseDfaFindBenchmark.wordProse.32768` counts `\b\w+\b` matches in 32 KiB of
+ASCII prose, about one match every five characters. The pattern has no captures, so
+the workload measures repeated match-start recovery without inner-capture
+extraction. In SafeRE each successful `find()` runs the forward DFA to the match end
+and the reverse DFA back to the match start, for String and direct UTF-8 input. A
+harness test checks this with operation diagnostics, so the workload must be
+retargeted if a different path takes over. Plain `\w+` would not do: UTF-8 counts it
+with a character-class scan that skips both DFAs. Compilation and UTF-8 encoding are
+outside timing.
+
 SafeRE also maintains a separate
 [OpenJDK-derived regex benchmark suite](https://github.com/safere/openjdk-regex-benchmarks).
 It compares SafeRE and `java.util.regex` on compatible workloads adapted from
 OpenJDK's regex microbenchmarks. That suite is GPL-2.0-only, so its source is
 not vendored here or included in the `safere-benchmarks` Maven module.
+
+### Cold compilation and first-use latency
+
+Regular `singleShotColdStart` declarations run in fresh JVM forks with no JMH warmup iterations
+and one measured invocation. They cover compilation, compile-plus-first-use, and first-use after
+untimed compilation.
+The cold runner never executes the measured operation for validation during setup. It retains the
+actual measured first-use result and validates it after timing, without replaying the operation;
+protocol tests also check the fixtures and preparation boundary separately. A second invocation in
+the same fork is rejected. Inputs are materialized and encoded before timing, and process launch
+is excluded.
+
+`InitializationLatencyBenchmark.firstFind.*` compiles during setup, then measures Matcher creation,
+the first `find()`, and capture participation. `InitializationLatencyBenchmark.compileAndFirstFind.*`
+includes compilation in that same timed operation. Both read capture group 1 through the matcher
+API, including for UTF-8; they do not use matcher-free Boolean search. Initial cases cover ASCII
+word classes, Unicode word/property classes, and ASCII classes combined with grapheme consumption
+or grapheme boundaries. The long first-search controls place a capture near the end of mixed
+text or exercise a miss through the same pattern. The compile-plus-first-use cases include
+a Java-derived character class. These workloads are part of the regular collection plan.
+
+`InitializationLatencyBenchmark.compileAndFirstFindAfterAscii.*` compiles an unrelated ASCII
+literal during setup in each fresh fork. The timed operation still compiles the target pattern,
+then searches and checks capture participation. The ASCII control and Java lower-case property
+use the same inputs and patterns as their unprimed `compileAndFirstFind` counterparts. Report
+this timing boundary separately when comparing first-use results.
+
+The standard cold run uses ten forks with one sample per fork. Compare the per-fork samples
+and medians alongside the JMH mean and confidence interval. Interleave A/B runs or repeat them
+in both orders to check for drift. The runner fails on errors, including an unexpected measured
+result reported by the cold validation step.
+
+```bash
+./run-java-benchmarks.sh --fastbuild --first-compile CrossEngineColdStartBenchmark.run -- \
+  -p crossEngineColdStartTrial=InitializationLatencyBenchmark.firstFind.graphemeCluster@safere-string
+```
+
+Run the paired `compileAndFirstFind` trial separately. Use `singleShotColdStart` only for supported
+single-operation workloads. Native cold-start runners currently cover compilation alone; their
+execution plans explicitly exclude these first-use timing boundaries. Fresh-process first-use
+latency and warmed compilation-plus-first-use measure different JVM states and must be reported
+separately.
+
+### Quantified capture workloads
+
+`QuantifiedCaptureBenchmark.{family}.{observation}.{outcome}.{size}` compares
+Boolean search, group-zero bounds, inner-capture participation, inner-capture
+text, and numbered, named, and functional replacement. All observation modes
+use identical patterns and prematerialized inputs. Matching measurements exclude
+compilation and input materialization. Java String cases create fresh matchers;
+native variants retain their existing API and ownership boundaries. The RE2-FFM
+variant explicitly includes its API-time UTF-8 conversion.
+
+The families include the nested unbounded repeat from the retained-repeat repair
+regression (`.*x(?:(a){1,}){2}y`), bounded inner repetition with greedy/lazy outer
+repetition, and anchored greedy/lazy optional captures that must retain a value
+when later iterations skip the group. The nested family holds the repeated
+suffix at a fixed length while growing the preceding nonmatching prefix: the old
+repair searched candidate partitions across that prefix. The geometric size sweep
+includes short inputs and successful/rejected controls. Group zero observes
+`start(0)` participation rather than copying the whole match; inner text copies
+`group(1)`. This distinguishes capture extraction from text materialization.
+The .NET group-zero adapter uses `Regex.Match()`, which also extracts captures
+and can add more work than the bounds-only Go and Rust APIs.
+
+Workload eligibility follows adapter capabilities and concrete capture semantics;
+focused measurement runs select engines through runner filters. Choosing a smaller
+comparison cohort does not exclude other adapters from the shared corpus.
+Nested families follow SafeRE's current accepted-path policy; the JDK can return
+an earlier capture boundary (the approved
+[earlier-capture divergence](../INTENTIONAL_DIVERGENCES.md#earlier-captures-in-nested-repetitions)).
+The subjects produce the same captured text under either boundary policy. JDK
+bounds are pinned separately rather than treated as an unconditional oracle.
+The long unanchored missing-suffix cases omit the expensive JDK backtracking
+rejection reference; anchored controls remain eligible at every size.
+
+C++ RE2 lacks named-template and callback replacement APIs. RE2-FFM's wrapper
+supports numbered replacement but does not expose named or callback replacement.
+Go's replacement callback exposes only the whole matched text, while this operation
+requires inner captures. PCRE2 JIT matching is eligible; its replacement rows retain
+the suite-wide registry restriction pending the broader audit in
+[#1207](https://github.com/safere/safere/issues/1207). PCRE2 itself supports
+substitution with JIT dispatch. See
+[cross-runtime coverage](CROSS_RUNTIME_ENGINES.md#workload-coverage).
+Native capture-aware functional replacement is implemented for SafeRE String,
+JDK String, Rust, and .NET. The SafeRE and JDK String callbacks quote captured
+text because the Java APIs interpret callback results as replacement templates.
+The captured fixture text contains no replacement-template metacharacters.
+RE2/J and SafeRE UTF-8 support named replacement. SafeRE UTF-8 capture-text
+trials include decoding the requested capture during timing.
+
+Numbered RE2 replacement syntax is declared in the data. Expected successful
+captures and replacements are checked before timing; Java harness tests also check
+exact bounds and rejected outputs. Native smoke validation must establish agreement
+for the concrete subjects before capture-observing rows are compared. Agreement on
+this corpus does not establish equivalent quantified-capture semantics for all
+patterns.
+
+These workloads assess current capture costs and scaling. They do not assume
+historical NFA routing or simulate an older implementation by disabling engines.
+Cross-runtime results provide context alongside differences in runtime, input
+representation, allocation, and harness overhead; they are separate from
+controlled same-runtime comparisons.
 
 ### Investigative benchmarks
 

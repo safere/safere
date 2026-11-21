@@ -90,17 +90,15 @@ final class BenchmarkCollectionPlan {
         (allocation ? allocationRunners() : runners())
             .stream()
                 .filter(runner -> runner.benchmark().equals(benchmark))
-                .map(
-                    runner ->
-                        new Runner(
-                            runner.profile(),
-                            runner.benchmark(),
-                            runner.parameter(),
-                            (smoke ? smokeTrialIds(runner) : runner.trialIds())
-                                .stream()
-                                    .filter(
-                                        id -> provider == null || matchesScanProvider(id, provider))
-                                    .toList()))
+                .map(runner ->
+                    new Runner(
+                        runner.profile(),
+                        runner.benchmark(),
+                        runner.parameter(),
+                        (smoke ? smokeTrialIds(runner) : runner.trialIds())
+                            .stream()
+                                .filter(id -> provider == null || matchesScanProvider(id, provider))
+                                .toList()))
                 .filter(runner -> !runner.trialIds().isEmpty())
                 .toList();
     if (selected.isEmpty()) {
@@ -119,13 +117,11 @@ final class BenchmarkCollectionPlan {
     arguments.add(argumentFileToken(benchmarkJar));
     runners.stream()
         .filter(runner -> !overriddenParameters.contains(runner.parameter()))
-        .forEach(
-            runner -> {
-              arguments.add("-p");
-              arguments.add(
-                  argumentFileToken(
-                      runner.parameter() + "=" + String.join(",", runner.trialIds())));
-            });
+        .forEach(runner -> {
+          arguments.add("-p");
+          arguments.add(
+              argumentFileToken(runner.parameter() + "=" + String.join(",", runner.trialIds())));
+        });
     return List.copyOf(arguments);
   }
 
@@ -151,13 +147,12 @@ final class BenchmarkCollectionPlan {
             CrossEngineScalingBenchmark.class,
             "crossEngineScalingTrial",
             crossEngine.trials(CrossEngineWorkload.TimingGroup.MICROSECONDS).stream()
-                .filter(
-                    trial ->
-                        !trial
-                            .workload()
-                            .measurement()
-                            .constraints()
-                            .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.NO_FORK))
+                .filter(trial ->
+                    !trial
+                        .workload()
+                        .measurement()
+                        .constraints()
+                        .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.NO_FORK))
                 .toList()),
         runner(
             "noFork",
@@ -201,25 +196,23 @@ final class BenchmarkCollectionPlan {
       List<Runner> runners, Predicate<String> includeTrial, boolean standardOnly) {
     return runners.stream()
         .filter(runner -> !standardOnly || runner.profile().equals("standard"))
-        .map(
-            runner ->
-                new Runner(
-                    runner.profile(),
-                    runner.benchmark(),
-                    runner.parameter(),
-                    runner.trialIds().stream().filter(includeTrial).toList()))
+        .map(runner ->
+            new Runner(
+                runner.profile(),
+                runner.benchmark(),
+                runner.parameter(),
+                runner.trialIds().stream().filter(includeTrial).toList()))
         .filter(runner -> !runner.trialIds().isEmpty())
         .toList();
   }
 
   private Set<String> allocationOnlyTrialIds() {
     return trials(Query.ALL).stream()
-        .filter(
-            trial ->
-                trial
-                    .measurement()
-                    .constraints()
-                    .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.ALLOCATION_PROFILE))
+        .filter(trial ->
+            trial
+                .measurement()
+                .constraints()
+                .contains(DeclarativeBenchmarkPlan.ExecutionConstraint.ALLOCATION_PROFILE))
         .map(CollectionTrial::id)
         .collect(Collectors.toUnmodifiableSet());
   }
@@ -333,14 +326,13 @@ final class BenchmarkCollectionPlan {
         }
         List<Runner> runners =
             args[0].equals("runners") ? plan.runners() : plan.allocationRunners();
-        runners.forEach(
-            runner ->
-                System.out.printf(
-                    "%s\t%s\t%s\t%s%n",
-                    runner.profile(),
-                    runner.benchmark(),
-                    runner.parameter(),
-                    String.join(",", smoke ? smokeTrialIds(runner) : runner.trialIds())));
+        runners.forEach(runner ->
+            System.out.printf(
+                "%s\t%s\t%s\t%s%n",
+                runner.profile(),
+                runner.benchmark(),
+                runner.parameter(),
+                String.join(",", smoke ? smokeTrialIds(runner) : runner.trialIds())));
       }
       case "runner-arguments" -> {
         if (args.length < 3) {

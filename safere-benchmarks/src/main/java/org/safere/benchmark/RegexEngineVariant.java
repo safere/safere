@@ -14,6 +14,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.MatchResult;
 import org.openjdk.jmh.infra.Blackhole;
 import org.safere.Utf8Sink;
 
@@ -98,6 +100,12 @@ enum RegexEngineVariant {
         }
 
         @Override
+        public ReplacementOutput replaceAllFunction(
+            RegexInput input, Function<MatchResult, String> function) {
+          return new StringReplacementOutput(pattern.matcher(string(input)).replaceAll(function));
+        }
+
+        @Override
         public ReplacementOutput replaceAll(RegexInput input, PreparedReplacement replacement) {
           return new StringReplacementOutput(
               pattern.matcher(string(input)).replaceAll(string(replacement)));
@@ -120,6 +128,7 @@ enum RegexEngineVariant {
           EngineCapability.MATCHES,
           EngineCapability.LOOKING_AT,
           EngineCapability.GROUP_PARTICIPATION,
+          EngineCapability.GROUP_TEXT,
           EngineCapability.REPLACE,
           EngineCapability.APPEND_REPLACEMENT,
           EngineCapability.MATCHER_RESET,
@@ -155,6 +164,20 @@ enum RegexEngineVariant {
             @Override
             public boolean lookingAt() {
               return matcher.lookingAt();
+            }
+
+            @Override
+            public String group(int group) {
+              int start = matcher.start(group);
+              if (start < 0) {
+                return null;
+              }
+              Utf8RegexInput source = (Utf8RegexInput) input;
+              return new String(
+                  source.bytes,
+                  source.offset + start,
+                  matcher.end(group) - start,
+                  StandardCharsets.UTF_8);
             }
 
             @Override
@@ -287,6 +310,12 @@ enum RegexEngineVariant {
         public ReplacementOutput replaceFirst(RegexInput input, PreparedReplacement replacement) {
           return new StringReplacementOutput(
               pattern.matcher(string(input)).replaceFirst(string(replacement)));
+        }
+
+        @Override
+        public ReplacementOutput replaceAllFunction(
+            RegexInput input, Function<MatchResult, String> function) {
+          return new StringReplacementOutput(pattern.matcher(string(input)).replaceAll(function));
         }
 
         @Override
@@ -568,6 +597,8 @@ enum RegexEngineVariant {
           features.add(DeclarativeBenchmarkPlan.Feature.APPEND_REPLACEMENT);
           features.add(DeclarativeBenchmarkPlan.Feature.NUMBERED_REPLACEMENT);
         }
+        case FUNCTIONAL_REPLACEMENT ->
+            features.add(DeclarativeBenchmarkPlan.Feature.FUNCTIONAL_REPLACEMENT);
         case SPLIT -> features.add(DeclarativeBenchmarkPlan.Feature.SPLIT);
         case MATCHER_RESET -> features.add(DeclarativeBenchmarkPlan.Feature.MATCHER_STATE);
         case REGIONS -> {
@@ -578,6 +609,7 @@ enum RegexEngineVariant {
     }
     switch (this) {
       case SAFERE_STRING -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.DFA_CACHE);
         features.add(DeclarativeBenchmarkPlan.Feature.DIAGNOSTICS);
         features.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
@@ -587,6 +619,7 @@ enum RegexEngineVariant {
         features.add(DeclarativeBenchmarkPlan.Feature.RETAINED_HEAP);
       }
       case SAFERE_UTF8, SAFERE_UTF8_VECTOR -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.DIAGNOSTICS);
         features.add(DeclarativeBenchmarkPlan.Feature.LINEAR_TIME);
         features.add(DeclarativeBenchmarkPlan.Feature.MATCHER_STATE);
@@ -595,11 +628,13 @@ enum RegexEngineVariant {
         features.add(DeclarativeBenchmarkPlan.Feature.UTF8_REPLACEMENT);
       }
       case JDK_STRING -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
         features.add(DeclarativeBenchmarkPlan.Feature.JAVA_CHARACTER_CLASS);
         features.add(DeclarativeBenchmarkPlan.Feature.RETAINED_HEAP);
       }
       case RE2J_STRING -> {
+        features.add(DeclarativeBenchmarkPlan.Feature.NAMED_REPLACEMENT);
         features.add(DeclarativeBenchmarkPlan.Feature.FLAGGED_COMPILE);
         features.add(DeclarativeBenchmarkPlan.Feature.LINEAR_TIME);
         features.add(DeclarativeBenchmarkPlan.Feature.RETAINED_HEAP);
@@ -621,7 +656,7 @@ enum RegexEngineVariant {
     List<RegexInput> inputs = new ArrayList<>(inputKeys.size());
     for (String inputKey : inputKeys) {
       if (inputRepresentation == InputRepresentation.PREEXISTING_UTF8) {
-        inputs.add(new Utf8RegexInput(org.safere.Utf8Input.trusted(data.getInputBytes(inputKey))));
+        inputs.add(utf8Input(data.getInputBytes(inputKey)));
       } else {
         inputs.add(new StringRegexInput(data.getInputString(inputKey)));
       }
@@ -700,6 +735,7 @@ enum RegexEngineVariant {
   private static EnumSet<EngineCapability> re2jCapabilities() {
     EnumSet<EngineCapability> capabilities = allCapabilities();
     capabilities.remove(EngineCapability.REGIONS);
+    capabilities.remove(EngineCapability.FUNCTIONAL_REPLACEMENT);
     return capabilities;
   }
 
@@ -740,7 +776,30 @@ enum RegexEngineVariant {
 
   record StringRegexInput(String value) implements RegexInput {}
 
-  record Utf8RegexInput(org.safere.Utf8Input value) implements RegexInput {}
+  static RegexInput utf8Input(byte[] bytes) {
+    return utf8Input(bytes, 0, bytes.length);
+  }
+
+  static RegexInput utf8Input(byte[] bytes, int offset, int length) {
+    return new Utf8RegexInput(bytes, offset, length);
+  }
+
+  private static final class Utf8RegexInput implements RegexInput {
+    // Borrow immutable fixture storage; keep native view offsets for timed capture decoding.
+    private final byte[] bytes;
+    private final int offset;
+    private final org.safere.Utf8Input value;
+
+    private Utf8RegexInput(byte[] bytes, int offset, int length) {
+      this.bytes = bytes;
+      this.offset = offset;
+      this.value = org.safere.Utf8Input.trusted(bytes, offset, length);
+    }
+
+    org.safere.Utf8Input value() {
+      return value;
+    }
+  }
 
   sealed interface PreparedReplacement permits StringReplacement, Utf8Replacement {}
 
@@ -859,6 +918,11 @@ enum RegexEngineVariant {
     }
 
     default ReplacementOutput replaceAll(RegexInput input, PreparedReplacement replacement) {
+      throw new UnsupportedOperationException();
+    }
+
+    default ReplacementOutput replaceAllFunction(
+        RegexInput input, Function<MatchResult, String> function) {
       throw new UnsupportedOperationException();
     }
 

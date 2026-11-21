@@ -284,16 +284,15 @@ class Utf8ReplacementTest {
     Utf8Matcher matcher = matcher("a", "xaxa");
     CollectingSink sink = new CollectingSink();
 
-    assertThatThrownBy(
-            () ->
-                replace(
-                    matcher,
-                    (bytes, offset, length) -> {
-                      sink.append(bytes, offset, length);
-                      throw new SinkFailure();
-                    },
-                    input("b"),
-                    all))
+    assertThatThrownBy(() ->
+            replace(
+                matcher,
+                (bytes, offset, length) -> {
+                  sink.append(bytes, offset, length);
+                  throw new SinkFailure();
+                },
+                input("b"),
+                all))
         .isInstanceOf(SinkFailure.class);
     assertThat(sink.toString()).isEqualTo("x");
     assertThat(matcher.start()).isEqualTo(1);
@@ -333,13 +332,12 @@ class Utf8ReplacementTest {
     for (boolean hasMatch : new boolean[] {false, true}) {
       Utf8Matcher matcher = matcher(hasMatch ? "a" : "z", "xaxa");
       CollectingSink sink = new CollectingSink();
-      assertThatThrownBy(
-              () ->
-                  replace(
-                      matcher,
-                      (bytes, offset, length) -> replace(matcher, sink, input("nested"), all),
-                      input("b"),
-                      all))
+      assertThatThrownBy(() ->
+              replace(
+                  matcher,
+                  (bytes, offset, length) -> replace(matcher, sink, input("nested"), all),
+                  input("b"),
+                  all))
           .isInstanceOf(ConcurrentModificationException.class);
       assertThat(sink.toString()).isEmpty();
       assertThatThrownBy(() -> matcher.appendTail(sink)).isInstanceOf(IllegalStateException.class);
@@ -403,13 +401,12 @@ class Utf8ReplacementTest {
     Utf8Matcher matcher = matcher("(a)", "a");
     assertThat(matcher.find()).isTrue();
 
-    assertThatThrownBy(
-            () ->
-                matcher.appendReplacement(
-                    (bytes, offset, length) -> {
-                      throw new SinkFailure();
-                    },
-                    input("$1")))
+    assertThatThrownBy(() ->
+            matcher.appendReplacement(
+                (bytes, offset, length) -> {
+                  throw new SinkFailure();
+                },
+                input("$1")))
         .isInstanceOf(SinkFailure.class);
     assertThat(matcher.start()).isZero();
     assertThat(matcher.end()).isEqualTo(1);
@@ -422,10 +419,9 @@ class Utf8ReplacementTest {
     Utf8Matcher matcher = matcher("a", "aa");
     assertThat(matcher.find()).isTrue();
 
-    assertThatThrownBy(
-            () ->
-                matcher.appendReplacement(
-                    (bytes, offset, length) -> matcher.find(), input("replacement")))
+    assertThatThrownBy(() ->
+            matcher.appendReplacement(
+                (bytes, offset, length) -> matcher.find(), input("replacement")))
         .isInstanceOf(ConcurrentModificationException.class);
     assertThat(matcher.start()).isZero();
     assertThat(matcher.end()).isEqualTo(1);
