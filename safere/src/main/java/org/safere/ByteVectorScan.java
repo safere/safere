@@ -464,6 +464,9 @@ final class ByteVectorScan {
     int limit = lastLoadStart(length, 0, vectorLen);
 
     for (; pos <= limit; pos += vectorLen) {
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.recordMultiLiteralScan(vectorLen);
+      }
       ByteVector inputVec = ByteVector.fromArray(SPECIES, bytes, offset + pos);
       VectorMask<Byte> matchMask = matches(inputVec, anchorRanges);
 
@@ -505,6 +508,9 @@ final class ByteVectorScan {
 
     int scalarLimit = lastMatchStart(length, minLength);
     for (; pos <= scalarLimit; pos++) {
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.recordMultiLiteralScan(1);
+      }
       int value = bytes[offset + pos] & 0xFF;
       for (int i = 0; i < numLits; i++) {
         String lit = literals[i];

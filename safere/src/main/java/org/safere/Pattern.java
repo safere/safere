@@ -662,10 +662,10 @@ public final class Pattern implements Serializable {
    * Returns whether the matcher-free existence searches ({@link #find(Utf8Input)} and {@link
    * #asPredicate()}) can answer for this pattern.
    *
-   * <p>Those paths use cheap checks followed by a forward existence DFA or an end-anchored
-   * reverse search, with exact verification and fallback. The flattened forward DFA may prove
-   * existence even when the original program has loop registers. Programs unsupported by the forward
-   * DFA retain the matcher's strategy sequence.
+   * <p>Those paths use cheap checks followed by a forward existence DFA or an end-anchored reverse
+   * search, with exact verification and fallback. The flattened forward DFA may prove existence
+   * even when the original program has loop registers. Programs unsupported by the forward DFA
+   * retain the matcher's strategy sequence.
    */
   private boolean canFindWithoutMatcher() {
     return forwardDfaSupported;
