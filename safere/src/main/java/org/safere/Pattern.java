@@ -1820,10 +1820,7 @@ public final class Pattern implements Serializable {
   }
 
   Dfa forwardExistenceDfa() {
-    return forwardExistenceDfa(getOrCreateThreadCache());
-  }
-
-  Dfa forwardExistenceDfa(ThreadCache cache) {
+    ThreadCache cache = getOrCreateThreadCache();
     Dfa dfa = cache.forwardExistenceDfa;
     if (dfa == null) {
       dfa =
@@ -2224,10 +2221,6 @@ public final class Pattern implements Serializable {
   /** Forward DFA narrowing checks the suffix after failure; avoid an eager duplicate scan. */
   RejectPrefilter findRejectPrefilter() {
     return innerLiteralSearch == null || !forwardDfaSupported ? rejectPrefilter : null;
-  }
-
-  boolean hasInnerLiteralSearch() {
-    return innerLiteralSearch != null;
   }
 
   /**

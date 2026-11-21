@@ -14,7 +14,6 @@ final class WorkCounter {
   private static final class Counter {
     private long units;
     private long forwardDfaSteps;
-    private long multiLiteralScanUnits;
     private long innerLiteralProbes;
     private long startScanCalls;
     private long startSkippedUnits;
@@ -42,19 +41,6 @@ final class WorkCounter {
     Counter counter = COUNTER.get();
     if (counter != null) {
       counter.forwardDfaSteps++;
-    }
-  }
-
-  /** Includes byte traversal, which is tracked separately from candidate verification. */
-  static long countWithMultiLiteralScanForTesting(Runnable task) {
-    Counter counter = count(task);
-    return counter.units + counter.multiLiteralScanUnits;
-  }
-
-  static void recordMultiLiteralScan(int units) {
-    Counter counter = COUNTER.get();
-    if (counter != null) {
-      counter.multiLiteralScanUnits += units;
     }
   }
 

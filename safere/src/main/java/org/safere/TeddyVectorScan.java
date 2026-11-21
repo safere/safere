@@ -39,9 +39,6 @@ final class TeddyVectorScan {
     int[] buckets = model.literalBuckets();
 
     for (; pos <= limit; pos += vectorLen) {
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.recordMultiLiteralScan(vectorLen);
-      }
       // Stage 1: 2-byte primary SIMD filter (discards ~85% of non-matching blocks)
       ByteVector input0 = ByteVector.fromArray(SPECIES, bytes, offset + pos);
       ByteVector lo0 = input0.and((byte) 0x0F);
@@ -94,9 +91,6 @@ final class TeddyVectorScan {
 
     int scalarLimit = length - minLen;
     for (; pos <= scalarLimit; pos++) {
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.recordMultiLiteralScan(1);
-      }
       for (String lit : literals) {
         if (pos + lit.length() <= length
             && Ascii.regionMatches(bytes, offset + pos, lit, lit.length())) {
