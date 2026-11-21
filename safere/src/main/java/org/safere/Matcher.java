@@ -1508,7 +1508,7 @@ public final class Matcher implements MatchResult {
         diagnosticBoundary(MatchStrategy.DFA);
         return applyFailedMatchResult();
       }
-      if (dfaResult != null && prog.numLoopRegs() == 0) {
+      if (dfaResult != null && parentPattern.dfaGroupZeroReliable(scanner, 0)) {
         diagnosticBoundary(MatchStrategy.DFA);
         return applyDeferredMatchResult(0, dfaResult.pos(), prog.numCaptures(), true, false);
       }
@@ -2150,8 +2150,7 @@ public final class Matcher implements MatchResult {
       return applyFullMatchResult(result);
     }
 
-    // Fast path: use cached DFA to check if a match exists in the remaining text.
-    // Use longest=false for a quick existence check — this returns the earliest match end.
+    // Use the first-match DFA to check if a match exists in the remaining text.
     Dfa.SearchResult fwdResult;
     if (!options.dfa() || !parentPattern.forwardDfaSupported()) {
       fwdResult = null;
@@ -2175,52 +2174,23 @@ public final class Matcher implements MatchResult {
       }
     }
 
-    // DFA sandwich (like RE2): the forward DFA found the earliest match end above. Now use the
-    // reverse DFA to find the corresponding match start. For programs whose group-0 bounds are
-    // reliable, that pair is authoritative: another anchored forward pass would only rediscover
-    // the same earliest end. With lazy capture extraction, the sandwich returns group(0) without
-    // running BitState/NFA, making it worthwhile even on the first find() call.
-    //
-    // The reverse DFA is lazily constructed on first use and cached for subsequent calls.
-    //
-    // Skip when the forward DFA detected an empty match (earlyEnd == effectiveStart): the
-    // sandwich uses longest-match for the final forward pass, which would incorrectly expand an
-    // empty match into a longer one for nullable patterns like (|a)*.
-    //
-    // Skip the reverse DFA phase when the pattern is anchored at the start — the match start is
-    // already known to be effectiveStart, so the reverse scan is unnecessary.
-    //
-    // When the DFA's match start is unreliable (patterns with lazy quantifiers, bounded repeats,
-    // anchors inside quantifiers, or alternation), the reverse DFA result is only authoritative if
-    // it proves the match starts at effectiveStart. Lazy quantifiers can make a non-leftmost match
-    // end earlier, causing the DFA to find the wrong start. Alternation can have the same effect:
-    // when alternatives match at different start positions with different endpoints, the forward
-    // DFA's earliest-end result may come from a non-leftmost match, and the reverse DFA from that
-    // wrong endpoint cannot find the leftmost start. In those cases, fall through to the
-    // BitState/NFA fallback which correctly handles all semantics.
-    //
-    // When the accepted start is authoritative, the sandwich still treats group(0) as deferred for
-    // programs whose end may be wrong; resolveCaptures() corrects the end position using the
-    // submatch engine.
+    // The DFA sandwich starts with a reliable nonempty match end. Start anchoring or an exact
+    // prefix candidate can supply the start directly. Otherwise a reverse search looks for the
+    // leftmost start at the reported end. Ambiguous starts fall through to BitState/NFA.
     // Bounded String views use the same DFA result path as independent text. Deferred captures
     // are resolved against that view before restoring the original input and capture offsets.
     if (options.dfa()
         && (!regionActive || independentRegion)
-        && parentPattern.dfaGroupZeroReliable()
         && fwdResult != null
-        && fwdResult.pos() > effectiveStart) {
+        && fwdResult.pos() > effectiveStart
+        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart)) {
       int earlyEnd = fwdResult.pos();
 
       if (prog.anchorStart()) {
         // Anchored: match start is effectiveStart. Since it is start-anchored, the match end
         // is guaranteed to be earlyEnd. Avoid redundant third DFA search.
         diagnosticBoundary(MatchStrategy.DFA);
-        return applyDeferredMatchResult(
-            effectiveStart,
-            earlyEnd,
-            prog.numCaptures(),
-            parentPattern.dfaGroupZeroReliable(),
-            false);
+        return applyDeferredMatchResult(effectiveStart, earlyEnd, prog.numCaptures(), true, false);
       } else {
         if (literalPrefixCandidateStart) {
           // A literal prefix occurrence is a candidate match start, even when the prefix is
@@ -2234,11 +2204,7 @@ public final class Matcher implements MatchResult {
             int matchEnd = fwdFirst.pos();
             diagnosticBoundary(MatchStrategy.DFA);
             return applyDeferredMatchResult(
-                effectiveStart,
-                matchEnd,
-                prog.numCaptures(),
-                parentPattern.dfaGroupZeroReliable(),
-                false);
+                effectiveStart, matchEnd, prog.numCaptures(), true, false);
           }
         }
         if (canUseReverseDfa()) {
@@ -2250,29 +2216,7 @@ public final class Matcher implements MatchResult {
                 searchReverseDfa(revDfa, scanner, earlyEnd, effectiveStart, true, true);
             if (revResult != null && revResult.matched()) {
               int matchStart = revResult.pos();
-              boolean reliableStart = !revResult.ambiguous();
-
-              // For dollarAnchorEnd patterns, the forward DFA's earlyEnd is always textLen
-              // (it can't return early). But the correct leftmost match may end before the
-              // trailing line terminator. The reverse DFA from textLen only finds starts for
-              // matches ending AT textLen, potentially missing an earlier-starting match that
-              // ends before the trailing line terminator. Check all dollar positions.
-              if (prog.dollarAnchorEnd() && earlyEnd == scanner.length()) {
-                int trailingStart =
-                    scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), earlyEnd);
-                if (trailingStart >= effectiveStart) {
-                  Dfa.SearchResult altRevResult =
-                      searchReverseDfa(revDfa, scanner, trailingStart, effectiveStart, true, true);
-                  if (altRevResult != null
-                      && altRevResult.matched()
-                      && altRevResult.pos() < matchStart) {
-                    matchStart = altRevResult.pos();
-                    reliableStart = !altRevResult.ambiguous();
-                  }
-                }
-              }
-
-              if (!reliableStart) {
+              if (revResult.ambiguous()) {
                 diagnosticDecision(
                     MatchStrategy.DFA,
                     StrategyDisposition.BYPASSED,
@@ -2289,22 +2233,14 @@ public final class Matcher implements MatchResult {
                   } else {
                     diagnosticBoundary(MatchStrategy.DFA);
                     return applyDeferredMatchResult(
-                        matchStart,
-                        exactEnd.pos(),
-                        prog.numCaptures(),
-                        parentPattern.dfaGroupZeroReliable(),
-                        false);
+                        matchStart, exactEnd.pos(), prog.numCaptures(), true, false);
                   }
                 }
               }
               if (matchStart >= 0) {
                 diagnosticBoundary(MatchStrategy.DFA);
                 return applyDeferredMatchResult(
-                    matchStart,
-                    earlyEnd,
-                    prog.numCaptures(),
-                    parentPattern.dfaGroupZeroReliable(),
-                    false);
+                    matchStart, earlyEnd, prog.numCaptures(), true, false);
               }
             }
             // If reverse DFA bails out, fall through to full search.
@@ -3608,13 +3544,13 @@ public final class Matcher implements MatchResult {
   private String replaceDfaOptimized(String replacement, int limit) {
     boolean regionActive = (regionStart != 0 || regionEnd != text.length());
     if (!canUseForwardDfa()
-        || !parentPattern.dfaGroupZeroReliable()
         // End-anchored patterns that are not start-anchored match at most once and benefit from
         // find()'s reverse-first DFA rejection.
         || (parentPattern.prog().anchorEnd() && !parentPattern.prog().anchorStart())
         || parentPattern.matchDescriptor().hasFindFastPath()
         || parentPattern.astAnalysis().hasNullableAlt()
-        || regionActive) {
+        || regionActive
+        || !parentPattern.dfaGroupZeroReliable(activeScanner(), searchFrom)) {
       return null;
     }
 
@@ -5349,9 +5285,9 @@ public final class Matcher implements MatchResult {
     }
 
     if (options.dfa()
-        && parentPattern.dfaGroupZeroReliable()
         && fwdResult != null
-        && fwdResult.pos() > effectiveStart) {
+        && fwdResult.pos() > effectiveStart
+        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart)) {
       int earlyEnd = fwdResult.pos();
 
       if (prog.anchorStart()) {
