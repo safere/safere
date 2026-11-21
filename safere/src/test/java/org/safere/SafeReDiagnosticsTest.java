@@ -112,6 +112,15 @@ class SafeReDiagnosticsTest {
   }
 
   @Test
+  void exportsPreviousMatchBoundaryAtTheBeginningOfAnAnchoredFixture() {
+    String json =
+        SafeReDiagnostics.bytecodeCaseToJsonLine(
+            "previous-match", "\\G(a)", 0, "a", SafeReDiagnostics.BytecodeMatchMode.ANCHORED);
+
+    assertThat(json).contains("{\"group\":1,\"matched\":true,\"start\":0,\"end\":1}");
+  }
+
+  @Test
   void exportsCharClassRangesAsPairs() {
     String json =
         SafeReDiagnostics.bytecodeCaseToJsonLine(
