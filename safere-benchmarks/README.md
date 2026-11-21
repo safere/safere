@@ -54,6 +54,13 @@ retargeted if a different path takes over. Plain `\w+` would not do: UTF-8 count
 with a character-class scan that skips both DFAs. Compilation and UTF-8 encoding are
 outside timing.
 
+`ReverseDfaFindBenchmark.proseLines.32768` keeps a capture-free workload on the
+reverse DFA. It counts `(?m)^.+$` matches in the same prose with a line break
+after each sentence (768 lines). The start-register search doesn't handle line
+anchors, so each successful `find()` runs the reverse DFA from the line end back
+to its start, for String and direct UTF-8 input. A harness test checks this with
+operation diagnostics.
+
 SafeRE also maintains a separate
 [OpenJDK-derived regex benchmark suite](https://github.com/safere/openjdk-regex-benchmarks).
 It compares SafeRE and `java.util.regex` on compatible workloads adapted from

@@ -1656,4 +1656,47 @@ class CrossEngineBenchmarkPlanTest {
       Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
     }
   }
+
+  @Test
+  void reverseDfaProseLinesWorkloadRecoversEveryMatchStartWithTheReverseDfa() {
+    // The start-register search doesn't handle line anchors, so each match start here comes from a
+    // reverse DFA pass. If another path takes over, this fails so the workload can be retargeted
+    // instead of silently measuring that path.
+    String workloadId = "ReverseDfaFindBenchmark.proseLines.32768";
+    CrossEngineBenchmarkPlan plan = CrossEngineBenchmarkPlan.load();
+    BenchmarkData data = BenchmarkData.get();
+    List<OperationDiagnostics> events = new ArrayList<>();
+    Pattern.setDiagnostics(
+        new SafeReMatchDiagnostics() {
+          @Override
+          public void onOperationCompleted(OperationDiagnostics event) {
+            events.add(event);
+          }
+        });
+    try {
+      for (RegexEngineVariant variant :
+          List.of(RegexEngineVariant.SAFERE_STRING, RegexEngineVariant.SAFERE_UTF8)) {
+        CrossEngineWorkload workload = plan.resolve(workloadId + "@" + variant.id()).workload();
+        var inputs = variant.prepareInputs(data, workload.inputKeys());
+        try (var compiled = variant.compile(workload.patterns().getFirst())) {
+          events.clear();
+          var matcher = compiled.matcher(inputs.getFirst());
+          int matches = 0;
+          while (matcher.find()) {
+            matches++;
+          }
+          assertThat(matches).as(variant.id()).isEqualTo(768);
+          assertThat(events).as(variant.id()).hasSize(matches + 1);
+          assertThat(events.subList(0, matches))
+              .as(variant.id())
+              .allSatisfy(event -> {
+                assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+                assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
+              });
+        }
+      }
+    } finally {
+      Pattern.setDiagnostics(SafeReMatchDiagnostics.NONE);
+    }
+  }
 }
