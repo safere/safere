@@ -13,8 +13,9 @@ import java.util.Arrays;
  * Complete, ordered literal alternatives for a bounded String and UTF-8 search fast path.
  *
  * <p>String searches with up to three distinct initial characters use per-literal windows. With
- * more initials, searches hop between candidates after the first window and return to windowed
- * search for dense candidates.
+ * more initials, whole-String searches hop between candidates after the first window and return to
+ * windowed search for dense candidates. String regions use the first-character scan to skip
+ * candidate-free stretches and verify matches in short per-literal windows.
  *
  * <p>UTF-8 searches use an exact first-byte accelerator when one is available. The default provider
  * can also scan a compact enclosing range on longer inputs. Dense range candidates near the start
@@ -27,6 +28,7 @@ final class LiteralAlternation {
   private static final int MAX_ALTERNATIVES = 8;
   private static final int WINDOW_LENGTH = 256;
   private static final int MAX_LITERAL_LENGTH = 12;
+  private static final int REGION_PROBE_DELAY = 2 * WINDOW_LENGTH;
   // Searches verify first-byte candidates one at a time until they see this many within
   // DENSE_CANDIDATE_SPAN bytes, then switch to one bounded scan per literal.
   private static final int DENSE_CANDIDATES = 8;
@@ -119,7 +121,20 @@ final class LiteralAlternation {
     if (from != 0) {
       return FALLBACK;
     }
-    return findString(text, 0, text.length(), true);
+    int end = text.length();
+    if (firstChars.length > 3) {
+      int limit = Math.min(WINDOW_LENGTH, end);
+      long match = search(text, 0, limit, end);
+      return match >= 0 || limit == end ? match : searchCandidates(text, limit);
+    }
+    if (!wholeInputRejection) {
+      return searchFixedWindows(text, 0, end);
+    }
+    if (end <= PROBE_LENGTH * 4) {
+      return search(text, 0, end, end);
+    }
+    long match = search(text, 0, PROBE_LENGTH, end);
+    return match >= 0 ? match : searchGrowingWindows(text, PROBE_LENGTH, end, PROBE_LENGTH * 2);
   }
 
   /** Searches an opaque String region and returns region-relative bounds. */
@@ -128,39 +143,17 @@ final class LiteralAlternation {
       return FALLBACK;
     }
     int start = region.offset();
-    long match = findString(region.text(), start, start + region.length(), false);
+    int end = start + region.length();
+    long match =
+        firstChars.length > 3
+            ? searchRegionWithSkips(region.text(), start, end)
+            : searchFixedWindows(region.text(), start, end);
     if (match < 0) {
       return match;
     }
     int matchStart = (int) (match >>> 32) - start;
     int matchEnd = (int) match - start;
     return ((long) matchStart << 32) | matchEnd;
-  }
-
-  /** Searches a bounded range using absolute String offsets. */
-  private long findString(String text, int start, int end, boolean wholeInput) {
-    if (firstChars.length > 3) {
-      // Keep early hits on the existing short-window path. Beyond it, character searches use
-      // the JVM's single-character intrinsics instead of one substring scan per alternative.
-      int limit = start + Math.min(WINDOW_LENGTH, end - start);
-      long match = search(text, start, limit, end);
-      if (match >= 0 || limit == end) {
-        return match;
-      }
-      if (!wholeInput && hasDensePrefix(text, limit, end)) {
-        return searchFixedWindows(text, limit, end);
-      }
-      return searchCandidates(text, limit, end, wholeInput);
-    }
-    if (!wholeInput || !wholeInputRejection) {
-      return searchFixedWindows(text, start, end);
-    }
-    if (end - start <= PROBE_LENGTH * 4) {
-      return search(text, start, end, end);
-    }
-    int probeEnd = start + PROBE_LENGTH;
-    long match = search(text, start, probeEnd, end);
-    return match >= 0 ? match : searchGrowingWindows(text, probeEnd, end, PROBE_LENGTH * 2);
   }
 
   private long searchFixedWindows(String text, int start, int end) {
@@ -175,25 +168,50 @@ final class LiteralAlternation {
     return NO_MATCH;
   }
 
-  /** Avoids verifying each literal separately when the next few region starts are already dense. */
-  private boolean hasDensePrefix(String text, int start, int end) {
-    int limit = start + Math.min(2 * DENSE_CANDIDATES, end - start);
-    for (int i = 0; i < DENSE_CANDIDATES; i++) {
-      int candidate = StringInputScanner.indexOfSmallSet(text, firstChars, start, limit);
-      if (candidate < 0) {
-        return false;
+  /**
+   * Uses the character scan to skip candidate-free stretches, leaving verification to the regular
+   * short windows. If two probes in a row find a nearby candidate, finish with the ordinary
+   * windowed search. A distant candidate pays for another probe, so check only that start.
+   */
+  private long searchRegionWithSkips(String text, int start, int end) {
+    // Favor nearby matches with two ordinary windows before sampling the region.
+    int nextProbe = start + Math.min(REGION_PROBE_DELAY, end - start);
+    boolean previousCandidateNearby = false;
+    while (start < end) {
+      if (start == nextProbe) {
+        if (end - start < WINDOW_LENGTH) {
+          return searchFixedWindows(text, start, end);
+        }
+        int candidate = StringInputScanner.indexOfSmallSet(text, firstChars, start, end);
+        if (candidate < 0) {
+          return NO_MATCH;
+        }
+        boolean nearby = candidate - start < WINDOW_LENGTH;
+        if (nearby && previousCandidateNearby) {
+          return searchFixedWindows(text, start, end);
+        }
+        previousCandidateNearby = nearby;
+        start = candidate;
+        int width = nearby ? WINDOW_LENGTH : 1;
+        nextProbe = start + Math.min(width, end - start);
       }
-      start = candidate + 1;
+      int limit = start + Math.min(WINDOW_LENGTH, nextProbe - start);
+      long match = search(text, start, limit, end);
+      if (match >= 0) {
+        return match;
+      }
+      start = limit;
     }
-    return true;
+    return NO_MATCH;
   }
 
   /** Candidate starts advance monotonically, including on a switch to windowed search. */
-  private long searchCandidates(String text, int start, int end, boolean wholeInput) {
+  private long searchCandidates(String text, int start) {
+    int end = text.length();
     int spanStart = start;
     int candidates = 0;
     for (int position = start; ; ) {
-      int candidate = StringInputScanner.indexOfSmallSet(text, firstChars, position, end);
+      int candidate = StringInputScanner.indexOfSmallSet(text, firstChars, position);
       if (candidate < 0) {
         return NO_MATCH;
       }
@@ -201,16 +219,14 @@ final class LiteralAlternation {
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.record(literal.length());
         }
-        if (literal.length() <= end - candidate && text.startsWith(literal, candidate)) {
+        if (text.startsWith(literal, candidate)) {
           return ((long) candidate << 32) | (candidate + literal.length());
         }
       }
       position = candidate + 1;
       if (++candidates == DENSE_CANDIDATES) {
         if (candidate - spanStart < DENSE_CANDIDATE_SPAN) {
-          return wholeInput
-              ? searchGrowingWindows(text, position, end, PROBE_LENGTH)
-              : searchFixedWindows(text, position, end);
+          return searchGrowingWindows(text, position, end, PROBE_LENGTH);
         }
         candidates = 0;
         spanStart = candidate;

@@ -170,6 +170,25 @@ class LiteralAlternationTest {
   }
 
   @Test
+  void regionSkipsPreserveMatchesAcrossWindowEdgesAndAfterFalseStarts() {
+    String regex = "backtrack|north|south|east|west|back";
+    Pattern pattern = Pattern.compile(regex);
+    java.util.regex.Pattern jdkPattern = java.util.regex.Pattern.compile(regex);
+    String outside = "north!";
+    for (String falseStarts : List.of("x".repeat(4_096) + "b!", "nxx".repeat(3_000))) {
+      for (int gap : new int[] {253, 254, 255, 8_192}) {
+        String prefix = outside + falseStarts + "x".repeat(gap);
+        String text = prefix + "backtrack west!";
+        for (int end : new int[] {prefix.length() + 4, text.length() - 1}) {
+          compareFinds(
+              pattern.matcher(text).region(outside.length(), end),
+              jdkPattern.matcher(text).region(outside.length(), end));
+        }
+      }
+    }
+  }
+
+  @Test
   void growingWindowBoundariesPreserveLeftmostMatchAndAlternativePriority() {
     for (String regex :
         List.of(

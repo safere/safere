@@ -145,6 +145,18 @@ class LiteralAlternationWorkTest {
     }
   }
 
+  @Test
+  void regionSearchAmortizesTheCostOfModeratelySpacedFalseCandidates() {
+    Pattern pattern = Pattern.compile("north|south|east|west|upper|lower|front|back");
+    String region = "x".repeat(288) + ("b" + "x".repeat(32)).repeat(1_000);
+    String text = "north!" + region + "back";
+    Matcher matcher = pattern.matcher(text).region(6, 6 + region.length());
+    long work = WorkCounter.countForTesting(() -> assertThat(matcher.find()).isFalse());
+    // Eight per-literal passes plus window overlap and occasional initial scans fit this budget.
+    // Restarting the small-set search and verification at every false start exceeds it.
+    assertThat(work).isPositive().isLessThanOrEqualTo(10L * region.length());
+  }
+
   private static long work(Pattern pattern, String text) {
     return WorkCounter.countForTesting(() -> assertThat(pattern.matcher(text).find()).isTrue());
   }
