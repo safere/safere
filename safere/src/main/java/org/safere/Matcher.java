@@ -1978,6 +1978,28 @@ public final class Matcher implements MatchResult {
 
   private boolean verifyEndAnchoredStart(InputScanner scanner, int start) {
     Prog prog = parentPattern.prog();
+    // A proved fixed end needs no verification scan, regardless of candidate length. Inner
+    // captures remain deferred to the exact engine.
+    if (parentPattern.endAnchoredStartHasExactEnd(scanner)) {
+      diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+      diagnosticBoundary(MatchStrategy.DFA);
+      return applyDeferredMatchResult(start, scanner.length(), prog.numCaptures(), true, false);
+    }
+    // With two legal ends, only the exact engine can select the end required by match priority.
+    if (parentPattern.shouldUseDfaEndVerification(scanner.length() - start)
+        && canUseForwardDfa()
+        && parentPattern.dfaGroupZeroReliable()
+        && parentPattern.hasUniqueEndAnchoredEndpoint(scanner)) {
+      diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+      Dfa.SearchResult result = searchForwardDfa(dfa(false), scanner, start, true, false);
+      if (result != null) {
+        if (!result.matched()) {
+          return false;
+        }
+        diagnosticBoundary(MatchStrategy.DFA);
+        return applyDeferredMatchResult(start, result.pos(), prog.numCaptures(), true, false);
+      }
+    }
     int[] exact =
         searchWithBitStateOrNfa(
             prog, scanner, start, start, scanner.length(), true, false, false, 1);

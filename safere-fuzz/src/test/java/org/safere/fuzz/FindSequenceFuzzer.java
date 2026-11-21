@@ -471,6 +471,11 @@ public final class FindSequenceFuzzer {
         String terminator =
             data.pickValue(List.of("", "\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029"));
         input = "x".repeat(data.consumeInt(0, 2048)) + "foo" + terminator;
+        String tail = data.pickValue(List.of(".+?", ".{1,3}?", "(.+?)"));
+        String endAnchor = data.pickValue(List.of("$", "\\Z", "\\z"));
+        assertFindSequence(
+            "(?s:.*c" + tail + ")" + endAnchor,
+            "a".repeat(1_024 + input.length()) + "cx" + terminator);
       }
       case 9 -> {
         regex =
