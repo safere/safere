@@ -211,13 +211,7 @@ final class BitState {
     }
 
     int ncap = 2 * Math.max(nsubmatch, 1);
-    BitState bs;
-    if (cached != null && cached.canReuse(prog, text, startPos, textLen)) {
-      bs = cached;
-      bs.reset(text, startPos, textLen, ncap, longest, endMatch);
-    } else {
-      bs = new BitState(prog, text, startPos, textLen, ncap, longest, endMatch, prog.greedyRunes());
-    }
+    BitState bs = getOrCreate(cached, prog, text, startPos, textLen, ncap, longest, endMatch);
 
     return bs.doSearch(startPos, searchLimit, anchored, resultBuffer);
   }
@@ -252,11 +246,49 @@ final class BitState {
       int ncap,
       boolean longest,
       boolean endMatch) {
+    return getOrCreate(
+        cached,
+        prog,
+        text,
+        startPos,
+        endPos,
+        ncap,
+        longest,
+        endMatch,
+        defaultPreviousMatchEnd(prog));
+  }
+
+  static BitState getOrCreate(
+      BitState cached,
+      Prog prog,
+      InputScanner text,
+      int startPos,
+      int endPos,
+      int ncap,
+      boolean longest,
+      boolean endMatch,
+      int previousMatchEnd) {
     if (cached != null && cached.canReuse(prog, text, startPos, endPos)) {
-      cached.reset(text, startPos, endPos, ncap, longest, endMatch);
+      cached.reset(text, startPos, endPos, ncap, longest, endMatch, previousMatchEnd);
       return cached;
     }
-    return new BitState(prog, text, startPos, endPos, ncap, longest, endMatch, prog.greedyRunes());
+    return new BitState(
+        prog,
+        text,
+        startPos,
+        endPos,
+        ncap,
+        longest,
+        endMatch,
+        prog.greedyRunes(),
+        previousMatchEnd);
+  }
+
+  private static int defaultPreviousMatchEnd(Prog prog) {
+    if (prog.hasPreviousMatchEnd()) {
+      throw new IllegalArgumentException("Previous-match assertions require an explicit boundary");
+    }
+    return 0;
   }
 
   /**
@@ -375,6 +407,8 @@ final class BitState {
   private int visitedLo;
 
   private int visitedHi;
+  private int previousMatchEnd;
+
   private int deadLo;
   private int deadHi;
 
@@ -456,9 +490,32 @@ final class BitState {
       boolean longest,
       boolean endMatch,
       Inst[] greedyRunes) {
+    this(
+        prog,
+        text,
+        startPos,
+        endPos,
+        ncap,
+        longest,
+        endMatch,
+        greedyRunes,
+        defaultPreviousMatchEnd(prog));
+  }
+
+  private BitState(
+      Prog prog,
+      InputScanner text,
+      int startPos,
+      int endPos,
+      int ncap,
+      boolean longest,
+      boolean endMatch,
+      Inst[] greedyRunes,
+      int previousMatchEnd) {
     this.prog = prog;
     this.instructions = prog.frozenInstructions();
     this.text = text;
+    this.previousMatchEnd = previousMatchEnd;
     this.textLen = text.length();
     this.basePos = startPos;
     this.endPos = endPos;
@@ -785,6 +842,13 @@ final class BitState {
             }
           }
 
+          case InstOp.OP_PREVIOUS_MATCH_END -> {
+            if (pos == previousMatchEnd && shouldVisit(ip.out, pos)) {
+              id = ip.out;
+              continue;
+            }
+          }
+
           case InstOp.OP_EMPTY_WIDTH -> {
             int curFlags = Nfa.emptyFlags(text, pos, prog.hasGraphemeSemantics(), graphemeContext);
             if ((ip.arg & ~curFlags) == 0) {
@@ -1081,8 +1145,15 @@ final class BitState {
    * #canReuse} first.
    */
   private void reset(
-      InputScanner text, int startPos, int endPos, int ncap, boolean longest, boolean endMatch) {
+      InputScanner text,
+      int startPos,
+      int endPos,
+      int ncap,
+      boolean longest,
+      boolean endMatch,
+      int previousMatchEnd) {
     this.text = text;
+    this.previousMatchEnd = previousMatchEnd;
     this.textLen = text.length();
     this.basePos = startPos;
     this.endPos = endPos;
