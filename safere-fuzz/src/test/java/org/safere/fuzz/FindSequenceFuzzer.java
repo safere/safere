@@ -415,7 +415,7 @@ public final class FindSequenceFuzzer {
     boolean warmLineEndCache = false;
     String warmInput = null;
     boolean previousMatchGrammar = false;
-    switch (data.consumeInt(0, 22)) {
+    switch (data.consumeInt(0, 23)) {
       case 0 -> {
         regex = nestedCapturingGroups(data.consumeInt(0, 512)) + "*";
         flags = 0;
@@ -640,6 +640,19 @@ public final class FindSequenceFuzzer {
             data.pickValue(List.of("*", "+", "{1,3}")),
             data.consumeBoolean());
         return;
+      }
+      case 23 -> {
+        String prefix = data.pickValue(List.of(".*c", ".*?c", "c"));
+        String tail = data.pickValue(List.of(".+?", ".*?", ".+", ".{1,4}?"));
+        if (data.consumeBoolean()) {
+          tail = "(" + tail + ")";
+        }
+        String anchor = data.pickValue(List.of("$", "\\Z", "\\z", "(?d:$)", "(?d:\\Z)"));
+        regex = "(?s)" + prefix + tail + anchor;
+        flags = 0;
+        String padding = data.pickValue(List.of("a", "abc", "é😀"));
+        String terminator = data.pickValue(LINE_TERMINATORS);
+        input = padding.repeat(data.consumeInt(0, 150)) + "cx" + terminator;
       }
       default -> throw new AssertionError();
     }
