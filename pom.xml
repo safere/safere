@@ -146,6 +146,17 @@
           </execution>
         </executions>
       </plugin>
+      <!-- Cache the CLI plugins used by the snapshot and release workflows. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-help-plugin</artifactId>
+        <version>3.6.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>versions-maven-plugin</artifactId>
+        <version>2.25.2</version>
+      </plugin>
     </plugins>
   </build>
 
