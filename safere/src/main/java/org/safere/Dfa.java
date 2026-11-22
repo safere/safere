@@ -2095,6 +2095,15 @@ final class Dfa {
     return doSearchInternal(text, startPos, anchored, longest, false, AdaptiveBackoff.NEUTRAL);
   }
 
+  /** Whether an anchored first-match search can decide priority at both terminal endpoints. */
+  static boolean supportsAnchoredEndPriority(Prog prog) {
+    return prog.dollarAnchorEnd()
+        && !prog.hasEmptyWidth()
+        && !prog.hasGraphemeSemantics()
+        && !prog.hasPreviousMatchEnd()
+        && prog.numLoopRegs() == 0;
+  }
+
   private SearchResult doSearchInternal(
       InputScanner text,
       int startPos,
@@ -2113,6 +2122,12 @@ final class Dfa {
     // behavior).
     // Compute the start position of the trailing line terminator for dollarAnchorEnd matching.
     int trailingTermStart = dollarEnd ? trailingLineStart(text) : textLen;
+    boolean prioritizeAnchoredEnd =
+        trailingTermStart < textLen
+            && anchored
+            && !longest
+            && !this.longest
+            && supportsAnchoredEndPriority(prog);
 
     // Position-dependent flag threshold: emptyFlags at positions >= this threshold contain
     // text-length-dependent flags (END_TEXT at textLen, DOLLAR_END near the end when text ends
@@ -2136,6 +2151,10 @@ final class Dfa {
         matchEnd = startPos;
         if (!longest && canStopAtFirstMatch(s, text, startPos, needEndMatch)) {
           return completeForwardSearch(new SearchResult(true, startPos), pos, startBackoff);
+        }
+        if (prioritizeAnchoredEnd && startPos == trailingTermStart) {
+          int end = prioritizeTrailingTerminator(s, text, startPos);
+          return completeForwardSearch(new SearchResult(true, end), pos, startBackoff);
         }
       }
     }
@@ -2553,6 +2572,10 @@ final class Dfa {
               if (!longest && canStopAtFirstMatch(s, text, endPos, needEndMatch)) {
                 return completeForwardSearch(new SearchResult(true, matchEnd), pos, backoff);
               }
+              if (prioritizeAnchoredEnd && endPos == trailingTermStart) {
+                int end = prioritizeTrailingTerminator(s, text, endPos);
+                return completeForwardSearch(new SearchResult(true, end), pos, backoff);
+              }
             }
           }
         }
@@ -2567,6 +2590,41 @@ final class Dfa {
     }
 
     return completeForwardSearch(new SearchResult(matched, matchEnd), pos, backoff);
+  }
+
+  /**
+   * An accepted pre-terminator match outranks every instruction after the first MATCH in this
+   * ordered, assertion-free frontier. Only the threads before it can replace that match. Step those
+   * threads through the final terminator (at most two code points), outside the DFA cache. A MATCH
+   * between CR and LF has no effect because its endpoint is ineligible.
+   */
+  private int prioritizeTrailingTerminator(State state, InputScanner text, int trailingStart) {
+    int[] frontier = state.insts;
+    int end = text.length();
+    for (int pos = trailingStart; pos < end; ) {
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record();
+        WorkCounter.recordForwardDfaStep();
+      }
+      long decoded = text.decodeForward(pos);
+      int cp = InputScanner.codePoint(decoded);
+      int successorCount = 0;
+      for (int id : frontier) {
+        Inst inst = prog.inst(id);
+        if (pos == trailingStart && inst.opCode == InstOp.OP_MATCH) {
+          break;
+        }
+        if (instMatches(inst, cp)) {
+          computeBuf[successorCount++] = inst.out;
+        }
+      }
+      if (successorCount == 0) {
+        return trailingStart;
+      }
+      frontier = expand(computeBuf, successorCount, 0);
+      pos = InputScanner.position(decoded);
+    }
+    return hasMatch(frontier) ? end : trailingStart;
   }
 
   // ---------------------------------------------------------------------------

@@ -653,6 +653,9 @@ public final class FindSequenceFuzzer {
         String padding = data.pickValue(List.of("a", "abc", "é😀"));
         String terminator = data.pickValue(LINE_TERMINATORS);
         input = padding.repeat(data.consumeInt(0, 150)) + "cx" + terminator;
+        if (data.consumeBoolean()) {
+          regex = "\\A" + regex;
+        }
       }
       default -> throw new AssertionError();
     }

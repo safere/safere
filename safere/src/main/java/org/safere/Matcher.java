@@ -1508,7 +1508,7 @@ public final class Matcher implements MatchResult {
         diagnosticBoundary(MatchStrategy.DFA);
         return applyFailedMatchResult();
       }
-      if (dfaResult != null && parentPattern.dfaGroupZeroReliable(scanner, 0)) {
+      if (dfaResult != null && parentPattern.dfaGroupZeroReliable(scanner, 0, true)) {
         diagnosticBoundary(MatchStrategy.DFA);
         return applyDeferredMatchResult(0, dfaResult.pos(), prog.numCaptures(), true, false);
       }
@@ -2183,7 +2183,7 @@ public final class Matcher implements MatchResult {
         && (!regionActive || independentRegion)
         && fwdResult != null
         && fwdResult.pos() > effectiveStart
-        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart)) {
+        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart, prog.anchorStart())) {
       int earlyEnd = fwdResult.pos();
 
       if (prog.anchorStart()) {
@@ -3550,7 +3550,8 @@ public final class Matcher implements MatchResult {
         || parentPattern.matchDescriptor().hasFindFastPath()
         || parentPattern.astAnalysis().hasNullableAlt()
         || regionActive
-        || !parentPattern.dfaGroupZeroReliable(activeScanner(), searchFrom)) {
+        || !parentPattern.dfaGroupZeroReliable(
+            activeScanner(), searchFrom, parentPattern.prog().anchorStart())) {
       return null;
     }
 
@@ -5287,7 +5288,7 @@ public final class Matcher implements MatchResult {
     if (options.dfa()
         && fwdResult != null
         && fwdResult.pos() > effectiveStart
-        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart)) {
+        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart, prog.anchorStart())) {
       int earlyEnd = fwdResult.pos();
 
       if (prog.anchorStart()) {

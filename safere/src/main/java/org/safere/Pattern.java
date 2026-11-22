@@ -2037,12 +2037,13 @@ public final class Pattern implements Serializable {
   }
 
   /**
-   * Returns whether first-match DFA bounds can be used for this search. A stripped {@code $} or
-   * {@code \Z} is checked outside the DFA's ordered frontier. When the assertion can match both
-   * before a final terminator and at input end, BitState or NFA must select the prioritized span.
+   * Returns whether first-match DFA bounds can be used for this search. Two eligible terminal
+   * endpoints require a priority proof from the anchored forward DFA or an exact engine.
    */
-  boolean dfaGroupZeroReliable(InputScanner scanner, int searchFrom) {
-    return dfaGroupZeroReliable() && hasUniqueEndAnchoredEndpoint(scanner, searchFrom);
+  boolean dfaGroupZeroReliable(InputScanner scanner, int searchFrom, boolean anchored) {
+    return dfaGroupZeroReliable()
+        && ((anchored && Dfa.supportsAnchoredEndPriority(prog))
+            || hasUniqueEndAnchoredEndpoint(scanner, searchFrom));
   }
 
   /**

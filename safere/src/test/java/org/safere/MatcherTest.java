@@ -861,7 +861,9 @@ class MatcherTest {
     @ValueSource(strings = {"", "\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029"})
     void findPreservesQuantifierPriorityAtEndAnchors(String terminator) {
       for (String anchor : List.of("$", "\\Z", "\\z", "(?d:$)", "(?d:\\Z)")) {
-        for (String body : List.of(".*c.+?", ".*?c.+?", ".*c.+", ".*c(.+?)", ".*c.*?")) {
+        for (String body :
+            List.of(
+                ".*c.+?", ".*?c.+?", ".*c.+", ".*c(.+?)", ".*c.*?", "\\A.*c(.+?)", "\\A.*c.+")) {
           String regex = "(?s)" + body + anchor;
           Pattern pattern = Pattern.compile(regex);
           var jdkPattern = java.util.regex.Pattern.compile(regex);

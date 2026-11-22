@@ -717,6 +717,47 @@ class DiagnosticsTest {
   }
 
   @Test
+  void anchoredDfaResolvesPriorityAtFinalLineTerminators() {
+    Pattern.setDiagnostics(diagnostics);
+    EnginePathOptions options = EnginePathOptions.builder().onePass(false).build();
+    for (String regex :
+        List.of(
+            "(?s)\\A.*c.+?$",
+            "(?s)\\A.*c.+\\Z",
+            "(?s)\\A.*c.{2,}\\Z",
+            "(?s)\\A.*c.+?(?d:$)",
+            "\\A.*c[0-9]+$")) {
+      Pattern pattern = Pattern.compile(regex, 0, options);
+      var jdk = java.util.regex.Pattern.compile(regex);
+      for (String terminator : List.of("\n", "\r\n", "\u0085", "\u2028")) {
+        String input = "é😀".repeat(1000) + "c2" + terminator;
+        var expected = jdk.matcher(input);
+        assertThat(expected.find()).isTrue();
+        Matcher finder = pattern.matcher(input);
+        assertThat(finder.find()).isTrue();
+        assertThat(finder.end()).isEqualTo(expected.end());
+
+        var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+        assertThat(utf8.find()).isTrue();
+        assertThat(utf8.end()).isEqualTo(input.substring(0, expected.end()).getBytes(UTF_8).length);
+
+        Matcher prefix = pattern.matcher(input);
+        assertThat(prefix.lookingAt()).isTrue();
+        assertThat(prefix.end()).isEqualTo(expected.end());
+        assertThat(pattern.matcher(input).replaceFirst("X"))
+            .isEqualTo(expected.reset().replaceFirst("X"));
+      }
+      assertThat(operationsFor(pattern))
+          .hasSize(16)
+          .allSatisfy(event -> {
+            assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+            assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
+            assertThat(event.reverseDfaSearchCount()).isZero();
+          });
+    }
+  }
+
+  @Test
   void captureHistoryFromEagerResultsPreservesAcceleratedDfaRejection() {
     Pattern.setDiagnostics(diagnostics);
     for (boolean utf8 : new boolean[] {false, true}) {
