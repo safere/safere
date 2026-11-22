@@ -157,6 +157,23 @@ class LiteralAlternationWorkTest {
     assertThat(work).isPositive().isLessThanOrEqualTo(10L * region.length());
   }
 
+  @Test
+  void regionSearchKeepsLinearWorkWhenNearbyAndDistantCandidatesAlternate() {
+    Pattern pattern = Pattern.compile("north|south|east|west|upper|lower|front|back");
+    // The first candidate in each pair is distant. The second is in the next position.
+    // This alternates the two skip decisions without triggering fixed-window fallback.
+    String segment = "x".repeat(512) + "bb";
+    long shorter = regionMissWork(pattern, segment.repeat(100));
+    long longer = regionMissWork(pattern, segment.repeat(400));
+    assertThat(shorter).isPositive();
+    assertThat(longer).isLessThanOrEqualTo(shorter * 5);
+  }
+
+  private static long regionMissWork(Pattern pattern, String region) {
+    Matcher matcher = pattern.matcher("north!" + region + "back").region(6, 6 + region.length());
+    return WorkCounter.countForTesting(() -> assertThat(matcher.find()).isFalse());
+  }
+
   private static long work(Pattern pattern, String text) {
     return WorkCounter.countForTesting(() -> assertThat(pattern.matcher(text).find()).isTrue());
   }
