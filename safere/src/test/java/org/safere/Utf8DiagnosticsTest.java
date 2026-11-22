@@ -556,7 +556,8 @@ class Utf8DiagnosticsTest {
   @Test
   void dfaSandwichReportsForwardAndReverseSearchCounts() {
     Pattern.setDiagnostics(diagnostics);
-    Pattern pattern = Pattern.compile("[ab]+é");
+    Pattern pattern =
+        Pattern.compile("[ab]+é", 0, EnginePathOptions.builder().startRegister(false).build());
 
     assertThat(matcher(pattern, "xxabé").find()).isTrue();
 
@@ -566,6 +567,24 @@ class Utf8DiagnosticsTest {
           assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
           assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
           assertThat(event.reverseDfaSearchCount()).isEqualTo(1);
+        });
+  }
+
+  @Test
+  void startRegisterReportsOneForwardSearchAndNoReverseSearch() {
+    Pattern.setDiagnostics(diagnostics);
+    Pattern pattern = Pattern.compile("[ab]+é");
+
+    Utf8Matcher matcher = matcher(pattern, "xxabé");
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.start()).isEqualTo(2);
+
+    assertThat(operationsFor(pattern))
+        .singleElement()
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+          assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
+          assertThat(event.reverseDfaSearchCount()).isZero();
         });
   }
 

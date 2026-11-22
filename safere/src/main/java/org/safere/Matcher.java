@@ -466,6 +466,8 @@ public final class Matcher implements MatchResult {
 
   private Dfa cachedReverseDfa;
   private boolean reverseDfaLookedUp;
+  private StartRegisterSearch cachedStartRegister;
+  private boolean startRegisterLookedUp;
 
   /**
    * Start-acceleration backoff state carried across the searches of one sequence of {@code find()}
@@ -668,6 +670,8 @@ public final class Matcher implements MatchResult {
     cachedForwardLongestMatchDfa = null;
     cachedReverseDfa = null;
     reverseDfaLookedUp = false;
+    cachedStartRegister = null;
+    startRegisterLookedUp = false;
     startBackoff = AdaptiveBackoff.NEUTRAL;
     if (bitStateBorrowed && cachedBitState != null) {
       bitStateBorrowed = false;
@@ -753,6 +757,8 @@ public final class Matcher implements MatchResult {
       cachedForwardLongestMatchDfa = null;
       cachedReverseDfa = null;
       reverseDfaLookedUp = false;
+      cachedStartRegister = null;
+      startRegisterLookedUp = false;
       cachedBitState = null;
       bitStateBorrowed = false;
       cachedNfa = null;
@@ -778,6 +784,55 @@ public final class Matcher implements MatchResult {
       }
       return d;
     }
+  }
+
+  private static final int REGISTER_MATCH = -1;
+  private static final int REGISTER_NO_MATCH = -2;
+
+  /**
+   * Finds the next match and its start in one forward pass with the start-register search, for an
+   * unanchored, capture-free find without a region. Returns {@link #REGISTER_MATCH} or {@link
+   * #REGISTER_NO_MATCH} when the search answered. Otherwise returns the position from which the
+   * caller runs the ordinary DFA search: {@code effectiveStart} when the pattern is not eligible,
+   * the search backed off or it fell back, or a later position when it handed the search over.
+   */
+  private int findWithStartRegister(InputScanner scanner, int effectiveStart, Prog prog) {
+    releaseEnginesOwnedByOtherThread();
+    StartRegisterSearch search = cachedStartRegister;
+    if (search == null) {
+      if (startRegisterLookedUp) {
+        return effectiveStart;
+      }
+      startRegisterLookedUp = true;
+      search = parentPattern.startRegisterSearch(threadCache());
+      cachedStartRegister = search;
+      if (search == null) {
+        return effectiveStart;
+      }
+    }
+    long result = search.find(scanner, effectiveStart, startBackoff);
+    if (result == StartRegisterSearch.SKIPPED) {
+      return effectiveStart;
+    }
+    startBackoff = search.startBackoff();
+    diagnosticParticipation(MatchStrategy.DFA, StrategyRole.REJECT_PREFILTER);
+    DiagnosticOperation activeDiagnostics = diagnosticOperation;
+    if (activeDiagnostics != null) {
+      activeDiagnostics.accumulator().incrementForwardDfaSearchCount();
+    }
+    if (result == StartRegisterSearch.FALLBACK) {
+      return effectiveStart;
+    }
+    if (result <= StartRegisterSearch.HANDOFF) {
+      return StartRegisterSearch.handoffPosition(result);
+    }
+    diagnosticBoundary(MatchStrategy.DFA);
+    if (result == StartRegisterSearch.NO_MATCH) {
+      applyFailedMatchResult();
+      return REGISTER_NO_MATCH;
+    }
+    applyDeferredMatchResult((int) (result >>> 32), (int) result, prog.numCaptures(), true, false);
+    return REGISTER_MATCH;
   }
 
   /** Returns the Pattern's thread-local cached reverse DFA (or null), caching it for reuse. */
@@ -2132,6 +2187,19 @@ public final class Matcher implements MatchResult {
               false,
               this.groups);
       return applyFullMatchResult(result);
+    }
+
+    if (!regionActive) {
+      int resume = findWithStartRegister(scanner, effectiveStart, prog);
+      if (resume < 0) {
+        return resume == REGISTER_MATCH;
+      }
+      if (resume != effectiveStart) {
+        // No match starts before resume; the forward and reverse DFA take over from there.
+        effectiveStart = resume;
+        startPositionPreselected = false;
+        literalPrefixCandidateStart = false;
+      }
     }
 
     // Fast path: use cached DFA to check if a match exists in the remaining text.
