@@ -12,15 +12,39 @@ import java.util.List;
 import java.util.Random;
 import java.util.function.IntUnaryOperator;
 import org.junit.jupiter.api.Test;
+import org.safere.Pattern;
 
 final class SemanticDomainTest {
   @Test
-  void sampledCapturePatternsCompileInTheirDomain() {
+  void sampledPatternsCompileInTheirDeclaredDomains() {
     Random choices = new Random(1209);
     for (int i = 0; i < 512; i++) {
+      var sample = SemanticDomain.generate(choices::nextInt);
+      FuzzSupport.compileRequired(sample.regex(), 0);
+      FuzzSupport.compileRequired(
+          sample.regex(), Pattern.COMMENTS | Pattern.UNICODE_CHARACTER_CLASS);
       FuzzSupport.compileRequired(CaptureSemanticsFuzzer.generateRegex(choices::nextInt, false), 0);
       FuzzSupport.compileRequired(CaptureSemanticsFuzzer.generateRegex(choices::nextInt, true), 0);
     }
+  }
+
+  @Test
+  void generatedPatternsExerciseCapturesReplacementAndBothSplitOperations() {
+    var sample = SemanticDomain.generate(choices(3, 1, 0, 1, 1, 1, 0));
+    assertThat(sample.regex()).isEqualTo("(,)(a)");
+    String subject = "x" + sample.witness() + "y" + sample.witness() + "z";
+    var compiled = FuzzSupport.compileRequired(sample.regex(), 0);
+    var found = compiled.matcher(subject);
+    assertThat(found.find()).isTrue();
+    assertThat(found.group(2)).isEqualTo("a");
+    assertThat(found.find()).isTrue();
+    assertThat(found.find()).isFalse();
+    assertThat(compiled.matcher(subject).replaceAll("[$2$1]")).isTrue();
+    ReplacementFuzzer.compareReplacements(sample.regex(), 0, subject, "[$2$1]", false);
+    SplitFuzzer.compareSplits(sample.regex(), 0, subject, 0);
+    assertThat(compiled.safeRePattern().split(subject, 0)).containsExactly("x", "y", "z");
+    assertThat(compiled.safeRePattern().splitWithDelimiters(subject, 0))
+        .containsExactly("x", ",a", "y", ",a", "z");
   }
 
   @Test
@@ -41,10 +65,49 @@ final class SemanticDomainTest {
   }
 
   @Test
-  void replayQuantifiedCaptureExamples() {
+  void previousMatchAssertionRemainsInTheSemanticDomain() {
+    var sample = SemanticDomain.generate(choices(1, 1, 0, 4));
+    assertThat(sample.regex()).isEqualTo("\\G(a)");
+    assertThat(FuzzSupport.compileRequired(Pattern.quote("\\G"), 0).matcher("\\G").matches())
+        .isTrue();
+    assertThat(FuzzSupport.compileRequired("\\G", Pattern.LITERAL).matcher("\\G").matches())
+        .isTrue();
+    var matcher = FuzzSupport.compileRequired(sample.regex(), 0).matcher("aa!a");
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.find()).isFalse();
+  }
+
+  @Test
+  void replayTextCasesFromThePreviousCorpus() {
+    // The old files used newline-separated pattern, subject and replacement fields.
+    MatchFuzzer.compareMatchOperations("a*", 0, "", 0);
+    MatchFuzzer.compareMatchOperations("^foo$", Pattern.MULTILINE, "foo\nbar", 0);
+    MatchFuzzer.compareMatchOperations("^.$", 0, "\u2028", 0);
+    MatchFuzzer.compareMatchOperations(".", 0, "😀", 0);
+
     CaptureSemanticsFuzzer.compareCaptures("(a)+", "aaay", false);
     CaptureSemanticsFuzzer.compareCaptures("(a?)*", "aaa", false);
     CaptureSemanticsFuzzer.compareCaptures("(?<word>a){1,2}", "xaa", true);
+    ReplacementFuzzer.compareReplacements("([a-z]+)-(\\d+)", 0, "abc-123", "$2:$1", false);
+    ReplacementFuzzer.compareReplacements("([.$])", 0, "a.$b", "\\$$1", true);
+    SplitFuzzer.compareSplits(",\\s*", 0, "alpha, beta,,gamma", 0);
+    SplitFuzzer.compareSplits(".*", 0, "abc", 0);
+
+    RegionBoundsFuzzer.compareRegion("^foo", 0, "xxfoo", 2, 5, true, false);
+    RegionBoundsFuzzer.compareRegion("\\bword\\b", 0, "word sword word", 6, 10, false, true);
+
+    compareFinds("\\ba", "a");
+    compareFinds("(a)?b", "aaab");
+    compareFinds("\\b", "abc");
+    compareFinds("(?:(a)?)??c?", "c" + "b".repeat(63));
+  }
+
+  private static void compareFinds(String regex, String subject) {
+    var matcher = FuzzSupport.compileRequired(regex, 0).matcher(subject);
+    while (matcher.find()) {
+      matcher.group();
+    }
   }
 
   private static IntUnaryOperator choices(Integer... values) {

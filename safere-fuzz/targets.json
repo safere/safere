@@ -40,7 +40,7 @@
   },
   {
     "class": "org.safere.fuzz.CompileFuzzer",
-    "kind": "broad",
+    "kind": "acceptance",
     "oss_fuzz": false,
     "seeds": "src/test/resources/org/safere/fuzz/CompileFuzzerInputs",
     "methods": [
@@ -78,7 +78,7 @@
     "class": "org.safere.fuzz.MatchFuzzer",
     "kind": "broad",
     "oss_fuzz": false,
-    "seeds": "src/test/resources/org/safere/fuzz/MatchFuzzerInputs",
+    "seeds": null,
     "methods": [
       "match"
     ]
@@ -116,7 +116,7 @@
     "class": "org.safere.fuzz.ReplacementFuzzer",
     "kind": "broad",
     "oss_fuzz": false,
-    "seeds": "src/test/resources/org/safere/fuzz/ReplacementFuzzerInputs",
+    "seeds": null,
     "methods": [
       "replacement"
     ]
@@ -143,7 +143,7 @@
     "class": "org.safere.fuzz.SplitFuzzer",
     "kind": "broad",
     "oss_fuzz": false,
-    "seeds": "src/test/resources/org/safere/fuzz/SplitFuzzerInputs",
+    "seeds": null,
     "methods": [
       "unassignedControlSplits",
       "repeatedClassSplits",
@@ -164,7 +164,7 @@
     "class": "org.safere.fuzz.UnicodeFuzzer",
     "kind": "broad",
     "oss_fuzz": false,
-    "seeds": "src/test/resources/org/safere/fuzz/UnicodeFuzzerInputs",
+    "seeds": null,
     "methods": [
       "unicode"
     ]
