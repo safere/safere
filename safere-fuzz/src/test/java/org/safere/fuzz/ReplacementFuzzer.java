@@ -123,25 +123,37 @@ public final class ReplacementFuzzer {
       input = "a" + data.consumeString(8);
       replacement = nonAsciiDigitReplacement(data);
     } else {
-      int template = data.consumeInt(0, 3);
+      int template = data.consumeInt(0, 4);
       flags = FuzzSupport.consumeFlags(data);
       SemanticDomain.Sample sample = SemanticDomain.generate(data, flags);
       regex = sample.regex();
       input = sample.input(data);
+      FuzzSupport.CompiledPattern compiled = FuzzSupport.compileRequired(regex, flags);
       replacement =
           switch (template) {
             case 0 -> "[$0]";
             case 1 -> "";
             case 2 -> "X";
+            case 3 -> compiled.matcher("").groupCount() > 0 ? "[$1]" : "[$0]";
             default -> data.consumeString(1024);
           };
+      compareReplacements(compiled, input, replacement, useStringBuffer);
+      return;
     }
     compareReplacements(regex, flags, input, replacement, useStringBuffer);
   }
 
   static void compareReplacements(
       String regex, int flags, String input, String replacement, boolean useStringBuffer) {
-    FuzzSupport.CompiledPattern pattern = FuzzSupport.compileRequired(regex, flags);
+    compareReplacements(
+        FuzzSupport.compileRequired(regex, flags), input, replacement, useStringBuffer);
+  }
+
+  private static void compareReplacements(
+      FuzzSupport.CompiledPattern pattern,
+      String input,
+      String replacement,
+      boolean useStringBuffer) {
     FuzzSupport.MatcherPair replaceAllMatcher = pattern.matcher(input);
     if (!replaceAllMatcher.replaceAll(replacement)) {
       return;

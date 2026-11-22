@@ -48,6 +48,17 @@ final class SemanticDomainTest {
   }
 
   @Test
+  void generatedCompositeCanRepeatAndRetainACapture() {
+    var sample = SemanticDomain.generate(choices(1, 0, 0, 6, 0, 1, 1, 2, 0, 0, 1, 0, 1));
+    assertThat(sample.regex()).isEqualTo("(?:(a)(?:b)){1,2}");
+    assertThat(sample.witness()).isEqualTo("abab");
+    var matcher = FuzzSupport.compileRequired(sample.regex(), 0).matcher(sample.witness());
+    assertThat(matcher.matches()).isTrue();
+    assertThat(matcher.group(1)).isEqualTo("a");
+    ReplacementFuzzer.compareReplacements(sample.regex(), 0, sample.witness(), "[$1]", false);
+  }
+
+  @Test
   void possessiveChoiceDependsOnTheImmediateOperand() {
     // The directly quantified consuming capture cannot take a possessive modifier.
     String consuming = CaptureSemanticsFuzzer.generateRegex(choices(1, 0, 10, 0, 0, 0, 0), false);
