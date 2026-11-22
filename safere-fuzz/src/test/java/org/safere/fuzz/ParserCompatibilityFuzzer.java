@@ -33,6 +33,7 @@ public final class ParserCompatibilityFuzzer {
     "$",
     "\\b",
     "\\B",
+    "\\G",
     "\\b{g}",
     "a\\Q\\E",
     "[a]",
@@ -63,24 +64,16 @@ public final class ParserCompatibilityFuzzer {
     "*",
     "*?",
     "* #q\n ?",
-    "* #q\n +",
-    "* #q\n + +",
     "+",
     "+?",
     "+ #q\n ?",
-    "+ #q\n +",
-    "+ #q\n + +",
     "{0}",
     "{00}",
     "{1,3}",
     "{01,03}",
     "{1}",
     "{01}",
-    "{2}+",
-    "{0,2}+",
     "{1} #q\n ?",
-    "{1} #q\n +",
-    "{1} #q\n + +",
     "??{1,3}",
     "??{01,03}",
     "?{1,3}",
@@ -91,8 +84,6 @@ public final class ParserCompatibilityFuzzer {
     "+{0}?+",
     "+{0}?+{1}",
     "+{1}{0}?+?",
-    "+++",
-    "++?{0,2}?",
     "+{01,03}",
     "{1,3}{1,3}",
     "{01,03}{02}"
@@ -163,14 +154,32 @@ public final class ParserCompatibilityFuzzer {
           data.pickValue(PREFIXES)
               + data.pickValue(ATOMS)
               + data.pickValue(CONNECTORS)
+              + "(?:"
               + data.pickValue(ATOMS)
+              + ")"
               + data.pickValue(SUFFIXES);
     }
     FuzzSupport.assertFullMatchesJdk(regex, flags, INPUTS);
-    // Append consumers to preserve the interpretation of the existing corpus.
     assertOperandFreePossessiveCountedRepeatMatchesJdk(data);
     assertQuantifierBoundaryFindsMatchJdk(data);
     assertCountedRepeatQuoteGapsMatchJdk(data);
+    assertZeroWidthPossessiveMatchesJdk(data);
+  }
+
+  private static void assertZeroWidthPossessiveMatchesJdk(FuzzedDataProvider data) {
+    RegexFragment operand =
+        data.consumeBoolean()
+            ? RegexFragment.zeroWidth(data.pickValue(List.of("", "^", "$", "\\b", "\\G")))
+            : RegexFragment.consuming(data.pickValue(List.of("a", "[ab]", "a|b")))
+                .group("(?:")
+                .repeat("{0}", 0);
+    String count = data.pickValue(List.of("*", "+", "?", "{2}", "{0,2}"));
+    String gap = data.pickValue(List.of("", " #q\n ", " ", "\\Q\\E"));
+    String regex = operand.group("(?:").regex() + count + gap + "+";
+    var pattern = FuzzSupport.compileRequired(regex, Pattern.COMMENTS);
+    for (String input : INPUTS) {
+      pattern.matcher(input).matches();
+    }
   }
 
   private static void assertCountedRepeatQuoteGapsMatchJdk(FuzzedDataProvider data) {

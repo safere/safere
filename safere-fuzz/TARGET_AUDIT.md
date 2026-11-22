@@ -15,6 +15,7 @@ comparisons use `FuzzSupport` and inherit its limitations listed below.
 | Target | Generated domain and assertions | Extraction disposition |
 | --- | --- | --- |
 | CompileFuzzer | Arbitrary pattern text up to 2048 characters and sampled flags; compilation acceptance. | Unsupported syntax and arbitrary flags prevent strict enrollment. |
+| UnsupportedSyntaxFuzzer | Composed lookaround, backreference, atomic-group, consuming-possessive and byte-escape syntax; checks rejection diagnostics and supported controls. | SafeRE rejection model with separate differential checks for controls. |
 | ParserCompatibilityFuzzer | Atoms, prefixes, connectors, suffixes, leading counted repeats, comment terminators and malformed groups; parser flags; acceptance and fixed membership subjects. | Grammar includes intentional syntax differences. |
 | CharacterClassExpressionFuzzer | Fixed regressions and composed base/ampersand/trailing/right pieces, intersections and comment separators; acceptance and membership. | Trivia selection avoids invalid separators; intentional class rules need model coverage, not JDK enrollment. |
 | EscapeSyntaxFuzzer | Fixed regressions and composed prefix/escape/suffix families; acceptance and membership with parser flags. | Keep broad pending a separate escape-domain proposal. |

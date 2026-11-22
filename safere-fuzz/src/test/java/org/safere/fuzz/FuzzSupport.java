@@ -47,6 +47,14 @@ final class FuzzSupport {
   private FuzzSupport() {}
 
   static CompiledPattern compileCompatibleOrSkip(String regex, int flags) {
+    return compile(regex, flags, false);
+  }
+
+  static CompiledPattern compileRequired(String regex, int flags) {
+    return compile(regex, flags, true);
+  }
+
+  private static CompiledPattern compile(String regex, int flags, boolean requireAcceptance) {
     org.safere.FuzzDivergenceEvidence.begin();
     org.safere.Pattern safeRePattern = null;
     java.util.regex.Pattern jdkPattern = null;
@@ -67,10 +75,9 @@ final class FuzzSupport {
     if (safeRePattern != null && jdkPattern != null) {
       return new CompiledPattern(regex, flags, safeRePattern, jdkPattern);
     }
-    if (safeReException != null && jdkException != null) {
-      return null;
-    }
-    if (safeReException != null && isOverCompilerBudget(safeReException)) {
+    if (!requireAcceptance
+        && safeReException != null
+        && (jdkException != null || isOverCompilerBudget(safeReException))) {
       return null;
     }
 
@@ -82,6 +89,10 @@ final class FuzzSupport {
         jdkException == null
             ? "compiled successfully"
             : jdkException.getClass().getSimpleName() + ": " + jdkException.getMessage();
+    if (requireAcceptance && safeReException != null && jdkException != null) {
+      throw FuzzFinding.failure(
+          regex, flags, "", "compile (expected acceptance)", "", "", safeRe, jdk);
+    }
     throw FuzzFinding.failure(regex, flags, "", "compile", "", "", safeRe, jdk);
   }
 
