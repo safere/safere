@@ -115,6 +115,39 @@ class FindBoundsDemandTest {
   }
 
   @Test
+  void appendReplacementAndTailUseTheUnreadMatch() {
+    String text = "x aay " + "a".repeat(700);
+    var expected = java.util.regex.Pattern.compile(NULLABLE).matcher(text);
+    var actual = Pattern.compile(NULLABLE).matcher(text);
+    StringBuilder expectedResult = new StringBuilder();
+    StringBuilder actualResult = new StringBuilder();
+    assertThat(expected.find()).isTrue();
+    assertThat(actual.find()).isTrue();
+
+    expected.appendReplacement(expectedResult, "<$1>").appendTail(expectedResult);
+    actual.appendReplacement(actualResult, "<$1>").appendTail(actualResult);
+
+    assertThat(actualResult.toString()).isEqualTo(expectedResult.toString());
+  }
+
+  @Test
+  @Tag("work-counter")
+  void displayingAnUnreadMatchLeavesTheNextFindEligibleForDeferral() {
+    String text = "x aay aaay " + "a".repeat(700);
+    var matcher = Pattern.compile(NULLABLE).matcher(text);
+    assertThat(matcher.find()).isTrue();
+    assertThat(
+            WorkCounter.countForTesting(
+                () -> assertThat(matcher.toString()).endsWith("lastmatch=aay]")))
+        .isPositive();
+    assertThat(matcher.find()).isTrue();
+    assertThat(
+            WorkCounter.countForTesting(
+                () -> assertThat(matcher.toString()).endsWith("lastmatch=aaay]")))
+        .isPositive();
+  }
+
+  @Test
   @Tag("work-counter")
   void restoringBoundsPerformsExactSelectionWithoutRepeatingTheForwardScan() {
     String text = "aay " + "x".repeat(700);

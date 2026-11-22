@@ -433,15 +433,16 @@ public final class Matcher implements MatchResult {
 
   private boolean groupZeroResolved = true;
 
-  /** Stashed match boundaries for deferred capture resolution. */
+  // Match bounds for deferred capture resolution. For a deferred find, these instead hold
+  // the original search lower bound and an end hint for exact selection.
   private int deferredMatchStart;
-
   private int deferredMatchEnd;
   private boolean deferredEndMatch;
 
-  // A flattened DFA proved existence for a nullable loop. The saved start is the original
-  // search lower bound, and the saved end is only a window-sizing hint for exact selection.
+  // A flattened DFA proved existence for a nullable loop.
   private boolean deferredFind;
+
+  // Reused matchers retain this signal across reset() and usePattern().
   private boolean findBoundsObserved;
 
   /** Opaque input view retained only until the current region match is consumed or discarded. */
@@ -4643,7 +4644,7 @@ public final class Matcher implements MatchResult {
   public String toString() {
     String lastMatch = "";
     if (deferredFind) {
-      resolveMatchBounds();
+      resolveDeferredFind(false);
     }
     if (hasMatch && groups[0] >= 0 && groups[1] >= groups[0]) {
       lastMatch = text.substring(groups[0], groups[1]);
@@ -4778,17 +4779,17 @@ public final class Matcher implements MatchResult {
 
   private void resolveMatchBounds() {
     if (deferredFind) {
-      resolveDeferredFind();
+      resolveDeferredFind(true);
     } else if (!groupZeroResolved) {
       resolveCaptures();
     }
   }
 
-  private void resolveDeferredFind() {
+  private void resolveDeferredFind(boolean recordBoundsDemand) {
     // The exact engine sees the same full input, search lower bound, and sizing hint as an eager
-    // find. Continuing the search comes through here too, and subsequent finds select bounds
-    // eagerly.
-    findBoundsObserved = true;
+    // find. Continuing the search comes through here too. A diagnostic rendering resolves the
+    // current match without changing the search policy for subsequent finds.
+    findBoundsObserved |= recordBoundsDemand;
     // This match was produced without diagnostics. A later operation may already have started
     // recording its own diagnostics by the time it needs the previous match's bounds.
     DiagnosticOperation nextOperation = diagnosticOperation;
@@ -4815,7 +4816,7 @@ public final class Matcher implements MatchResult {
       return;
     }
     if (deferredFind) {
-      resolveDeferredFind();
+      resolveDeferredFind(true);
       if (capturesResolved) {
         return;
       }
