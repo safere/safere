@@ -934,7 +934,11 @@ sealed interface Utf8StartAccelerator {
 
     @Override
     public AcceleratorPolicy policy() {
-      return AcceleratorPolicy.LEADING_EXPANSION.withStrategy(inner.policy().strategy());
+      AcceleratorPolicy policy =
+          wideLeadingClass
+              ? AcceleratorPolicy.WIDE_LEADING_EXPANSION
+              : AcceleratorPolicy.LEADING_EXPANSION;
+      return policy.withStrategy(inner.policy().strategy());
     }
 
     /**
