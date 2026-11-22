@@ -58,6 +58,12 @@ are already unguarded paths, so the languages coincide. This proof permits
 `matches()` to publish the fixed whole-region bounds, but says nothing about
 which prioritized prefix, search result, or capture vector wins.
 
+A successful flattened DFA search can defer exact selection for a full-input
+`find()`. The exact engine resumes from the original search lower bound with
+the same input and assertion context. The DFA endpoint is only a sizing hint.
+Resolving bounds or continuing the search performs the exact selection once
+without replaying the DFA search.
+
 Capture results belong to the selected prioritized path. Losing paths must not
 leak their writes into that result. Compiler transformations involving nested,
 nullable, lazy, or bounded repetitions need capture-aware tests, including a
