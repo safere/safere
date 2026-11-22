@@ -1195,7 +1195,12 @@ final class Dfa {
    * it; see {@link #resetCache}.
    */
   private State computeNextOrReset(State s, int cp, InputScanner text, int nextPos, int pos) {
-    State ns = computeNext(s, cp, text, nextPos);
+    return computeNextOrReset(s, cp, text, nextPos, pos, false);
+  }
+
+  private State computeNextOrReset(
+      State s, int cp, InputScanner text, int nextPos, int pos, boolean resolveWordBoundaries) {
+    State ns = computeNext(s, cp, text, nextPos, resolveWordBoundaries);
     if (ns != null) {
       return ns;
     }
@@ -1203,7 +1208,8 @@ final class Dfa {
       return null;
     }
     State recreated = recreateAfterReset(s);
-    State next = recreated == null ? null : computeNext(recreated, cp, text, nextPos);
+    State next =
+        recreated == null ? null : computeNext(recreated, cp, text, nextPos, resolveWordBoundaries);
     return next == null ? budgetExhaustedAfterReset() : next;
   }
 
@@ -1606,6 +1612,11 @@ final class Dfa {
    * resulting state.
    */
   private State computeNext(State s, int cp, InputScanner text, int nextPos) {
+    return computeNext(s, cp, text, nextPos, false);
+  }
+
+  private State computeNext(
+      State s, int cp, InputScanner text, int nextPos, boolean resolveWordBoundaries) {
     // At end of text, re-expand the current instruction set with end-of-text empty flags.
     // This allows empty-width assertions like $ and \b to fire.
     if (cp < 0) {
@@ -1815,18 +1826,12 @@ final class Dfa {
       return deadState;
     }
 
-    // Compute empty flags at nextPos (after consuming cp). Omit deferred flags:
-    // word boundary (depends on the next character) and END_LINE (depends on what's at
-    // nextPos, not deterministic for cache). Unsatisfied EMPTY_WIDTH instructions will
-    // remain in the frontier for re-evaluation when the next character arrives.
-    int emptyFlags = emptyFlags(text, nextPos);
-    emptyFlags &=
-        ~(EmptyOp.WORD_BOUNDARY
-            | EmptyOp.NON_WORD_BOUNDARY
-            | EmptyOp.UNICODE_WORD_BOUNDARY
-            | EmptyOp.UNICODE_NON_WORD_BOUNDARY
-            | EmptyOp.END_LINE
-            | EmptyOp.UNIX_END_LINE);
+    // Cached transitions defer flags that depend on the next character. At the final terminator
+    // the caller can resolve word boundaries in the destination frontier and bypass the cache.
+    int emptyFlags = emptyFlags(text, nextPos) & ~(EmptyOp.END_LINE | EmptyOp.UNIX_END_LINE);
+    if (!resolveWordBoundaries) {
+      emptyFlags &= ~EmptyOp.WORD_BOUNDARIES;
+    }
 
     int[] nextInsts = expand(computeBuf, successorCount, emptyFlags);
 
@@ -2098,7 +2103,7 @@ final class Dfa {
   /** Whether an anchored first-match search can decide priority at both terminal endpoints. */
   static boolean supportsAnchoredEndPriority(Prog prog) {
     return prog.dollarAnchorEnd()
-        && !prog.hasEmptyWidth()
+        && !prog.hasEmptyWidthOutsideWordBoundaries()
         && !prog.hasGraphemeSemantics()
         && !prog.hasPreviousMatchEnd()
         && prog.numLoopRegs() == 0;
@@ -2128,6 +2133,7 @@ final class Dfa {
             && !longest
             && !this.longest
             && supportsAnchoredEndPriority(prog);
+    boolean resolveTerminalWordBoundaries = prioritizeAnchoredEnd && prog.hasWordBoundary();
 
     // Position-dependent flag threshold: emptyFlags at positions >= this threshold contain
     // text-length-dependent flags (END_TEXT at textLen, DOLLAR_END near the end when text ends
@@ -2141,6 +2147,9 @@ final class Dfa {
     if (s == null) {
       return completeForwardSearch(null, pos, startBackoff);
     }
+    if (resolveTerminalWordBoundaries && startPos == trailingTermStart) {
+      return completeAnchoredEndSearch(s, text, trailingTermStart, startBackoff);
+    }
 
     boolean matched = false;
     int matchEnd = -1;
@@ -2153,8 +2162,7 @@ final class Dfa {
           return completeForwardSearch(new SearchResult(true, startPos), pos, startBackoff);
         }
         if (prioritizeAnchoredEnd && startPos == trailingTermStart) {
-          int end = prioritizeTrailingTerminator(s, text, startPos);
-          return completeForwardSearch(new SearchResult(true, end), pos, startBackoff);
+          return completeAnchoredEndSearch(s, text, trailingTermStart, startBackoff);
         }
       }
     }
@@ -2524,6 +2532,14 @@ final class Dfa {
         // cached transitions are position-independent. The end-of-text sentinel (cp < 0)
         // is always safe to cache because it always means "at text end".
         int effectiveNextPos = Math.min(nextPos, textLen);
+        if (resolveTerminalWordBoundaries && effectiveNextPos == trailingTermStart) {
+          // Resolve word boundaries from the consuming transition's seeds. They are program
+          // entries, so expansion can follow their alternatives in the original priority order.
+          State terminal = computeNextOrReset(s, cp, text, effectiveNextPos, pos, true);
+          return terminal == null
+              ? completeForwardSearch(null, pos, backoff)
+              : completeAnchoredEndSearch(terminal, text, trailingTermStart, backoff);
+        }
         State ns;
         if ((hasSurrogateWordContext(cp) && !text.isCodePointBoundary(pos))
             || transitionDependsOnPosition(cp, effectiveNextPos, posDepThreshold)) {
@@ -2573,8 +2589,7 @@ final class Dfa {
                 return completeForwardSearch(new SearchResult(true, matchEnd), pos, backoff);
               }
               if (prioritizeAnchoredEnd && endPos == trailingTermStart) {
-                int end = prioritizeTrailingTerminator(s, text, endPos);
-                return completeForwardSearch(new SearchResult(true, end), pos, backoff);
+                return completeAnchoredEndSearch(s, text, trailingTermStart, backoff);
               }
             }
           }
@@ -2592,15 +2607,21 @@ final class Dfa {
     return completeForwardSearch(new SearchResult(matched, matchEnd), pos, backoff);
   }
 
+  private SearchResult completeAnchoredEndSearch(
+      State state, InputScanner text, int trailingStart, long backoff) {
+    int end = prioritizeTrailingTerminator(state, text, trailingStart);
+    return completeForwardSearch(new SearchResult(end >= 0, end), trailingStart, backoff);
+  }
+
   /**
-   * An accepted pre-terminator match outranks every instruction after the first MATCH in this
-   * ordered, assertion-free frontier. Only the threads before it can replace that match. Step those
-   * threads through the final terminator (at most two code points), outside the DFA cache. A MATCH
-   * between CR and LF has no effect because its endpoint is ineligible.
+   * The ordered frontier at the terminator already has its assertions resolved for this position. A
+   * match there discards lower-priority paths. Continue through at most two code points to check
+   * whether a higher-priority path can reach input end. A match between CR and LF is ineligible.
    */
   private int prioritizeTrailingTerminator(State state, InputScanner text, int trailingStart) {
     int[] frontier = state.insts;
     int end = text.length();
+    int preferredEnd = -1;
     for (int pos = trailingStart; pos < end; ) {
       if (WorkCounterConfig.ENABLED) {
         WorkCounter.record();
@@ -2612,6 +2633,7 @@ final class Dfa {
       for (int id : frontier) {
         Inst inst = prog.inst(id);
         if (pos == trailingStart && inst.opCode == InstOp.OP_MATCH) {
+          preferredEnd = trailingStart;
           break;
         }
         if (instMatches(inst, cp)) {
@@ -2619,12 +2641,13 @@ final class Dfa {
         }
       }
       if (successorCount == 0) {
-        return trailingStart;
+        return preferredEnd;
       }
-      frontier = expand(computeBuf, successorCount, 0);
       pos = InputScanner.position(decoded);
+      int flags = prog.hasWordBoundary() ? emptyFlags(text, pos) : 0;
+      frontier = expand(computeBuf, successorCount, flags);
     }
-    return hasMatch(frontier) ? end : trailingStart;
+    return hasMatch(frontier) ? end : preferredEnd;
   }
 
   // ---------------------------------------------------------------------------

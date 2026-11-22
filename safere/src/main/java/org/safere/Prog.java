@@ -49,6 +49,7 @@ final class Prog {
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
   private boolean hasEmptyWidth;
+  private boolean hasEmptyWidthOutsideWordBoundaries;
   private boolean hasPreviousMatchEnd;
   private boolean flatNfaSupported;
 
@@ -89,6 +90,7 @@ final class Prog {
     this.hasWordBoundary = other.hasWordBoundary;
     this.hasTextAnchor = other.hasTextAnchor;
     this.hasEmptyWidth = other.hasEmptyWidth;
+    this.hasEmptyWidthOutsideWordBoundaries = other.hasEmptyWidthOutsideWordBoundaries;
     this.hasPreviousMatchEnd = other.hasPreviousMatchEnd;
   }
 
@@ -144,10 +146,14 @@ final class Prog {
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
     hasEmptyWidth = false;
+    hasEmptyWidthOutsideWordBoundaries = false;
     hasPreviousMatchEnd = false;
     flatNfaSupported = !hasGraphemeSemantics;
     for (Inst inst : instArray) {
-      hasEmptyWidth |= inst.op == InstOp.EMPTY_WIDTH;
+      if (inst.op == InstOp.EMPTY_WIDTH) {
+        hasEmptyWidth = true;
+        hasEmptyWidthOutsideWordBoundaries |= (inst.arg & ~EmptyOp.WORD_BOUNDARIES) != 0;
+      }
       hasPreviousMatchEnd |= inst.op == InstOp.PREVIOUS_MATCH_END;
       if (inst.op == InstOp.ALT_MATCH
           || inst.op == InstOp.LOOP_ENTER
@@ -296,6 +302,11 @@ final class Prog {
     return hasEmptyWidth;
   }
 
+  /** Whether an empty-width instruction uses a flag outside the word-boundary flags. */
+  boolean hasEmptyWidthOutsideWordBoundaries() {
+    return hasEmptyWidthOutsideWordBoundaries;
+  }
+
   /** Returns whether execution needs the operation's fixed previous-match boundary. */
   boolean hasPreviousMatchEnd() {
     return hasPreviousMatchEnd;
@@ -306,15 +317,10 @@ final class Prog {
   }
 
   private boolean computeHasWordBoundary() {
-    int mask =
-        EmptyOp.WORD_BOUNDARY
-            | EmptyOp.NON_WORD_BOUNDARY
-            | EmptyOp.UNICODE_WORD_BOUNDARY
-            | EmptyOp.UNICODE_NON_WORD_BOUNDARY;
     int n = size();
     for (int i = 0; i < n; i++) {
       Inst ip = inst(i);
-      if (ip.op == InstOp.EMPTY_WIDTH && (ip.arg & mask) != 0) {
+      if (ip.op == InstOp.EMPTY_WIDTH && (ip.arg & EmptyOp.WORD_BOUNDARIES) != 0) {
         return true;
       }
     }

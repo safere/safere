@@ -726,6 +726,10 @@ class DiagnosticsTest {
             "(?s)\\A.*c.+\\Z",
             "(?s)\\A.*c.{2,}\\Z",
             "(?s)\\A.*c.+?(?d:$)",
+            "(?s)\\A.*\\bc.+?\\Z",
+            "(?Us)\\A.*c.+?\\b\\Z",
+            "(?s)\\A.*c.+?\\B\\Z",
+            "(?s)\\A.*c.+?\\B(?d:\\Z)",
             "\\A.*c[0-9]+$")) {
       Pattern pattern = Pattern.compile(regex, 0, options);
       var jdk = java.util.regex.Pattern.compile(regex);
@@ -746,6 +750,7 @@ class DiagnosticsTest {
         assertThat(prefix.end()).isEqualTo(expected.end());
         assertThat(pattern.matcher(input).replaceFirst("X"))
             .isEqualTo(expected.reset().replaceFirst("X"));
+        assertThat(pattern.split(input, -1)).isEqualTo(jdk.split(input, -1));
       }
       assertThat(operationsFor(pattern))
           .hasSize(16)
@@ -754,6 +759,28 @@ class DiagnosticsTest {
             assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
             assertThat(event.reverseDfaSearchCount()).isZero();
           });
+    }
+  }
+
+  @Test
+  void anchoredDfaResolvesWordBoundaryAtStartOfFinalTerminator() {
+    Pattern.setDiagnostics(diagnostics);
+    for (String regex : List.of("(?s)(?:\\B|.)$", "(?s)(?:.|\\B)$", "(?s)(?:\\b|.)$")) {
+      Pattern pattern =
+          Pattern.compile(regex, 0, EnginePathOptions.builder().onePass(false).build());
+      for (String input : List.of("\n", "\u2028")) {
+        var expected = java.util.regex.Pattern.compile(regex).matcher(input);
+        assertThat(expected.lookingAt()).isTrue();
+        Matcher matcher = pattern.matcher(input);
+        assertThat(matcher.lookingAt()).isTrue();
+        assertThat(matcher.end()).isEqualTo(expected.end());
+        var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+        assertThat(utf8.lookingAt()).isTrue();
+        assertThat(utf8.end()).isEqualTo(input.substring(0, expected.end()).getBytes(UTF_8).length);
+      }
+      assertThat(operationsFor(pattern))
+          .hasSize(4)
+          .allSatisfy(event -> assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA));
     }
   }
 

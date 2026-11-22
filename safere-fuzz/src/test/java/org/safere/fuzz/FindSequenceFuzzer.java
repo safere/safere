@@ -642,7 +642,7 @@ public final class FindSequenceFuzzer {
         return;
       }
       case 23 -> {
-        String prefix = data.pickValue(List.of(".*c", ".*?c", "c"));
+        String prefix = data.pickValue(List.of(".*c", ".*?c", "c", ".*\\bc", ".*\\Bc"));
         String tail = data.pickValue(List.of(".+?", ".*?", ".+", ".{1,4}?"));
         if (data.consumeBoolean()) {
           tail = "(" + tail + ")";
@@ -655,6 +655,9 @@ public final class FindSequenceFuzzer {
         input = padding.repeat(data.consumeInt(0, 150)) + "cx" + terminator;
         if (data.consumeBoolean()) {
           regex = "\\A" + regex;
+        }
+        if (data.consumeBoolean()) {
+          regex = "(?U)" + regex;
         }
       }
       default -> throw new AssertionError();

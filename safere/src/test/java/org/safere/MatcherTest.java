@@ -863,7 +863,15 @@ class MatcherTest {
       for (String anchor : List.of("$", "\\Z", "\\z", "(?d:$)", "(?d:\\Z)")) {
         for (String body :
             List.of(
-                ".*c.+?", ".*?c.+?", ".*c.+", ".*c(.+?)", ".*c.*?", "\\A.*c(.+?)", "\\A.*c.+")) {
+                ".*c.+?",
+                ".*?c.+?",
+                ".*c.+",
+                ".*c(.+?)",
+                ".*c.*?",
+                "\\A.*c(.+?)",
+                "\\A.*c.+",
+                "\\A.*\\bc(.+?)",
+                "\\A.*c(.+?)\\b")) {
           String regex = "(?s)" + body + anchor;
           Pattern pattern = Pattern.compile(regex);
           var jdkPattern = java.util.regex.Pattern.compile(regex);
