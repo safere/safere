@@ -553,7 +553,7 @@ final class Dfa {
    * DFA caches transitions per (state, class) and the word-boundary computation depends on whether
    * the current character is a word character.
    */
-  private static int[] buildBoundaries(Prog prog) {
+  static int[] buildBoundaries(Prog prog) {
     IntArrayList bounds = new IntArrayList();
     bounds.add(0);
     bounds.add(Utils.MAX_RUNE + 1);

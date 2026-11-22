@@ -66,7 +66,7 @@ class PatternInternalTest {
               Matcher matcher = pattern.matcher(input);
               assertThat(matcher.find()).isTrue();
               assertThat(matcher.group()).isEqualTo(match);
-              return List.of(pattern.reverseProg(), reverseDfaProg, pattern.reverseDfaSetup());
+              return List.of(reverseDfaProg, pattern.reverseDfaSetup());
             }));
       }
       List<Object> shared = futures.getFirst().get();
