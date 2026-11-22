@@ -230,6 +230,35 @@ public final class Pattern implements Serializable {
     Dfa forwardFirstMatchDfa;
     Dfa forwardLongestMatchDfa;
     Dfa reverseDfa;
+    StartRegisterSearch startRegister;
+    boolean startRegisterLookedUp;
+  }
+
+  /**
+   * Returns this thread's start-register search, or null when the pattern is not eligible. The
+   * search stands in for the reverse DFA of a capture-free DFA sandwich, so it is only built where
+   * that sandwich would give authoritative group-zero bounds.
+   */
+  StartRegisterSearch startRegisterSearch(ThreadCache cache) {
+    if (!cache.startRegisterLookedUp) {
+      cache.startRegisterLookedUp = true;
+      if (enginePathOptions.startRegister()
+          && enginePathOptions.dfa()
+          && enginePathOptions.reverseDfa()
+          && prog.numCaptures() <= 1
+          && dfaGroupZeroReliable()
+          && forwardDfaSupported()
+          && canUseReverseDfa()
+          // Inner-literal narrowing of the forward DFA is worth more than the reverse pass.
+          && innerLiteralSearch == null) {
+        cache.startRegister =
+            StartRegisterSearch.create(
+                flatDfaProg(),
+                dfaStartAcceleration() ? stringStartAccelerator : null,
+                dfaStartAcceleration() ? utf8StartAccelerator : null);
+      }
+    }
+    return cache.startRegister;
   }
 
   // Per-Pattern ThreadLocal is intentional: each Pattern caches its own DFA/BitState/Nfa state per
