@@ -125,6 +125,8 @@ public final class Matcher implements MatchResult {
   private int searchFrom;
   // Retained across failed attempts; unlike searchFrom, excludes empty-match advancement.
   private int previousMatchEnd;
+  // Fixed for the whole attempt, including narrowed searches and capture extraction.
+  private int operationPreviousMatchEnd;
   private int appendPos;
   private boolean transparentBounds;
   private boolean anchoringBounds = true;
@@ -311,60 +313,47 @@ public final class Matcher implements MatchResult {
     return policy.isExactMatchCandidate() || pos >= AdaptiveBackoff.resumePos(startBackoff);
   }
 
-  private boolean hasLiteralStartAccelerator(InputScanner scanner) {
-    return parentPattern.startPrecedesFindReject()
-        && (text != null
-            || scanner instanceof Utf8InputScanner
-            || scanner instanceof StringRegionInputScanner);
+  /** Returns whether {@link #doFindCore} runs the start accelerator for {@code scanner}. */
+  private boolean startSearchRuns(InputScanner scanner) {
+    return text != null
+        || scanner instanceof Utf8InputScanner
+        || scanner instanceof StringRegionInputScanner;
   }
 
   /**
    * Like {@link #rejectFindFrom}, for the tail after a short input's first start candidate (see
    * {@link RejectPrefilter#canRejectTail}).
    */
-  private boolean rejectTailFrom(InputScanner scanner, int fromIndex, EnginePathOptions options) {
-    RejectPrefilter rejectPrefilter =
-        scanner instanceof Utf8InputScanner
-            ? parentPattern.utf8FindRejectPrefilter()
-            : parentPattern.findRejectPrefilter();
-    if (rejectPrefilter == null) {
-      return false;
-    }
+  private boolean rejectTailFrom(
+      RejectPrefilter rejectPrefilter,
+      InputScanner scanner,
+      int fromIndex,
+      EnginePathOptions options) {
     return diagnosticsAccumulator() == null
         ? rejectPrefilter.canRejectTail(text, scanner, fromIndex, options)
         : reportRejection(rejectPrefilter.tailRejectionStrategy(text, scanner, fromIndex, options));
   }
 
-  private boolean rejectFindFrom(InputScanner scanner, int fromIndex, EnginePathOptions options) {
-    RejectPrefilter rejectPrefilter =
-        scanner instanceof Utf8InputScanner
-            ? parentPattern.utf8FindRejectPrefilter()
-            : parentPattern.findRejectPrefilter();
-    if (rejectPrefilter == null) {
-      return false;
-    }
+  private boolean rejectFindFrom(
+      RejectPrefilter rejectPrefilter,
+      InputScanner scanner,
+      int fromIndex,
+      EnginePathOptions options) {
     return diagnosticsAccumulator() == null
         ? rejectPrefilter.canReject(text, scanner, fromIndex, options)
         : rejectWithDiagnostics(rejectPrefilter, text, scanner, fromIndex, options);
   }
 
   /**
-   * Charges a matcher-level start-accelerator call from {@code pos} to {@link #startBackoff},
-   * unless its candidates are exact match starts (see {@link #startAccelerationAllowed}).
-   *
-   * <p>A leading expansion over a wide class such as non-DOTALL {@code .} is not charged either. It
-   * often returns the search start itself (for a short skip, or a hit on the first line), and
-   * charging that as a failed skip would quarantine {@link #startBackoff}, which also stops the
-   * forward DFA from fast-forwarding through its start state. Each call already costs at most one
-   * scan to the next inner hit plus one walk back over the line holding it, and later calls resume
-   * after the previous match, which lies past that hit.
+   * Charges a matcher-level start-accelerator call from {@code pos} to {@link #startBackoff} when
+   * its policy {@linkplain AcceleratorPolicy#chargesSkips charges skips}.
    */
   private void chargeStartAcceleration(
-      int pos, int candidate, int textLen, AcceleratorPolicy policy, boolean wideLeadingClass) {
+      int pos, int candidate, int textLen, AcceleratorPolicy policy) {
     if (WorkCounterConfig.ENABLED) {
       WorkCounter.recordStartScan(candidate - pos);
     }
-    if (!policy.isExactMatchCandidate() && !wideLeadingClass) {
+    if (policy.chargesSkips()) {
       startBackoff = AdaptiveBackoff.recordSkip(startBackoff, pos, candidate, textLen, policy);
     }
   }
@@ -617,6 +606,7 @@ public final class Matcher implements MatchResult {
     resetWindowBackoff();
     searchFrom = 0;
     previousMatchEnd = 0;
+    operationPreviousMatchEnd = 0;
     startBackoff = AdaptiveBackoff.NEUTRAL;
   }
 
@@ -624,6 +614,7 @@ public final class Matcher implements MatchResult {
     resetWindowBackoff();
     searchFrom = regionStart;
     previousMatchEnd = regionStart;
+    operationPreviousMatchEnd = regionStart;
     startBackoff = AdaptiveBackoff.NEUTRAL;
   }
 
@@ -638,6 +629,7 @@ public final class Matcher implements MatchResult {
 
   private void prepareAnchoredAttempt() {
     rememberPreviousMatchEnd();
+    operationPreviousMatchEnd = previousMatchEnd;
     clearDeferredCaptureState();
     findExhaustedAfterTerminalEmptyMatch = false;
     // An anchored failure invalidates the result, but does not reset find's continuation.
@@ -1615,6 +1607,7 @@ public final class Matcher implements MatchResult {
   private boolean findImpl() {
     modCount++;
     rememberPreviousMatchEnd();
+    operationPreviousMatchEnd = previousMatchEnd;
     if (findExhaustedAfterTerminalEmptyMatch) {
       applyFailedMatchResult();
       return false;
@@ -1693,7 +1686,10 @@ public final class Matcher implements MatchResult {
    * Returns whether DFA paths implement every instruction and boundary predicate in {@code prog}.
    */
   private static boolean dfaSupportsProgram(Prog prog) {
-    return prog != null && !prog.hasGraphemeSemantics() && prog.numLoopRegs() == 0;
+    return prog != null
+        && !prog.hasGraphemeSemantics()
+        && !prog.hasPreviousMatchEnd()
+        && prog.numLoopRegs() == 0;
   }
 
   private boolean canUseForwardDfa() {
@@ -1736,6 +1732,7 @@ public final class Matcher implements MatchResult {
     modCount++;
     reset();
     searchFrom = start;
+    operationPreviousMatchEnd = start;
     return findWithContinuation(previousMatchEnd);
   }
 
@@ -1961,7 +1958,7 @@ public final class Matcher implements MatchResult {
     int effectiveStart = searchFrom;
     if (!transparentBounds && text != null && prog.hasGraphemeClusterInstruction()) {
       EnginePathOptions options = enginePathOptions();
-      RejectPrefilter rejection = parentPattern.findRejectPrefilter();
+      RejectPrefilter rejection = parentPattern.findPlan().stringReject();
       if (options.charClassMatchFastPaths() && rejection != null) {
         if (regionClassSearch == null) {
           regionClassSearch = new RegionClassSearch();
@@ -1991,7 +1988,7 @@ public final class Matcher implements MatchResult {
           return applyFailedMatchResult();
         }
         chargeStartAcceleration(
-            searchFrom - regionStart, candidate, region.length(), accelerator.policy(), false);
+            searchFrom - regionStart, candidate, region.length(), accelerator.policy());
         effectiveStart = regionStart + candidate;
       }
     }
@@ -2023,6 +2020,28 @@ public final class Matcher implements MatchResult {
 
   private boolean verifyEndAnchoredStart(InputScanner scanner, int start) {
     Prog prog = parentPattern.prog();
+    // A proved fixed end needs no verification scan, regardless of candidate length. Inner
+    // captures remain deferred to the exact engine.
+    if (parentPattern.endAnchoredStartHasExactEnd(scanner)) {
+      diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+      diagnosticBoundary(MatchStrategy.DFA);
+      return applyDeferredMatchResult(start, scanner.length(), prog.numCaptures(), true, false);
+    }
+    // With two legal ends, only the exact engine can select the end required by match priority.
+    if (parentPattern.shouldUseDfaEndVerification(scanner.length() - start)
+        && canUseForwardDfa()
+        && parentPattern.dfaGroupZeroReliable()
+        && parentPattern.hasUniqueEndAnchoredEndpoint(scanner)) {
+      diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+      Dfa.SearchResult result = searchForwardDfa(dfa(false), scanner, start, true, false);
+      if (result != null) {
+        if (!result.matched()) {
+          return false;
+        }
+        diagnosticBoundary(MatchStrategy.DFA);
+        return applyDeferredMatchResult(start, result.pos(), prog.numCaptures(), true, false);
+      }
+    }
     int[] exact =
         searchWithBitStateOrNfa(
             prog, scanner, start, start, scanner.length(), true, false, false, 1);
@@ -2080,15 +2099,13 @@ public final class Matcher implements MatchResult {
       }
     }
 
-    boolean literalStartFirst =
-        options.startAcceleration()
-            && !prog.anchorStart()
-            && scanner.length() - searchFrom < Pattern.MAX_LITERAL_START_FIRST_LENGTH
-            && hasLiteralStartAccelerator(scanner);
-    // A wide-class leading expansion's literal search below fails exactly when this would reject.
-    if (!literalStartFirst
-        && !(options.startAcceleration() && parentPattern.startSubsumesFindReject())
-        && rejectFindFrom(scanner, searchFrom, options)) {
+    FindPlan findPlan = parentPattern.findPlan();
+    RejectPrefilter rejectPrefilter = findPlan.reject(scanner instanceof Utf8InputScanner);
+    int rejectMode =
+        findPlan.rejectMode(
+            rejectPrefilter, scanner.length() - searchFrom, startSearchRuns(scanner));
+    if (rejectMode == FindPlan.REJECT_FIRST
+        && rejectFindFrom(rejectPrefilter, scanner, searchFrom, options)) {
       return applyFailedMatchResult();
     }
 
@@ -2127,10 +2144,9 @@ public final class Matcher implements MatchResult {
         }
       }
     }
-    if (literalStartFirst
-        && startPositionPreselected
-        && scanner.length() - effectiveStart >= Pattern.MIN_REJECT_AFTER_START_REMAINING
-        && rejectTailFrom(scanner, effectiveStart, options)) {
+    if (startPositionPreselected
+        && FindPlan.rejectsTail(rejectMode, scanner.length() - effectiveStart)
+        && rejectTailFrom(rejectPrefilter, scanner, effectiveStart, options)) {
       return applyFailedMatchResult();
     }
 
@@ -2367,6 +2383,7 @@ public final class Matcher implements MatchResult {
             && !replacementNeedsCaptures
             && !parentPattern.innerCapturesObserved()
             && !prog.hasGraphemeSemantics()
+            && !prog.hasPreviousMatchEnd()
             && options.lazyCaptureExtraction()
             && prog.numCaptures() <= MAX_LAZY_FALLBACK_SUBMATCHES;
     int nsubmatch = lazyFallbackCaptures ? 1 : prog.numCaptures();
@@ -2418,7 +2435,7 @@ public final class Matcher implements MatchResult {
         }
         return -1;
       }
-      chargeStartAcceleration(fromIndex, innerMatch, scanner.length(), policy, false);
+      chargeStartAcceleration(fromIndex, innerMatch, scanner.length(), policy);
       // As in findNextStringStartCandidate, an unanchored rejection at the inner candidate rules
       // out every expanded start.
       diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
@@ -2436,12 +2453,7 @@ public final class Matcher implements MatchResult {
         diagnosticBoundary(strategy);
       }
     } else {
-      chargeStartAcceleration(
-          fromIndex,
-          candidate,
-          scanner.length(),
-          policy,
-          accelerator instanceof Utf8StartAccelerator.LeadingExpansion le && le.wideLeadingClass());
+      chargeStartAcceleration(fromIndex, candidate, scanner.length(), policy);
     }
     return candidate;
   }
@@ -2471,7 +2483,7 @@ public final class Matcher implements MatchResult {
         }
         return -1;
       }
-      chargeStartAcceleration(fromIndex, innerMatch, scanner.length(), policy, false);
+      chargeStartAcceleration(fromIndex, innerMatch, scanner.length(), policy);
       // Zero repetitions are legal and there are no leading assertions. Every match from an
       // expanded start therefore has a suffix matching from an inner candidate. An unanchored
       // rejection here rules out all later starts without traversing the leading run backward.
@@ -2504,13 +2516,7 @@ public final class Matcher implements MatchResult {
         diagnosticBoundary(strategy);
       }
     } else {
-      chargeStartAcceleration(
-          fromIndex,
-          candidate,
-          scanner.length(),
-          policy,
-          accelerator instanceof StringStartAccelerator.LeadingExpansion le
-              && le.wideLeadingClass());
+      chargeStartAcceleration(fromIndex, candidate, scanner.length(), policy);
     }
     return candidate;
   }
@@ -3041,7 +3047,15 @@ public final class Matcher implements MatchResult {
       int bitStateEnd = speculate ? startPos + windowSize : endPos;
       BitState bs =
           BitState.getOrCreate(
-              cachedBitState, prog, text, startPos, bitStateEnd, ncap, longest, endMatchEffective);
+              cachedBitState,
+              prog,
+              text,
+              startPos,
+              bitStateEnd,
+              ncap,
+              longest,
+              endMatchEffective,
+              previousMatchEndOnInput(text));
       int[] destBuf =
           reuseGroups != null && reuseGroups.length >= ncap ? reuseGroups : bitStateResult;
       if (destBuf == null || destBuf.length < ncap) {
@@ -3128,6 +3142,11 @@ public final class Matcher implements MatchResult {
     return result;
   }
 
+  private int previousMatchEndOnInput(InputScanner scanner) {
+    // Region views use local coordinates; full-context engines retain input coordinates.
+    return operationPreviousMatchEnd - (scanner == cachedRegionScanner ? regionStart : 0);
+  }
+
   private int[] searchNfa(
       Prog prog,
       InputScanner scanner,
@@ -3190,7 +3209,8 @@ public final class Matcher implements MatchResult {
             anchorEndPos,
             emptyAnchorStartPos,
             emptyAnchorEndPos,
-            graphemeContextFor(prog, scanner));
+            graphemeContextFor(prog, scanner),
+            previousMatchEndOnInput(scanner));
 
     releaseEnginesOwnedByOtherThread();
     if (cachedNfa == null && !nfaBorrowed) {
@@ -3453,7 +3473,7 @@ public final class Matcher implements MatchResult {
         }
         hasEndAnchoredCandidate = endAnchoredStart >= 0;
       }
-      RejectPrefilter rejectPrefilter = parentPattern.findRejectPrefilter();
+      RejectPrefilter rejectPrefilter = parentPattern.findPlan().stringReject();
       if (!hasEndAnchoredCandidate
           && rejectPrefilter != null
           && text != null
@@ -3611,6 +3631,7 @@ public final class Matcher implements MatchResult {
     sb.append(text, matchEnd, text.length());
     appendPos = matchEnd;
     if (replaceAll) {
+      previousMatchEnd = matchEnd;
       applyFailedMatchResult();
       if (matchStart == matchEnd) {
         searchFrom = matchEnd < regionEnd ? matchEnd + 1 : regionEnd + 1;
@@ -3768,8 +3789,9 @@ public final class Matcher implements MatchResult {
       this.appendPos = firstMatchEnd;
     } else {
       applyFailedMatchResult();
+      previousMatchEnd = builderAppendPos;
       this.appendPos = textLen;
-      this.searchFrom = textLen;
+      this.searchFrom = builderAppendPos;
     }
     diagnosticBoundary(MatchStrategy.DFA);
     DiagnosticAccumulator accumulator = diagnosticsAccumulator();
@@ -4088,7 +4110,8 @@ public final class Matcher implements MatchResult {
           resolveCaptures();
         }
       } else {
-        this.searchFrom = regionEnd;
+        previousMatchEnd = matchEnd;
+        this.searchFrom = matchEnd;
         applyFailedMatchResult();
       }
       if (accumulator != null) {
@@ -4208,7 +4231,8 @@ public final class Matcher implements MatchResult {
             firstMatchStart, firstMatchEnd, parentPattern.prog().numCaptures(), true, false);
       }
     } else {
-      this.searchFrom = regionEnd;
+      previousMatchEnd = appendPosition;
+      this.searchFrom = appendPosition;
       applyFailedMatchResult();
     }
 
@@ -4340,7 +4364,8 @@ public final class Matcher implements MatchResult {
     if (limit == 1) {
       applyFullMatchResult(new int[] {firstMatchStart, firstMatchEnd});
     } else {
-      searchFrom = regionEnd;
+      previousMatchEnd = appendPos;
+      searchFrom = appendPos;
       applyFailedMatchResult();
     }
 
@@ -4407,6 +4432,7 @@ public final class Matcher implements MatchResult {
     result.append(replacement);
 
     appendPos = textLen;
+    previousMatchEnd = textLen;
     searchFrom = regionEnd + 1;
     applyFailedMatchResult();
     findExhaustedAfterTerminalEmptyMatch = true;
@@ -5117,6 +5143,19 @@ public final class Matcher implements MatchResult {
   }
 
   int findSplitPositions(int limit, SplitBuffer buffer) {
+    if (parentPattern.prog().hasPreviousMatchEnd()) {
+      // Splitting must retain the previous match boundary between delimiter searches.
+      while (find()) {
+        if (limit > 0 && buffer.size / 2 >= limit - 1) {
+          break;
+        }
+        if (buffer.size == 0 && groups[0] == 0 && groups[1] == 0) {
+          continue;
+        }
+        buffer.add(groups[0], groups[1]);
+      }
+      return buffer.size / 2;
+    }
     // The first search reuses this end-anchored probe instead of repeating it.
     int firstEndAnchoredStart = END_ANCHORED_START_UNKNOWN;
     if (!parentPattern.prog().anchorStart()) {
@@ -5126,7 +5165,7 @@ public final class Matcher implements MatchResult {
         return 0;
       }
       firstEndAnchoredStart = endAnchoredStart;
-      RejectPrefilter rejectPrefilter = parentPattern.findRejectPrefilter();
+      RejectPrefilter rejectPrefilter = parentPattern.findPlan().stringReject();
       if (endAnchoredStart < 0 && rejectPrefilter != null && text != null) {
         if (rejectPrefilter.canReject(text, null, 0, enginePathOptions())) {
           return 0;

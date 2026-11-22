@@ -90,6 +90,18 @@ detection, group-zero bounds, and capture extraction have separate capability
 requirements. Fast paths need semantic eligibility checks as well as size or
 performance checks.
 
+An assertion-free reverse DFA without progress registers recognizes the exact
+reversed language. An unambiguous leftmost start and a single legal terminal
+endpoint therefore establish group-zero bounds; inner captures still require
+the exact engine. Matcher and matcher-free searches share this proof, independent
+of candidate length. Unproved candidates share a forward-verification eligibility
+gate before BitState/NFA fallback. A reverse accepting state may skip unread
+prefix input only when every code-point equivalence class returns to the identical
+frontier and no assertion or progress state depends on the skipped context.
+Derived language-proof flags must be excluded from semantic state-cache keys and
+regenerated with states after a cache reset. Skipped input must not count as
+scanned progress toward a DFA cache-reset budget.
+
 Disabling an optimization must preserve the observable API trace: booleans,
 bounds, captures, snapshots, replacement output, and later searches.
 `EnginePathContract` and `EnginePathOptions` describe and exercise these roles;
@@ -124,6 +136,13 @@ Clearing a result does not necessarily reset the next-search cursor.
 - Match snapshots must remain independent of subsequent matcher mutation.
 - Result streams and functional replacements must detect prohibited callback
   mutation under their API contract.
+
+The `\G` assertion compares against a position fixed for the entire operation. Successful
+operations establish the next boundary; empty-match cursor advancement does not move it.
+Initial/reset searches use the region beginning, while `find(int)` uses its explicit start.
+Engine input views translate the boundary into their own coordinates. Patterns containing
+`\G` use exact NFA/BitState execution and eager captures; DFA, OnePass, and deferred
+capture paths remain ineligible until they carry the same assertion context.
 
 Empty-match progress depends on the representation: String matching uses Java
 indices, while UTF-8 matching advances at scalar boundaries. Test terminal empty
