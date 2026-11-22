@@ -24,7 +24,9 @@ class MatcherThreadHandoffTest {
 
   @Test
   void handoffUsesExecutingThreadsForwardAndReverseDfas() throws Exception {
-    Pattern pattern = Pattern.compile("[a-q][^u-z]{3}x");
+    Pattern pattern =
+        Pattern.compile(
+            "[a-q][^u-z]{3}x", 0, EnginePathOptions.builder().startRegister(false).build());
     Matcher transferred = pattern.matcher("zz abcdx zz bcdex");
     assertThat(transferred.find()).isTrue();
     Dfa originalForward = (Dfa) field("cachedForwardFirstMatchDfa").get(transferred);
@@ -45,6 +47,29 @@ class MatcherThreadHandoffTest {
         });
     assertThat(worker[0]).isNotSameAs(originalForward).isSameAs(worker[2]);
     assertThat(worker[1]).isNotSameAs(originalReverse).isSameAs(worker[3]);
+  }
+
+  @Test
+  void handoffUsesExecutingThreadsStartRegisterSearch() throws Exception {
+    Pattern pattern = Pattern.compile("[a-q][^u-z]{3}x");
+    Matcher transferred = pattern.matcher("zz abcdx zz bcdex");
+    assertThat(transferred.find()).isTrue();
+    StartRegisterSearch original =
+        (StartRegisterSearch) field("cachedStartRegister").get(transferred);
+    assertThat(original)
+        .isNotNull()
+        .isSameAs(pattern.startRegisterSearch(pattern.getOrCreateThreadCache()));
+
+    StartRegisterSearch[] worker =
+        onWorker(() -> {
+          assertThat(transferred.find()).isTrue();
+          assertThat(transferred.group()).isEqualTo("bcdex");
+          return new StartRegisterSearch[] {
+            (StartRegisterSearch) field("cachedStartRegister").get(transferred),
+            pattern.startRegisterSearch(pattern.getOrCreateThreadCache()),
+          };
+        });
+    assertThat(worker[0]).isNotSameAs(original).isSameAs(worker[1]);
   }
 
   @ParameterizedTest
