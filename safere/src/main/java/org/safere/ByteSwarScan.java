@@ -6,7 +6,6 @@
 package org.safere;
 
 import static java.lang.invoke.MethodHandles.byteArrayViewVarHandle;
-import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.util.Objects.requireNonNull;
 import static org.safere.ByteScanBounds.lastLoadStart;
@@ -472,7 +471,7 @@ abstract class ByteSwarScan {
                   | ((thirdDifference - BYTE_ONES) & ~thirdDifference))
               & BYTE_HIGH_BITS;
       if (matches != 0) {
-        if (nativeOrder() == LITTLE_ENDIAN) {
+        if (LITTLE_ENDIAN) {
           return position + (Long.numberOfTrailingZeros(matches) >>> 3);
         }
         return indexOfByteTripleScalar(
