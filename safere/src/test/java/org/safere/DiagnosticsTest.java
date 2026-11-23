@@ -378,10 +378,8 @@ class DiagnosticsTest {
             "short contextual candidate", "\\b(marker)([a-z]*)\\z", shortCandidate, false, false),
         Arguments.of(
             "long contextual candidate", "\\b(marker)([a-z]*)\\z", longCandidate, true, true),
-        // Boolean verification can use the forward DFA for ambiguous ends.
-        // Matcher needs exact matching to preserve endpoint priority.
-        Arguments.of("dollar with LF", "(?s)(marker)(.+?)$", longCandidate + "\n", false, true),
-        Arguments.of("Z with CRLF", "(?s)(marker)(.+?)\\Z", longCandidate + "\r\n", false, true));
+        Arguments.of("dollar with LF", "(?s)(marker)(.+?)$", longCandidate + "\n", true, true),
+        Arguments.of("Z with CRLF", "(?s)(marker)(.+?)\\Z", longCandidate + "\r\n", true, true));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -785,6 +783,56 @@ class DiagnosticsTest {
             assertThat(event.reverseDfaSearchCount()).isZero();
           });
     }
+  }
+
+  @Test
+  void dfaSelectsFinalEndpointWithInternalTextAssertions() {
+    Pattern.setDiagnostics(diagnostics);
+    String input = "a".repeat(16384) + "\nc2\r\n";
+    for (String regex :
+        List.of(
+            "(?s).*(?m:^)\\bc.+?(?:\\z|(?m:$))\\Z",
+            "(?s).*c.+(?:\\z|(?m:$))$",
+            "(?s)(?:c2|a.*\\n)\\Z")) {
+      Pattern pattern =
+          Pattern.compile(regex, 0, EnginePathOptions.builder().onePass(false).build());
+      var expected = java.util.regex.Pattern.compile(regex).matcher(input);
+      Matcher matcher = pattern.matcher(input);
+      assertThat(expected.lookingAt()).isTrue();
+      assertThat(matcher.lookingAt()).isTrue();
+      assertThat(matcher.end()).isEqualTo(expected.end());
+      assertThat(expected.reset().find()).isTrue();
+      assertThat(matcher.reset().find()).isTrue();
+      assertThat(matcher.start()).isEqualTo(expected.start());
+      assertThat(matcher.end()).isEqualTo(expected.end());
+      var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+      assertThat(utf8.find()).isTrue();
+      assertThat(utf8.start()).isEqualTo(expected.start());
+      assertThat(utf8.end()).isEqualTo(expected.end());
+      assertThat(operationsFor(pattern))
+          .hasSize(3)
+          .allSatisfy(event -> assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA));
+    }
+  }
+
+  @Test
+  void dfaKeepsWholeCodePointsWhenSkippingToTheFinalTerminator() {
+    Pattern.setDiagnostics(diagnostics);
+    Pattern pattern =
+        Pattern.compile("[^x]*?\\Z", 0, EnginePathOptions.builder().onePass(false).build());
+    String prefix = "a".repeat(16384) + "😀";
+    for (String tail : List.of("\r\n", "", "\u2029")) {
+      String input = prefix + tail;
+      Matcher matcher = pattern.matcher(input);
+      assertThat(matcher.lookingAt()).isTrue();
+      assertThat(matcher.end()).isEqualTo(prefix.length());
+      var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+      assertThat(utf8.lookingAt()).isTrue();
+      assertThat(utf8.end()).isEqualTo(prefix.getBytes(UTF_8).length);
+    }
+    assertThat(operationsFor(pattern))
+        .hasSize(6)
+        .allSatisfy(event -> assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA));
   }
 
   @Test

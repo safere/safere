@@ -1557,7 +1557,7 @@ public final class Matcher implements MatchResult {
         diagnosticBoundary(MatchStrategy.DFA);
         return applyFailedMatchResult();
       }
-      if (dfaResult != null && parentPattern.dfaGroupZeroReliable(scanner, 0, true)) {
+      if (dfaResult != null && parentPattern.dfaGroupZeroReliable()) {
         diagnosticBoundary(MatchStrategy.DFA);
         return applyDeferredMatchResult(0, dfaResult.pos(), prog.numCaptures(), true, false);
       }
@@ -2034,26 +2034,29 @@ public final class Matcher implements MatchResult {
       diagnosticBoundary(MatchStrategy.DFA);
       return applyDeferredMatchResult(start, scanner.length(), prog.numCaptures(), true, false);
     }
-    // With two legal ends, only the exact engine can select the end required by match priority.
-    if (parentPattern.shouldUseDfaEndVerification(scanner.length() - start)
-        && canUseForwardDfa()
-        && parentPattern.dfaGroupZeroReliable()
-        && parentPattern.hasUniqueEndAnchoredEndpoint(scanner)) {
-      diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
-      Dfa.SearchResult result = searchForwardDfa(dfa(false), scanner, start, true, false);
-      if (result != null) {
-        if (!result.matched()) {
-          return false;
-        }
-        diagnosticBoundary(MatchStrategy.DFA);
-        return applyDeferredMatchResult(start, result.pos(), prog.numCaptures(), true, false);
+    Dfa.SearchResult result = searchForwardEndAnchoredCandidate(scanner, start);
+    if (result != null) {
+      if (!result.matched()) {
+        return false;
       }
+      diagnosticBoundary(MatchStrategy.DFA);
+      return applyDeferredMatchResult(start, result.pos(), prog.numCaptures(), true, false);
     }
     int[] exact =
         searchWithBitStateOrNfa(
             prog, scanner, start, start, scanner.length(), true, false, false, 1);
     return exact != null
         && applyDeferredMatchResult(start, exact[1], prog.numCaptures(), true, false);
+  }
+
+  private Dfa.SearchResult searchForwardEndAnchoredCandidate(InputScanner scanner, int start) {
+    if (!parentPattern.shouldUseDfaEndVerification(scanner.length() - start)
+        || !canUseForwardDfa()
+        || !parentPattern.dfaGroupZeroReliable()) {
+      return null;
+    }
+    diagnosticParticipation(MatchStrategy.DFA, StrategyRole.CANDIDATE_VERIFICATION);
+    return searchForwardDfa(dfa(false), scanner, start, true, false);
   }
 
   /**
@@ -2242,7 +2245,7 @@ public final class Matcher implements MatchResult {
         && (!regionActive || independentRegion)
         && fwdResult != null
         && fwdResult.pos() > effectiveStart
-        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart, prog.anchorStart())) {
+        && parentPattern.dfaGroupZeroReliable()) {
       int earlyEnd = fwdResult.pos();
 
       if (prog.anchorStart()) {
@@ -3624,8 +3627,7 @@ public final class Matcher implements MatchResult {
         || parentPattern.matchDescriptor().hasFindFastPath()
         || parentPattern.astAnalysis().hasNullableAlt()
         || regionActive
-        || !parentPattern.dfaGroupZeroReliable(
-            activeScanner(), searchFrom, parentPattern.prog().anchorStart())) {
+        || !parentPattern.dfaGroupZeroReliable()) {
       return null;
     }
 
@@ -5399,7 +5401,7 @@ public final class Matcher implements MatchResult {
     if (options.dfa()
         && fwdResult != null
         && fwdResult.pos() > effectiveStart
-        && parentPattern.dfaGroupZeroReliable(scanner, effectiveStart, prog.anchorStart())) {
+        && parentPattern.dfaGroupZeroReliable()) {
       int earlyEnd = fwdResult.pos();
 
       if (prog.anchorStart()) {
@@ -5451,6 +5453,15 @@ public final class Matcher implements MatchResult {
       return -1L;
     }
     if (endAnchoredStart >= 0) {
+      if (parentPattern.endAnchoredStartHasExactEnd(scanner)) {
+        return packPositions(endAnchoredStart, scanner.length());
+      }
+      Dfa.SearchResult dfaResult = searchForwardEndAnchoredCandidate(scanner, endAnchoredStart);
+      if (dfaResult != null) {
+        return dfaResult.matched()
+            ? packPositions(endAnchoredStart, dfaResult.pos())
+            : END_ANCHORED_UNRESOLVED;
+      }
       int[] exact =
           searchWithBitStateOrNfa(
               parentPattern.prog(),

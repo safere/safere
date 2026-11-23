@@ -1166,14 +1166,9 @@ public final class Pattern implements Serializable {
   }
 
   /** Returns whether the end anchor has only one eligible endpoint on this input. */
-  boolean hasUniqueEndAnchoredEndpoint(InputScanner scanner) {
-    return hasUniqueEndAnchoredEndpoint(scanner, 0);
-  }
-
-  private boolean hasUniqueEndAnchoredEndpoint(InputScanner scanner, int searchFrom) {
+  private boolean hasUniqueEndAnchoredEndpoint(InputScanner scanner) {
     return !prog.dollarAnchorEnd()
-        || scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), scanner.length())
-            < searchFrom;
+        || scanner.trailingLineTerminatorStart(prog.dollarAnchorUnixLines(), scanner.length()) < 0;
   }
 
   /** Keeps short unproved candidates on BitState and avoids NFA work on longer ones. */
@@ -2023,16 +2018,6 @@ public final class Pattern implements Serializable {
   /** Returns whether the DFA can model the program's repetition semantics for group zero. */
   boolean dfaGroupZeroReliable() {
     return prog.numLoopRegs() == 0;
-  }
-
-  /**
-   * Returns whether first-match DFA bounds can be used for this search. Two eligible terminal
-   * endpoints require a priority proof from the anchored forward DFA or an exact engine.
-   */
-  boolean dfaGroupZeroReliable(InputScanner scanner, int searchFrom, boolean anchored) {
-    return dfaGroupZeroReliable()
-        && ((anchored && Dfa.supportsAnchoredEndPriority(prog))
-            || hasUniqueEndAnchoredEndpoint(scanner, searchFrom));
   }
 
   /**

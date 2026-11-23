@@ -49,7 +49,6 @@ final class Prog {
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
   private boolean hasEmptyWidth;
-  private boolean hasEmptyWidthOutsideLineAndWordBoundaries;
   private boolean hasPreviousMatchEnd;
   private boolean flatNfaSupported;
 
@@ -90,8 +89,6 @@ final class Prog {
     this.hasWordBoundary = other.hasWordBoundary;
     this.hasTextAnchor = other.hasTextAnchor;
     this.hasEmptyWidth = other.hasEmptyWidth;
-    this.hasEmptyWidthOutsideLineAndWordBoundaries =
-        other.hasEmptyWidthOutsideLineAndWordBoundaries;
     this.hasPreviousMatchEnd = other.hasPreviousMatchEnd;
   }
 
@@ -147,15 +144,10 @@ final class Prog {
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
     hasEmptyWidth = false;
-    hasEmptyWidthOutsideLineAndWordBoundaries = false;
     hasPreviousMatchEnd = false;
     flatNfaSupported = !hasGraphemeSemantics;
     for (Inst inst : instArray) {
-      if (inst.op == InstOp.EMPTY_WIDTH) {
-        hasEmptyWidth = true;
-        hasEmptyWidthOutsideLineAndWordBoundaries |=
-            (inst.arg & ~(EmptyOp.LINE_BOUNDARIES | EmptyOp.WORD_BOUNDARIES)) != 0;
-      }
+      hasEmptyWidth |= inst.op == InstOp.EMPTY_WIDTH;
       hasPreviousMatchEnd |= inst.op == InstOp.PREVIOUS_MATCH_END;
       if (inst.op == InstOp.ALT_MATCH
           || inst.op == InstOp.LOOP_ENTER
@@ -302,11 +294,6 @@ final class Prog {
   /** Returns whether the program contains an assertion, excluding stripped outer anchors. */
   boolean hasEmptyWidth() {
     return hasEmptyWidth;
-  }
-
-  /** Whether an empty-width instruction needs a context other than line or word boundaries. */
-  boolean hasEmptyWidthOutsideLineAndWordBoundaries() {
-    return hasEmptyWidthOutsideLineAndWordBoundaries;
   }
 
   /** Returns whether execution needs the operation's fixed previous-match boundary. */

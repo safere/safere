@@ -57,8 +57,6 @@ final class EmptyOp {
   /** Multiline {@code $} with UNIX_LINES. */
   public static final int UNIX_END_LINE = 1 << 11;
 
-  static final int LINE_BOUNDARIES = BEGIN_LINE | END_LINE | UNIX_BEGIN_LINE | UNIX_END_LINE;
-
   /** {@code \b{g}} — Unicode extended grapheme cluster boundary. */
   public static final int GRAPHEME_CLUSTER_BOUNDARY = 1 << 12;
 

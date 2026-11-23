@@ -645,7 +645,9 @@ public final class FindSequenceFuzzer {
         String prefix =
             data.pickValue(List.of(".*c", ".*?c", "c", ".*\\bc", ".*\\Bc", ".*(?m:^)\\bc"));
         String tail =
-            data.pickValue(List.of(".+?", ".*?", ".+", ".{1,4}?", ".+?(?m:$)", ".+(?dm:$)"));
+            data.pickValue(
+                List.of(
+                    ".+?", ".*?", ".+", ".{1,4}?", ".+?(?m:$)", ".+(?dm:$)", ".+?(?:\\z|(?m:$))"));
         if (data.consumeBoolean()) {
           tail = "(" + tail + ")";
         }
