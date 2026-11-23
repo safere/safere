@@ -99,13 +99,13 @@ final class Dfa {
   private static final int DEFAULT_MAX_STATES = 10_000;
 
   /** Budget for retained cache data. Array copies can briefly keep the old arrays live. */
-  private static final long CACHE_BYTE_BUDGET = 16L * 1024 * 1024;
+  static final long CACHE_BYTE_BUDGET = 16L * 1024 * 1024;
 
   private static final int INITIAL_TRANSITION_CELLS = 1024;
   // Budget uncompressed references. Object and array headers are VM-dependent, so allow an
   // estimated fixed amount per state for them, the map entry and the optional state accelerator.
-  private static final int REFERENCE_BYTES = Long.BYTES;
-  private static final int STATE_OVERHEAD_BYTES = 256;
+  static final int REFERENCE_BYTES = Long.BYTES;
+  static final int STATE_OVERHEAD_BYTES = 256;
 
   /**
    * Input positions of progress per cached state that this DFA must have covered before the state
