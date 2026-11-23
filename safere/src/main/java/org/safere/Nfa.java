@@ -163,6 +163,7 @@ final class Nfa {
 
   private boolean matched;
   private int[] bestMatch;
+  private int searchEnd;
   private final AddToThreadqStack addToThreadqStack = new AddToThreadqStack();
 
   // QueueState pool
@@ -258,14 +259,27 @@ final class Nfa {
   }
 
   int[] runSearch(boolean anchored, MatchKind kind, int nsubmatch, int endPos, int[] reuseGroups) {
+    return runSearch(anchored, kind, nsubmatch, endPos, reuseGroups, null);
+  }
+
+  int[] runSearch(
+      boolean anchored,
+      MatchKind kind,
+      int nsubmatch,
+      int endPos,
+      int[] reuseGroups,
+      FindTailMemo tailMemo) {
     if (prog.hasGraphemeClusterInstruction()) {
-      doSearchEveryCharPosition(anchored);
+      doSearchEveryCharPosition(anchored, tailMemo);
     } else {
-      doSearch(anchored);
+      doSearch(anchored, tailMemo);
     }
 
     if (!matched) {
       return null;
+    }
+    if (tailMemo != null) {
+      tailMemo.finishSearch(bestMatch[1]);
     }
     if (kind == MatchKind.FULL_MATCH && bestMatch[1] != endPos) {
       return null;
@@ -279,6 +293,10 @@ final class Nfa {
       Arrays.fill(result, ncopy, result.length, -1);
     }
     return result;
+  }
+
+  int searchEnd() {
+    return searchEnd;
   }
 
   /**
@@ -554,7 +572,7 @@ final class Nfa {
    *
    * @param anchored whether to anchor the search at the context start
    */
-  private void doSearch(boolean anchored) {
+  private void doSearch(boolean anchored, FindTailMemo tailMemo) {
     InputScanner text = context.text();
     int startPos = context.searchStart();
     int searchLimit = context.searchLimit();
@@ -602,6 +620,9 @@ final class Nfa {
         continue;
       }
 
+      if (tailMemo != null && isPastMatch(pos) && repeatedTail(tailMemo, pos, runq, null)) {
+        break;
+      }
       boolean done =
           flatProgram
               ? stepFlatCodePoint(runq, nextq, text, pos, nextPos)
@@ -623,6 +644,7 @@ final class Nfa {
       pos = nextPos;
     }
 
+    searchEnd = pos;
     freeQueueState(runq);
     freeQueueState(nextq);
   }
@@ -636,7 +658,7 @@ final class Nfa {
    * ordinary SafeRE programs. A boundary assertion alone does not introduce new candidate starts;
    * programs containing only scalar consumers and {@code \b{g}} use {@link #doSearch}.
    */
-  private void doSearchEveryCharPosition(boolean anchored) {
+  private void doSearchEveryCharPosition(boolean anchored, FindTailMemo tailMemo) {
     InputScanner text = context.text();
     int startPos = context.searchStart();
     int searchLimit = context.searchLimit();
@@ -671,6 +693,12 @@ final class Nfa {
         addToThreadq(runq, prog.start(), text, pos, initialCap, false);
       }
 
+      if (tailMemo != null
+          && isPastMatch(pos)
+          && (!runq.isEmpty() || !delayedGrapheme.isEmpty())
+          && repeatedTail(tailMemo, pos, runq, delayedGrapheme)) {
+        break;
+      }
       int nextBoundaryPos;
       if (!runq.isEmpty()) {
         long stepResult = inputStep(text, pos);
@@ -701,6 +729,7 @@ final class Nfa {
       }
     }
 
+    searchEnd = pos;
     freeQueueState(runq);
     if (prog.hasGraphemeSemantics()) {
       for (QueueState q : delayedGrapheme.values()) {
@@ -713,6 +742,77 @@ final class Nfa {
           freeQueueState(delayedBuffer[i]);
           delayedBuffer[i] = null;
         }
+      }
+    }
+  }
+
+  private boolean isPastMatch(int pos) {
+    // A search may change the previous match end. Past both boundaries, every future \G
+    // assertion fails in both the search that learns a proof and the search that uses it.
+    return matched && pos > bestMatch[1] && pos > context.previousMatchEnd();
+  }
+
+  private boolean repeatedTail(
+      FindTailMemo memo, int pos, QueueState runq, Map<Integer, QueueState> delayed) {
+    if (!memo.atCheckpoint(
+        pos, context.text(), delayed != null && !(context.text() instanceof Utf8InputScanner))) {
+      return false;
+    }
+    if (WorkCounterConfig.ENABLED) {
+      WorkCounter.record();
+    }
+    IntArrayList key = memo.key();
+    if (memo.usesInstructionFailures()) {
+      for (int i = 0; i < runq.size; i++) {
+        key.add(runq.threads[i].id);
+      }
+      return memo.seen(pos);
+    }
+    appendTailQueue(key, runq, pos);
+    if (delayed != null) {
+      // A queue can already contain visited marks even if it has no live threads. Those marks
+      // constrain expansions from earlier positions that have yet to reach this queue.
+      delayed.forEach((position, queue) -> {
+        key.add(position);
+        appendTailQueue(key, queue, position);
+        key.add(queue.visitedGrapheme.size());
+        for (long visit : queue.visitedGrapheme) {
+          key.add((int) visit);
+          key.add((int) (visit >>> 32));
+        }
+      });
+    }
+    return memo.seen(pos);
+  }
+
+  private void appendTailQueue(IntArrayList key, QueueState queue, int pos) {
+    key.add(queue.size);
+    for (int i = 0; i < queue.size; i++) {
+      NfaThread thread = queue.threads[i];
+      Inst inst = prog.inst(thread.id);
+      key.add(thread.id);
+      if (prog.hasGraphemeSemantics()) {
+        if (inst.op == InstOp.GRAPHEME_CLUSTER) {
+          key.add(
+              GraphemeSupport.visitVariant(
+                  context.text(),
+                  pos,
+                  thread.graphemeStart,
+                  context.consumeRegionStart(),
+                  context.endPos(),
+                  context.graphemeContext()));
+        }
+        // The next epsilon expansion follows consumption and is more than one unit past the
+        // match start. Even the String-specific boundary rules only distinguish start zero here.
+        key.add(
+            GraphemeSupport.hasPositiveMatchStart(context.graphemeContext(), thread.capture[0])
+                ? 1
+                : 0);
+      }
+      // A queued thread consumes before consulting its registers again. Any saved position
+      // will then be older than the current one, so only an unset register is distinct.
+      for (int reg = ncapture; reg < threadArraySize; reg++) {
+        key.add(thread.capture[reg] < 0 ? 0 : 1);
       }
     }
   }

@@ -637,7 +637,7 @@ class BitStateWindowTest {
           BitState attempt = cache.bitState;
           assertThat(attempt).isNotNull();
           long allowedWork = window(pattern.prog(), scanner, windowSize).stepBudgetForTesting();
-          assertThat(attempt.stepCountForTesting()).isBetween(1L, allowedWork);
+          assertThat(attempt.stepCount()).isBetween(1L, allowedWork);
           assertThat(attempt.stepBudgetForTesting()).isEqualTo(allowedWork);
           assertThat(matcher.start()).isEqualTo(prefix.length() - 3);
           assertThat(matcher.end()).isEqualTo(prefix.length());

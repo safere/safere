@@ -15,6 +15,17 @@ from candidate starts, replay unbounded prefixes, or enumerate partitions to
 repair a result. Repeated search and replacement need their own progress and
 work bounds; a linear inner search alone does not establish those bounds.
 
+Repeated searches charge scans up to the selected match and bounded lookahead to cursor
+advancement. When scans overlap beyond that allowance, the matcher uses the exact NFA and records
+failures at bounded intervals. A continuation after the final match cannot accept on the same
+input and bounds. Scalar programs with independent instructions record each failure by instruction
+and position. A later search stops when all its live instructions have failed there. Both searches
+check only positions past the previous-match boundary, where any future `\G` assertion fails.
+For programs that need extra state, the key preserves the whole frontier, including thread order,
+progress state, and pending grapheme work. The matcher discards old checkpoints as the cursor
+advances and returns to the prepared path once it passes the scanned range. The fixed program
+bounds the number and size of keys per checkpoint.
+
 Use explicit stacks and worklists for user-controlled nesting. Engine state,
 capture bookkeeping, caches, Unicode context, and fallback work must each have
 a stated bound. A cache key must include every context bit affecting its result;

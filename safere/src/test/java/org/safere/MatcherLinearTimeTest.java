@@ -126,6 +126,262 @@ class MatcherLinearTimeTest {
         });
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "(a.*z)|(a)",
+        "((?:aa)*z)|(a)",
+        "\\G(?:(a.*z)|(a))",
+        "((?:\\X)*z)|(a)",
+        "((?:a?)*z)|(a)"
+      })
+  void stringFindSequenceStaysLinearAfterPreferredBranchFails(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    assertLinearSequence(
+        "String find " + regex,
+        size -> {
+          Matcher matcher = pattern.matcher("a".repeat(size));
+          for (int i = 0; i < size; i++) {
+            assertThat(matcher.find()).isTrue();
+            assertThat(matcher.start()).isEqualTo(i);
+            assertThat(matcher.end()).isEqualTo(i + 1);
+            assertThat(matcher.group(1)).isNull();
+            assertThat(matcher.group(2)).isEqualTo("a");
+          }
+          assertThat(matcher.find()).isFalse();
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "(a.*z)|(a)",
+        "((?:aa)*z)|(a)",
+        "\\G(?:(a.*z)|(a))",
+        "((?:\\X)*z)|(a)",
+        "((?:a?)*z)|(a)"
+      })
+  void utf8FindSequenceStaysLinearAfterPreferredBranchFails(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    assertLinearSequence(
+        "UTF-8 find " + regex,
+        size -> {
+          Utf8Matcher matcher =
+              pattern.matcher(Utf8Input.validated("a".repeat(size).getBytes(UTF_8)));
+          for (int i = 0; i < size; i++) {
+            assertThat(matcher.find()).isTrue();
+            assertThat(matcher.start()).isEqualTo(i);
+            assertThat(matcher.end()).isEqualTo(i + 1);
+            assertThat(matcher.start(1)).isEqualTo(-1);
+            assertThat(matcher.start(2)).isEqualTo(i);
+          }
+          assertThat(matcher.find()).isFalse();
+        });
+  }
+
+  @Test
+  void aLiveInstructionCanStillWinInsideAKnownFailedTail() {
+    String input = "a".repeat(520) + "z";
+    Matcher matcher = Pattern.compile("((?:a{17})*z)|(a.*y)|(a)").matcher(input);
+    for (int i = 0; i < 10; i++) {
+      assertThat(matcher.find()).isTrue();
+      assertThat(matcher.start()).isEqualTo(i);
+      assertThat(matcher.end()).isEqualTo(i + 1);
+      assertThat(matcher.group(3)).isEqualTo("a");
+    }
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.start()).isEqualTo(10);
+    assertThat(matcher.end()).isEqualTo(input.length());
+    assertThat(matcher.group(1)).isEqualTo(input.substring(10));
+    assertThat(matcher.group(2)).isNull();
+    assertThat(matcher.group(3)).isNull();
+    assertThat(matcher.find()).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a.*z|a", "\\G(?:a.*z|a)", "(?:\\X)*z|a"})
+  void replaceAllStaysLinearAfterPreferredBranchFails(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    assertLinearSequence(
+        "replaceAll " + regex,
+        size ->
+            assertThat(pattern.matcher("a".repeat(size)).replaceAll("x"))
+                .isEqualTo("x".repeat(size)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a.*z|a", "\\G(?:a.*z|a)", "(?:\\X)*z|a"})
+  void splitStaysLinearAfterPreferredBranchFails(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    assertLinearSequence(
+        "split " + regex,
+        size ->
+            assertThat(pattern.split("a".repeat(size), -1))
+                .hasSize(size + 1)
+                .allMatch(String::isEmpty));
+  }
+
+  @Test
+  void repeatedSearchPreservesPriorityAndCapturesAcrossRegionsAndResets() {
+    String shortMatches = "a".repeat(512);
+    String input = "prefix" + shortMatches + "\naaaaz" + "suffix";
+    Pattern pattern = Pattern.compile("(?:(a.*z)|(a))");
+    Matcher matcher = pattern.matcher(input).region("prefix".length(), input.length() - 6);
+
+    for (int i = 0; i < shortMatches.length(); i++) {
+      assertThat(matcher.find()).isTrue();
+      assertThat(matcher.start()).isEqualTo(6 + i);
+      assertThat(matcher.group(1)).isNull();
+      assertThat(matcher.group(2)).isEqualTo("a");
+    }
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.group(1)).isEqualTo("aaaaz");
+    assertThat(matcher.group(2)).isNull();
+    assertThat(matcher.find()).isFalse();
+
+    matcher.reset("az");
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.group(1)).isEqualTo("az");
+    assertThat(matcher.group(2)).isNull();
+  }
+
+  @Test
+  void lookaheadDoesNotMoveAnIndependentRegionStartAnchor() {
+    String input = "p" + "a".repeat(256) + "p";
+    Matcher matcher = Pattern.compile("^(a.*z|a)").matcher(input).region(1, 257);
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.start()).isEqualTo(1);
+    assertThat(matcher.end()).isEqualTo(2);
+    assertThat(matcher.find()).isFalse();
+  }
+
+  @Test
+  void memoizedGraphemeSearchRespectsTheOpaqueRegionClassFilter() {
+    String input = "_" + "a".repeat(100) + "\uD800\uDC00".repeat(100) + "_";
+    Matcher matcher =
+        Pattern.compile("(?:\\X*z)?[a\\uDC00]").matcher(input).region(1, input.length() - 1);
+    for (int i = 1; i <= 100; i++) {
+      assertThat(matcher.find()).isTrue();
+      assertThat(matcher.start()).isEqualTo(i);
+    }
+    assertThat(matcher.find()).isFalse();
+  }
+
+  @Test
+  void replacementPreservesItsAppendPositionWhenTheSearchChangesEngines() {
+    String input = "a".repeat(256) + "tail";
+    Matcher matcher = Pattern.compile("a.*z|a").matcher(input);
+    assertThat(matcher.replaceAll("x")).isEqualTo("x".repeat(256) + "txil");
+    assertThat(matcher.appendTail(new StringBuilder()).toString()).isEmpty();
+  }
+
+  @Test
+  void findResumesDfaAfterPassingThePreviouslyExploredTail() {
+    int prefixLength = 256;
+    String input = "a".repeat(prefixLength) + "\n" + "a\n".repeat(128);
+    Matcher matcher =
+        Pattern.compile("a.*z|a", 0, EnginePathOptions.builder().startRegister(false).build())
+            .matcher(input);
+    for (int i = 0; i < prefixLength; i++) {
+      assertThat(matcher.find()).isTrue();
+      assertThat(matcher.start()).isEqualTo(i);
+    }
+    assertThat(
+            WorkCounter.countForwardDfaStepsForTesting(() -> {
+              assertThat(matcher.find()).isTrue();
+              assertThat(matcher.start()).isEqualTo(prefixLength + 1);
+            }))
+        .isPositive();
+  }
+
+  @Test
+  void renderingDeferredNullableFindBoundsStillAccountsForTailWork() {
+    Pattern pattern = Pattern.compile("(?:a?)*z|a");
+    assertLinearSequence(
+        "deferred nullable finds",
+        size -> {
+          Matcher matcher = pattern.matcher("a".repeat(size));
+          for (int i = 0; i < size; i++) {
+            assertThat(matcher.find()).isTrue();
+            assertThat(matcher.toString()).contains("lastmatch=a");
+          }
+          assertThat(matcher.find()).isFalse();
+        });
+  }
+
+  @Test
+  void sparseTailCheckpointsAllowVariableWidthUtf8Decoding() {
+    Pattern pattern = Pattern.compile(".*z|💡|é");
+    long small = multibyteFindWork(pattern, 2_048);
+    long large = multibyteFindWork(pattern, 8_192);
+    assertThat(small).isPositive();
+    assertThat(large).isLessThanOrEqualTo(6 * small);
+  }
+
+  @Test
+  void separateLookaheadRangesDoNotRebuildAFullRegionTable() {
+    Pattern pattern = Pattern.compile("a.*z|a");
+    assertLinearSequence(
+        "independent long branches",
+        blocks -> {
+          Matcher matcher = pattern.matcher(("a".repeat(256) + "\n").repeat(blocks));
+          int matches = 0;
+          while (matcher.find()) {
+            matches++;
+          }
+          assertThat(matches).isEqualTo(256 * blocks);
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void startVerificationDoesNotRescanAMemoizedTail(boolean utf8) {
+    Pattern pattern = Pattern.compile("x*a(?:.*z)?");
+    assertLinearSequence(
+        "leading expansion, UTF-8=" + utf8,
+        blocks -> {
+          String input = ("_".repeat(64) + "a").repeat(blocks);
+          int count = 0;
+          if (utf8) {
+            Utf8Matcher matcher = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+            while (matcher.find()) {
+              assertThat(matcher.start()).isEqualTo(64 + 65 * count++);
+            }
+          } else {
+            Matcher matcher = pattern.matcher(input);
+            while (matcher.find()) {
+              assertThat(matcher.start()).isEqualTo(64 + 65 * count++);
+            }
+          }
+          assertThat(count).isEqualTo(blocks);
+        });
+  }
+
+  private static long multibyteFindWork(Pattern pattern, int repetitions) {
+    Utf8Input input = Utf8Input.validated("💡é".repeat(repetitions).getBytes(UTF_8));
+    return WorkCounter.countWithForwardDfaStepsForTesting(() -> {
+      Utf8Matcher matcher = pattern.matcher(input);
+      for (int i = 0; i < repetitions; i++) {
+        assertThat(matcher.find()).isTrue();
+        assertThat(matcher.start()).isEqualTo(6 * i);
+        assertThat(matcher.end()).isEqualTo(6 * i + 4);
+        assertThat(matcher.find()).isTrue();
+        assertThat(matcher.start()).isEqualTo(6 * i + 4);
+        assertThat(matcher.end()).isEqualTo(6 * i + 6);
+      }
+      assertThat(matcher.find()).isFalse();
+    });
+  }
+
+  private static void assertLinearSequence(String operation, IntConsumer run) {
+    long small = WorkCounter.countWithForwardDfaStepsForTesting(() -> run.accept(256));
+    long large = WorkCounter.countWithForwardDfaStepsForTesting(() -> run.accept(1024));
+    assertThat(small).isPositive();
+    assertThat(large)
+        .as("%s with four times the input, small work=%d, large work=%d", operation, small, large)
+        .isLessThanOrEqualTo(6 * small);
+  }
+
   private static String repeatedDotStarSqlUnionInput(int selectCount) {
     StringBuilder input = new StringBuilder();
     for (int i = 1; i <= selectCount; i++) {

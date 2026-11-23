@@ -311,6 +311,8 @@ final class Dfa {
   /** Position from which the active search (or post-bailout span) is measured. */
   private int progressAnchor;
 
+  private int nativeScanUnits;
+
   /** Whether a search has established {@link #progressAnchor}. */
   private boolean hasProgressAnchor;
 
@@ -2015,6 +2017,22 @@ final class Dfa {
     return lastStartBackoff;
   }
 
+  int searchEnd() {
+    return progressAnchor;
+  }
+
+  int nativeScanUnits() {
+    return nativeScanUnits;
+  }
+
+  private int findStateEscape(StateAccelerator accelerator, InputScanner text, int pos, int end) {
+    int escape = StateAccelerator.findNextEscape(accelerator, text, pos, end);
+    if (accelerator instanceof StateAccelerator.SingleAsciiEscape) {
+      nativeScanUnits += (escape < 0 ? end : escape) - pos;
+    }
+    return escape;
+  }
+
   /**
    * Fast-forwards the start position of unanchored search matching when returning to the start
    * state.
@@ -2136,6 +2154,7 @@ final class Dfa {
       long startBackoff) {
     graphemeContext = GraphemeSupport.Context.create(text, hasGraphemeSemantics);
     beginSearch(startPos);
+    nativeScanUnits = 0;
     int pos = startPos;
     int textLen = text.length();
     // If the compiled program requires end-of-text matching (stripped $ or \z), enforce it.
@@ -2278,7 +2297,7 @@ final class Dfa {
         }
       }
       if (s.accelerator != null && (!s.isStartState || anchored) && (textLen - pos >= 16)) {
-        int nextPos = StateAccelerator.findNextEscape(s.accelerator, text, pos, textLen);
+        int nextPos = findStateEscape(s.accelerator, text, pos, textLen);
         if (nextPos == -1) {
           pos = textLen;
           break;
@@ -2493,7 +2512,7 @@ final class Dfa {
               : Integer.MAX_VALUE;
       do {
         if (s.accelerator != null && (textLen - pos >= 16) && (!s.isStartState || anchored)) {
-          int nextPos = StateAccelerator.findNextEscape(s.accelerator, text, pos, textLen);
+          int nextPos = findStateEscape(s.accelerator, text, pos, textLen);
           if (nextPos == -1) {
             pos = textLen;
           } else if (nextPos > pos) {

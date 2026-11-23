@@ -1114,7 +1114,7 @@ final class BitState {
   }
 
   /** Returns the logical instruction charges from the last search. */
-  long stepCountForTesting() {
+  long stepCount() {
     return stepCount;
   }
 

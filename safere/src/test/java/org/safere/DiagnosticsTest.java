@@ -296,6 +296,25 @@ class DiagnosticsTest {
   }
 
   @Test
+  void aFewMatchesBeforeAnAcceleratedTailStayInTheDfa() {
+    Pattern.setDiagnostics(diagnostics);
+    Pattern pattern = Pattern.compile("a[^z]*z|a");
+    String tail = "b".repeat(16_384);
+    String input = "a".repeat(16) + tail;
+    Matcher stringMatcher = pattern.matcher(input);
+    Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+    for (int i = 0; i < 16; i++) {
+      assertThat(stringMatcher.find()).isTrue();
+      assertThat(utf8Matcher.find()).isTrue();
+    }
+    assertThat(stringMatcher.find()).isFalse();
+    assertThat(utf8Matcher.find()).isFalse();
+    assertThat(pattern.matcher(input).replaceAll("x")).isEqualTo("x".repeat(16) + tail);
+    assertThat(operationsFor(pattern))
+        .noneMatch(event -> event.boundaryStrategy() == MatchStrategy.NFA);
+  }
+
+  @Test
   void forcedBitStateAndNfaReportTheExactEngine() {
     Pattern.setDiagnostics(diagnostics);
     EnginePathOptions bitStateOnly =
