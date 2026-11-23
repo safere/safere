@@ -6,14 +6,15 @@
 package org.safere.fuzz;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.code_intelligence.jazzer.api.FuzzedDataProvider;
-import com.code_intelligence.jazzer.junit.FuzzTest;
 import java.util.List;
 import java.util.regex.PatternSyntaxException;
+import org.junit.jupiter.api.Test;
 import org.safere.Pattern;
 
-public final class UnsupportedSyntaxFuzzer {
+final class UnsupportedSyntaxTest {
   private static final String GROUP_ERROR = "invalid Perl operator";
   private static final String ESCAPE_ERROR = "invalid escape sequence";
   private static final String REFERENCE_ERROR = "backreferences are not supported";
@@ -44,34 +45,53 @@ public final class UnsupportedSyntaxFuzzer {
   static final List<String> CONTEXTS = List.of("%s", "x(?:%s)y", "(?:z|%s)$", "(?:%s){0}");
   static final List<String> GAPS = List.of("", "\\Q\\E", " ", " #q\n ");
 
-  record Feature(String body, String quantifier, String description, boolean jdkAccepts) {
+  private record Feature(String body, String quantifier, String description, boolean jdkAccepts) {
     String syntax(String gap) {
       return quantifier == null ? body : body + quantifier + gap + "+";
     }
   }
 
-  enum Mode {
+  private enum Mode {
     COMMENTS,
     SCOPED_COMMENTS,
     PLAIN
   }
 
-  record Rejection(String regex, int flags, String description) {}
+  private record Rejection(String regex, int flags, String description) {}
 
-  @FuzzTest(maxDuration = "30s")
-  void unsupportedSyntax(FuzzedDataProvider data) {
-    fuzzerTestOneInput(data);
+  @Test
+  void generatedRejectionsHaveTheExpectedCauseAndControlsStillMatch() {
+    for (var feature : FEATURES) {
+      for (String context : CONTEXTS) {
+        for (String gap : GAPS) {
+          for (var mode : Mode.values()) {
+            var rejection = rejection(feature, context, gap, mode);
+            assertRejected(rejection);
+            if (feature.jdkAccepts()) {
+              assertThatNoException()
+                  .isThrownBy(
+                      () -> java.util.regex.Pattern.compile(rejection.regex(), rejection.flags()));
+            } else {
+              assertThatThrownBy(
+                      () -> java.util.regex.Pattern.compile(rejection.regex(), rejection.flags()))
+                  .isInstanceOf(PatternSyntaxException.class);
+            }
+          }
+        }
+      }
+      assertSupportedControls(feature);
+    }
   }
 
-  public static void fuzzerTestOneInput(FuzzedDataProvider data) {
-    Feature feature = data.pickValue(FEATURES);
-    String gap = data.pickValue(GAPS);
-    Mode mode = data.pickValue(Mode.values());
-    assertRejected(rejection(feature, data.pickValue(CONTEXTS), gap, mode));
-    assertSupportedControls(feature, data.pickValue(List.of("x", "é", "😀")));
+  @Test
+  void unexpectedAcceptanceFailsARejectionCheck() {
+    var supported = new Rejection("(a)", 0, "invalid Perl operator");
+    assertThatThrownBy(() -> assertRejected(supported))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("must reject");
   }
 
-  static Rejection rejection(Feature feature, String context, String gap, Mode mode) {
+  private static Rejection rejection(Feature feature, String context, String gap, Mode mode) {
     String regex = context.formatted(feature.syntax(mode == Mode.PLAIN ? "" : gap));
     return switch (mode) {
       case COMMENTS -> new Rejection(regex, Pattern.COMMENTS, feature.description());
@@ -80,7 +100,7 @@ public final class UnsupportedSyntaxFuzzer {
     };
   }
 
-  static void assertRejected(Rejection rejection) {
+  private static void assertRejected(Rejection rejection) {
     try {
       Pattern.compile(rejection.regex(), rejection.flags());
     } catch (PatternSyntaxException error) {
@@ -93,12 +113,14 @@ public final class UnsupportedSyntaxFuzzer {
         "SafeRE must reject /%s/ with flags %s".formatted(rejection.regex(), rejection.flags()));
   }
 
-  static void assertSupportedControls(Feature feature, String prefix) {
+  private static void assertSupportedControls(Feature feature) {
     String syntax = feature.syntax("");
-    String subject = prefix + syntax + "z";
-    assertMatches(Pattern.quote(prefix + syntax) + "z", 0, subject);
-    assertMatches(subject, Pattern.LITERAL, subject);
-    assertMatches("(?x:" + prefix + " # " + syntax + "\nz)", 0, prefix + "z");
+    for (String prefix : List.of("x", "é", "😀")) {
+      String subject = prefix + syntax + "z";
+      assertMatches(Pattern.quote(prefix + syntax) + "z", 0, subject);
+      assertMatches(subject, Pattern.LITERAL, subject);
+      assertMatches("(?x:" + prefix + " # " + syntax + "\nz)", 0, prefix + "z");
+    }
     if (feature.quantifier() != null) {
       // The same possessive modifier is valid when the immediate operand cannot consume.
       String zeroWidth = "(?:(?:" + feature.body() + "){0})";

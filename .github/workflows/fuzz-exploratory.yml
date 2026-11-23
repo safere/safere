@@ -18,10 +18,7 @@ jobs:
         with:
           java-version-file: .sdkmanrc
           cache: maven
-      - name: Generated dialect rejection
-        run: safere-fuzz/scripts/run-fuzz-test.sh --max-duration 30s UnsupportedSyntaxFuzzer
       - name: Broad differential discovery
-        if: ${{ !cancelled() }}
         run: safere-fuzz/scripts/run-fuzz-test.sh --suite broad --max-duration 2m --keep-going 3
       - name: Preserve findings and run provenance
         if: always()

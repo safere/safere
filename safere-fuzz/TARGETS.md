@@ -65,15 +65,14 @@ A wrapped zero-count repetition is zero-width even when its child can consume.
 A directly quantified consuming operand takes an ordinary modifier. A counted
 repeat following a quantifier has a separate implicit empty operand.
 
-`UnsupportedSyntaxFuzzer` generates lookaround, atomic groups, backreferences,
+`UnsupportedSyntaxTest` enumerates lookaround, atomic groups, backreferences,
 consuming possessive quantifiers and `\C` in composed patterns. It checks the
-`PatternSyntaxException` diagnostic and matches quoted, literal-mode and
-comment-hidden forms as supported controls. It runs in the exploratory workflow.
+`PatternSyntaxException` diagnostic and runs quoted, literal-mode and
+comment-hidden controls with ASCII, BMP and supplementary prefixes.
 
 | Target | Generated surface / oracle | Disposition |
 | --- | --- | --- |
 | `CompileFuzzer` | Arbitrary syntax and flags; JDK compile acceptance | Broad |
-| `UnsupportedSyntaxFuzzer` | Unsupported syntax rejection and supported controls | Robustness |
 | `ParserCompatibilityFuzzer` | Grammar-biased syntax and membership | Broad |
 | `CharacterClassExpressionFuzzer` | Class/intersection grammar and membership, plus an explicit range-trivia model against unspaced references | Mixed, conservatively broad |
 | `EscapeSyntaxFuzzer` | Escape syntax and membership | Broad |
@@ -136,9 +135,10 @@ these remain generated exploratory findings but are not unconditional agreement
 probes run for every input. Compatible spellings remain fixed differential probes.
 `IntentionalReproductionTest` replays it independently and requires review when
 outcomes change. These are not passing fuzz seeds and never suppress other inputs.
-`FuzzSupportTest` checks the rejection generator across its feature, context and
-trivia choices. It also verifies that unrestricted acceptance still reports
-compile differences and that a rejection check fails if SafeRE accepts its case.
+`UnsupportedSyntaxTest` checks rejection across features, contexts and trivia.
+It also verifies that a rejection check fails when SafeRE accepts the pattern.
+`FuzzSupportTest` verifies that unrestricted acceptance still reports compile
+differences.
 
 ## Graduation and retained coverage
 

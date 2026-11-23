@@ -170,15 +170,6 @@
     ]
   },
   {
-    "class": "org.safere.fuzz.UnsupportedSyntaxFuzzer",
-    "kind": "robustness",
-    "oss_fuzz": false,
-    "seeds": null,
-    "methods": [
-      "unsupportedSyntax"
-    ]
-  },
-  {
     "class": "org.safere.fuzz.Utf8InputFuzzer",
     "kind": "broad",
     "oss_fuzz": false,
