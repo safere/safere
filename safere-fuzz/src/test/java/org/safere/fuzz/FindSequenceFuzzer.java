@@ -642,15 +642,17 @@ public final class FindSequenceFuzzer {
         return;
       }
       case 23 -> {
-        String prefix = data.pickValue(List.of(".*c", ".*?c", "c", ".*\\bc", ".*\\Bc"));
-        String tail = data.pickValue(List.of(".+?", ".*?", ".+", ".{1,4}?"));
+        String prefix =
+            data.pickValue(List.of(".*c", ".*?c", "c", ".*\\bc", ".*\\Bc", ".*(?m:^)\\bc"));
+        String tail =
+            data.pickValue(List.of(".+?", ".*?", ".+", ".{1,4}?", ".+?(?m:$)", ".+(?dm:$)"));
         if (data.consumeBoolean()) {
           tail = "(" + tail + ")";
         }
         String anchor = data.pickValue(List.of("$", "\\Z", "\\z", "(?d:$)", "(?d:\\Z)"));
         regex = "(?s)" + prefix + tail + anchor;
         flags = 0;
-        String padding = data.pickValue(List.of("a", "abc", "é😀"));
+        String padding = data.pickValue(List.of("a", "abc", "é😀", "é😀\n"));
         String terminator = data.pickValue(LINE_TERMINATORS);
         input = padding.repeat(data.consumeInt(0, 150)) + "cx" + terminator;
         if (data.consumeBoolean()) {

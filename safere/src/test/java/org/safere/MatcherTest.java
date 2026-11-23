@@ -871,11 +871,15 @@ class MatcherTest {
                 "\\A.*c(.+?)",
                 "\\A.*c.+",
                 "\\A.*\\bc(.+?)",
-                "\\A.*c(.+?)\\b")) {
+                "\\A.*c(.+?)\\b",
+                "\\A.*(?m:^)\\bc(.+?)",
+                "\\A.*c(.+?)(?m:$)",
+                "\\A.*c(.+?)(?dm:$)")) {
           String regex = "(?s)" + body + anchor;
           Pattern pattern = Pattern.compile(regex);
           var jdkPattern = java.util.regex.Pattern.compile(regex);
-          for (String prefix : List.of("", "ab", "é😀", "abc".repeat(450))) {
+          for (String prefix :
+              List.of("", "ab", "é😀", "abc".repeat(450), "é😀".repeat(450) + "\n")) {
             String input = prefix + "cx" + terminator;
             Matcher matcher = pattern.matcher(input);
             var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));

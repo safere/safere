@@ -1199,8 +1199,13 @@ final class Dfa {
   }
 
   private State computeNextOrReset(
-      State s, int cp, InputScanner text, int nextPos, int pos, boolean resolveWordBoundaries) {
-    State ns = computeNext(s, cp, text, nextPos, resolveWordBoundaries);
+      State s,
+      int cp,
+      InputScanner text,
+      int nextPos,
+      int pos,
+      boolean resolveDestinationAssertions) {
+    State ns = computeNext(s, cp, text, nextPos, resolveDestinationAssertions);
     if (ns != null) {
       return ns;
     }
@@ -1209,7 +1214,9 @@ final class Dfa {
     }
     State recreated = recreateAfterReset(s);
     State next =
-        recreated == null ? null : computeNext(recreated, cp, text, nextPos, resolveWordBoundaries);
+        recreated == null
+            ? null
+            : computeNext(recreated, cp, text, nextPos, resolveDestinationAssertions);
     return next == null ? budgetExhaustedAfterReset() : next;
   }
 
@@ -1616,7 +1623,7 @@ final class Dfa {
   }
 
   private State computeNext(
-      State s, int cp, InputScanner text, int nextPos, boolean resolveWordBoundaries) {
+      State s, int cp, InputScanner text, int nextPos, boolean resolveDestinationAssertions) {
     // At end of text, re-expand the current instruction set with end-of-text empty flags.
     // This allows empty-width assertions like $ and \b to fire.
     if (cp < 0) {
@@ -1826,11 +1833,11 @@ final class Dfa {
       return deadState;
     }
 
-    // Cached transitions defer flags that depend on the next character. At the final terminator
-    // the caller can resolve word boundaries in the destination frontier and bypass the cache.
-    int emptyFlags = emptyFlags(text, nextPos) & ~(EmptyOp.END_LINE | EmptyOp.UNIX_END_LINE);
-    if (!resolveWordBoundaries) {
-      emptyFlags &= ~EmptyOp.WORD_BOUNDARIES;
+    // Cached transitions defer flags that depend on the next character. The uncached transition
+    // into the final terminator can resolve every assertion in the destination frontier.
+    int emptyFlags = emptyFlags(text, nextPos);
+    if (!resolveDestinationAssertions) {
+      emptyFlags &= ~(EmptyOp.WORD_BOUNDARIES | EmptyOp.END_LINE | EmptyOp.UNIX_END_LINE);
     }
 
     int[] nextInsts = expand(computeBuf, successorCount, emptyFlags);
@@ -2103,7 +2110,7 @@ final class Dfa {
   /** Whether an anchored first-match search can decide priority at both terminal endpoints. */
   static boolean supportsAnchoredEndPriority(Prog prog) {
     return prog.dollarAnchorEnd()
-        && !prog.hasEmptyWidthOutsideWordBoundaries()
+        && !prog.hasEmptyWidthOutsideLineAndWordBoundaries()
         && !prog.hasGraphemeSemantics()
         && !prog.hasPreviousMatchEnd()
         && prog.numLoopRegs() == 0;
@@ -2133,7 +2140,7 @@ final class Dfa {
             && !longest
             && !this.longest
             && supportsAnchoredEndPriority(prog);
-    boolean resolveTerminalWordBoundaries = prioritizeAnchoredEnd && prog.hasWordBoundary();
+    boolean resolveTerminalAssertions = prioritizeAnchoredEnd && prog.hasEmptyWidth();
 
     // Position-dependent flag threshold: emptyFlags at positions >= this threshold contain
     // text-length-dependent flags (END_TEXT at textLen, DOLLAR_END near the end when text ends
@@ -2147,7 +2154,7 @@ final class Dfa {
     if (s == null) {
       return completeForwardSearch(null, pos, startBackoff);
     }
-    if (resolveTerminalWordBoundaries && startPos == trailingTermStart) {
+    if (resolveTerminalAssertions && startPos == trailingTermStart) {
       return completeAnchoredEndSearch(s, text, trailingTermStart, startBackoff);
     }
 
@@ -2532,9 +2539,9 @@ final class Dfa {
         // cached transitions are position-independent. The end-of-text sentinel (cp < 0)
         // is always safe to cache because it always means "at text end".
         int effectiveNextPos = Math.min(nextPos, textLen);
-        if (resolveTerminalWordBoundaries && effectiveNextPos == trailingTermStart) {
-          // Resolve word boundaries from the consuming transition's seeds. They are program
-          // entries, so expansion can follow their alternatives in the original priority order.
+        if (resolveTerminalAssertions && effectiveNextPos == trailingTermStart) {
+          // Resolve assertions from the consuming transition's program seeds, so expansion
+          // follows their alternatives in the original priority order.
           State terminal = computeNextOrReset(s, cp, text, effectiveNextPos, pos, true);
           return terminal == null
               ? completeForwardSearch(null, pos, backoff)
@@ -2644,7 +2651,7 @@ final class Dfa {
         return preferredEnd;
       }
       pos = InputScanner.position(decoded);
-      int flags = prog.hasWordBoundary() ? emptyFlags(text, pos) : 0;
+      int flags = prog.hasEmptyWidth() ? emptyFlags(text, pos) : 0;
       frontier = expand(computeBuf, successorCount, flags);
     }
     return hasMatch(frontier) ? end : preferredEnd;

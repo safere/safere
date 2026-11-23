@@ -49,7 +49,7 @@ final class Prog {
   private boolean hasWordBoundary;
   private boolean hasTextAnchor;
   private boolean hasEmptyWidth;
-  private boolean hasEmptyWidthOutsideWordBoundaries;
+  private boolean hasEmptyWidthOutsideLineAndWordBoundaries;
   private boolean hasPreviousMatchEnd;
   private boolean flatNfaSupported;
 
@@ -90,7 +90,8 @@ final class Prog {
     this.hasWordBoundary = other.hasWordBoundary;
     this.hasTextAnchor = other.hasTextAnchor;
     this.hasEmptyWidth = other.hasEmptyWidth;
-    this.hasEmptyWidthOutsideWordBoundaries = other.hasEmptyWidthOutsideWordBoundaries;
+    this.hasEmptyWidthOutsideLineAndWordBoundaries =
+        other.hasEmptyWidthOutsideLineAndWordBoundaries;
     this.hasPreviousMatchEnd = other.hasPreviousMatchEnd;
   }
 
@@ -146,13 +147,14 @@ final class Prog {
     hasWordBoundary = computeHasWordBoundary();
     hasTextAnchor = computeHasTextAnchor();
     hasEmptyWidth = false;
-    hasEmptyWidthOutsideWordBoundaries = false;
+    hasEmptyWidthOutsideLineAndWordBoundaries = false;
     hasPreviousMatchEnd = false;
     flatNfaSupported = !hasGraphemeSemantics;
     for (Inst inst : instArray) {
       if (inst.op == InstOp.EMPTY_WIDTH) {
         hasEmptyWidth = true;
-        hasEmptyWidthOutsideWordBoundaries |= (inst.arg & ~EmptyOp.WORD_BOUNDARIES) != 0;
+        hasEmptyWidthOutsideLineAndWordBoundaries |=
+            (inst.arg & ~(EmptyOp.LINE_BOUNDARIES | EmptyOp.WORD_BOUNDARIES)) != 0;
       }
       hasPreviousMatchEnd |= inst.op == InstOp.PREVIOUS_MATCH_END;
       if (inst.op == InstOp.ALT_MATCH
@@ -302,9 +304,9 @@ final class Prog {
     return hasEmptyWidth;
   }
 
-  /** Whether an empty-width instruction uses a flag outside the word-boundary flags. */
-  boolean hasEmptyWidthOutsideWordBoundaries() {
-    return hasEmptyWidthOutsideWordBoundaries;
+  /** Whether an empty-width instruction needs a context other than line or word boundaries. */
+  boolean hasEmptyWidthOutsideLineAndWordBoundaries() {
+    return hasEmptyWidthOutsideLineAndWordBoundaries;
   }
 
   /** Returns whether execution needs the operation's fixed previous-match boundary. */

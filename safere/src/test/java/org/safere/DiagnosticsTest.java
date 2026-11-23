@@ -721,6 +721,7 @@ class DiagnosticsTest {
   void anchoredDfaResolvesPriorityAtFinalLineTerminators() {
     Pattern.setDiagnostics(diagnostics);
     EnginePathOptions options = EnginePathOptions.builder().onePass(false).build();
+    List<String> terminators = List.of("\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029");
     for (String regex :
         List.of(
             "(?s)\\A.*c.+?$",
@@ -731,11 +732,17 @@ class DiagnosticsTest {
             "(?Us)\\A.*c.+?\\b\\Z",
             "(?s)\\A.*c.+?\\B\\Z",
             "(?s)\\A.*c.+?\\B(?d:\\Z)",
-            "\\A.*c[0-9]+$")) {
+            "(?s)\\A.*(?m:^)\\bc.+?\\Z",
+            "(?s)\\A.*(?dm:^)c.+?\\Z",
+            "(?s)\\A.*c.+?(?m:$)\\Z",
+            "(?s)\\A.*c.+(?m:$)\\Z",
+            "(?s)\\A.*c.+?(?dm:$)\\Z",
+            "(?s)\\A.*c.+?(?m:$)(?d:\\Z)",
+            "(?s)\\A.*c[0-9]+$")) {
       Pattern pattern = Pattern.compile(regex, 0, options);
       var jdk = java.util.regex.Pattern.compile(regex);
-      for (String terminator : List.of("\n", "\r\n", "\u0085", "\u2028")) {
-        String input = "é😀".repeat(1000) + "c2" + terminator;
+      for (String terminator : terminators) {
+        String input = "é😀".repeat(1000) + "\nc2" + terminator;
         var expected = jdk.matcher(input);
         assertThat(expected.find()).isTrue();
         Matcher finder = pattern.matcher(input);
@@ -754,7 +761,7 @@ class DiagnosticsTest {
         assertThat(pattern.split(input, -1)).isEqualTo(jdk.split(input, -1));
       }
       assertThat(operationsFor(pattern))
-          .hasSize(16)
+          .hasSize(4 * terminators.size())
           .allSatisfy(event -> {
             assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
             assertThat(event.forwardDfaSearchCount()).isEqualTo(1);
@@ -764,12 +771,20 @@ class DiagnosticsTest {
   }
 
   @Test
-  void anchoredDfaResolvesWordBoundaryAtStartOfFinalTerminator() {
+  void anchoredDfaResolvesAssertionsAtStartOfFinalTerminator() {
     Pattern.setDiagnostics(diagnostics);
-    for (String regex : List.of("(?s)(?:\\B|.)$", "(?s)(?:.|\\B)$", "(?s)(?:\\b|.)$")) {
+    List<String> inputs = List.of("\n", "\r\n", "\u2028");
+    for (String regex :
+        List.of(
+            "(?s)(?:\\B|.)$",
+            "(?s)(?:.|\\B)$",
+            "(?s)(?:\\b|.+)$",
+            "(?s)(?:.(?m:^)|(?m:$))\\Z",
+            "(?s)(?:.(?m:$).|(?m:$))\\Z",
+            "(?s)(?:.(?dm:$).|(?m:$))\\Z")) {
       Pattern pattern =
           Pattern.compile(regex, 0, EnginePathOptions.builder().onePass(false).build());
-      for (String input : List.of("\n", "\u2028")) {
+      for (String input : inputs) {
         var expected = java.util.regex.Pattern.compile(regex).matcher(input);
         assertThat(expected.lookingAt()).isTrue();
         Matcher matcher = pattern.matcher(input);
@@ -780,7 +795,7 @@ class DiagnosticsTest {
         assertThat(utf8.end()).isEqualTo(input.substring(0, expected.end()).getBytes(UTF_8).length);
       }
       assertThat(operationsFor(pattern))
-          .hasSize(4)
+          .hasSize(2 * inputs.size())
           .allSatisfy(event -> assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.DFA));
     }
   }
