@@ -6,7 +6,6 @@
 package org.safere.fuzz;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.regex.Pattern;
@@ -17,40 +16,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 final class FuzzSupportTest {
   @Test
-  void generatedRejectionsHaveTheExpectedCauseAndControlsStillMatch() {
-    for (var feature : UnsupportedSyntaxFuzzer.FEATURES) {
-      for (String context : UnsupportedSyntaxFuzzer.CONTEXTS) {
-        for (String gap : UnsupportedSyntaxFuzzer.GAPS) {
-          for (var mode : UnsupportedSyntaxFuzzer.Mode.values()) {
-            var rejection = UnsupportedSyntaxFuzzer.rejection(feature, context, gap, mode);
-            UnsupportedSyntaxFuzzer.assertRejected(rejection);
-            if (feature.jdkAccepts()) {
-              assertThatNoException()
-                  .isThrownBy(() -> Pattern.compile(rejection.regex(), rejection.flags()));
-            } else {
-              assertThatThrownBy(() -> Pattern.compile(rejection.regex(), rejection.flags()))
-                  .isInstanceOf(PatternSyntaxException.class);
-            }
-          }
-        }
-      }
-      UnsupportedSyntaxFuzzer.assertSupportedControls(feature, "x");
-    }
-  }
-
-  @Test
   void unrestrictedCompileExplorationStillReportsDialectDifferences() {
     assertThatThrownBy(() -> FuzzSupport.compileCompatibleOrSkip("(a)\\1", 0))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("compile divergence");
-  }
-
-  @Test
-  void unexpectedAcceptanceFailsARejectionCheck() {
-    var supported = new UnsupportedSyntaxFuzzer.Rejection("(a)", 0, "invalid Perl operator");
-    assertThatThrownBy(() -> UnsupportedSyntaxFuzzer.assertRejected(supported))
-        .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("must reject");
   }
 
   @Test

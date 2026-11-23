@@ -73,7 +73,7 @@ public final class EscapeSyntaxFuzzer {
       List.of(
           "", "a", "A", "0", "7", "@", "\u001b", "&", "-", "©", "Ā", "é", "☃", "😀", "𠀀", "🙀",
           "\u0000", "\u0140", "\uD800", "\uD840", "\uf57f");
-  // Unsupported numeric references are tested by UnsupportedSyntaxFuzzer. The octal neighbors
+  // Unsupported numeric references are tested by UnsupportedSyntaxTest. The octal neighbors
   // and the ambiguous class-range spellings still take part in differential generation.
   private static final String[] REGRESSION_REGEXES = {
     "^\\©",

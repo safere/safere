@@ -15,7 +15,6 @@ comparisons use `FuzzSupport` and inherit its limitations listed below.
 | Target | Generated domain and assertions | Extraction disposition |
 | --- | --- | --- |
 | CompileFuzzer | Arbitrary pattern text up to 2048 characters and sampled flags; compilation acceptance. | Opt-in acceptance suite. Expected dialect differences remain visible here. |
-| UnsupportedSyntaxFuzzer | Composed lookaround, backreference, atomic-group, consuming-possessive and byte-escape syntax; checks rejection diagnostics and supported controls. | SafeRE rejection model with separate differential checks for controls. |
 | ParserCompatibilityFuzzer | Atoms, prefixes, connectors, suffixes, leading counted repeats, comment terminators and malformed groups; parser flags; acceptance and fixed membership subjects. | Grammar includes intentional syntax differences. |
 | CharacterClassExpressionFuzzer | Fixed regressions and composed base/ampersand/trailing/right pieces, intersections and comment separators; acceptance and membership. | Trivia selection avoids invalid separators; intentional class rules need model coverage, not JDK enrollment. |
 | EscapeSyntaxFuzzer | Fixed regressions and composed prefix/escape/suffix families; acceptance and membership with parser flags. | Keep broad pending a separate escape-domain proposal. |
@@ -32,6 +31,9 @@ comparisons use `FuzzSupport` and inherit its limitations listed below.
 | Utf8InputFuzzer | Literal/keyword/fixed-offset/grapheme/multi-anchor representation checks; direct JDK prefix-slice, boundary-region, start-anchor, final-terminator, position-dependent and multi-offset comparisons; random repeated literal and arbitrary pattern/byte windows, strict UTF-8 validation, bounds/progress. | RepresentationChecks and Utf8RobustnessChecks are shared with independent targets. Direct JDK families remain broad. Valid representation inputs exclude lossy surrogate conversion. |
 
 ## Shared exploratory comparator boundaries
+
+`UnsupportedSyntaxTest` enumerates rejection cases and checks supported controls
+with both engines during the regular test build.
 
 - Both engines rejecting syntax ends a comparison that allows rejection.
   Those comparisons exclude SafeRE compiler-size rejection as a workload limit.
