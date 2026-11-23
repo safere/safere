@@ -829,8 +829,9 @@ abstract class ByteSwarScan {
   }
 
   /**
-   * Skips leading non-ASCII blocks when at least 128 bytes remain. Skipped bytes cannot belong to
-   * an ASCII class; resuming exact scanning at the returned position overlaps at most 32 bytes.
+   * Skips leading non-ASCII blocks. The caller must leave at least 128 bytes in the range. Skipped
+   * bytes cannot belong to an ASCII class; resuming exact scanning at the returned position
+   * overlaps at most 32 bytes.
    */
   static int skipNonAsciiBlocks(byte[] bytes, int offset, int length, int start) {
     int position = start;
