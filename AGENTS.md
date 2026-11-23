@@ -195,8 +195,8 @@ Use the [write-benchmark-report skill](.agents/skills/write-benchmark-report/SKI
 for collections and published reports. Performance PRs must include measured
 before/after benchmark results in the PR description. Every benchmark
 comparison in a PR description must give both values and a ratio for each
-metric. Label the ratio direction so readers can tell whether it shows an
-improvement or a regression.
+metric. Divide the candidate value by the baseline value and label that
+direction.
 Reserve checked-in `benchmark-results/` artifacts for corpus-wide benchmark
 reports. Keep focused PR measurements local; do not add standalone evidence
 reports or raw-data archives to a performance PR unless explicitly requested.
