@@ -457,14 +457,14 @@ public final class Matcher implements MatchResult {
   private boolean replacementNeedsCaptures;
 
   /**
-   * Cached DFA references to avoid repeated ThreadLocal lookups in find-all loops. Populated on
-   * first use and reused for subsequent calls within this Matcher's lifetime.
+   * Cached DFA references to avoid repeated per-thread cache lookups in find-all loops. Populated
+   * on first use and reused for subsequent calls within this Matcher's lifetime.
    */
   private Dfa cachedForwardFirstMatchDfa;
 
   /**
    * The parent pattern's per-thread cache, fetched on first use so later lookups by this Matcher
-   * skip the {@link ThreadLocal} and {@link java.lang.ref.SoftReference} dereferences.
+   * skip the owner check, {@link ThreadLocal} and {@link java.lang.ref.SoftReference} dereferences.
    */
   private Pattern.ThreadCache threadCache;
 
@@ -4420,17 +4420,35 @@ public final class Matcher implements MatchResult {
    * etc. for numbered groups, and {@code ${name}} for named groups. Use {@code \\} for a literal
    * backslash and {@code \$} for a literal dollar sign.
    *
+   * <p>If the replacement string is malformed or names a group that does not exist, an {@link
+   * IllegalArgumentException} is thrown and {@code sb} is left unchanged. If it refers to a group
+   * number that does not exist, an {@link IndexOutOfBoundsException} is thrown, and {@code sb} may
+   * already contain the text preceding the match and the replacement expanded up to the invalid
+   * reference.
+   *
    * @param sb the target string builder
    * @param replacement the replacement string
    * @return this matcher
    * @throws IllegalStateException if no match has yet been attempted, or if the previous match
    *     operation failed
+   * @throws IllegalArgumentException if the replacement string is malformed or refers to a named
+   *     group that does not exist
+   * @throws IndexOutOfBoundsException if the replacement string refers to a group number that does
+   *     not exist
    */
   public Matcher appendReplacement(StringBuilder sb, String replacement) {
     modCount++;
     checkMatch();
-    sb.append(text, appendPos, start());
-    appendReplacementBody(sb, replacement);
+    // The replacement is validated while it is expanded. As in the JDK, only an
+    // IllegalArgumentException rolls back the partial output; other exceptions leave it in place.
+    int restoreLength = sb.length();
+    try {
+      sb.append(text, appendPos, start());
+      appendReplacementBody(sb, replacement);
+    } catch (IllegalArgumentException e) {
+      sb.setLength(restoreLength);
+      throw e;
+    }
     appendPos = end();
     return this;
   }

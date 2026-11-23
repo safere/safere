@@ -138,15 +138,16 @@ public final class SplitFuzzer {
   }
 
   public static void fuzzerTestOneInput(FuzzedDataProvider data) {
-    String regex = data.consumeString(256);
     int flags = FuzzSupport.consumeFlags(data);
-    String input = data.consumeString(2048);
+    SemanticDomain.Sample sample = SemanticDomain.generate(data, flags);
+    String regex = sample.regex();
+    String input = sample.input(data);
     int limit = data.consumeInt(-16, 16);
-    FuzzSupport.CompiledPattern pattern = FuzzSupport.compileOrSkip(regex, flags);
-    if (pattern == null) {
-      return;
-    }
+    compareSplits(regex, flags, input, limit);
+  }
 
+  static void compareSplits(String regex, int flags, String input, int limit) {
+    FuzzSupport.CompiledPattern pattern = FuzzSupport.compileRequired(regex, flags);
     pattern.split(input);
     pattern.split(input, limit);
     pattern.splitWithDelimiters(input);
@@ -155,6 +156,21 @@ public final class SplitFuzzer {
       pattern.split(input, largeLimit);
       pattern.splitWithDelimiters(input, largeLimit);
     }
+  }
+
+  @Test
+  void previousMatchBoundaryDelimiters() {
+    // Refs #1209. These delimiters came from the old compile findings for \G.
+    String adjacent = "\\G\\x00s.s";
+    String input = "\0sxs\0sys!rest";
+    int flags = Pattern.DOTALL | Pattern.UNICODE_CASE;
+    compareSplits(adjacent, flags, input, -1);
+    assertThat(Pattern.compile(adjacent, flags).split(input, -1)).containsExactly("", "", "!rest");
+
+    String quantified = ".Gaa>\\G*gsZ\\x00";
+    String infixInput = "xGaa>gsZ\0!rest";
+    compareSplits(quantified, 0, infixInput, -1);
+    assertThat(Pattern.compile(quantified).split(infixInput, -1)).containsExactly("", "!rest");
   }
 
   @Test
