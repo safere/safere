@@ -30,6 +30,7 @@ final class GraphemeSupport {
   /** Initializes the shared segmentation tables for a grapheme-capable compiled program. */
   static void prepareTables() {
     // Invoking this static method completes class initialization before compilation returns.
+    // A nested table holder would also need an explicit initialization call here.
     // Per-input segmentation context remains owned by the matching operation.
   }
 

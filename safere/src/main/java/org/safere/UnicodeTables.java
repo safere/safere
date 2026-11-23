@@ -782,7 +782,7 @@ final class UnicodeTables {
     static final Map<String, int[][]> GROUPS = UnicodeGroups.groups();
   }
 
-  /** Returns the shared Unicode groups without loading them for ASCII-only classes. */
+  /** Returns the shared Unicode groups, loading them on first use. */
   public static Map<String, int[][]> unicodeGroups() {
     return UnicodeGroupsHolder.GROUPS;
   }

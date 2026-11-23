@@ -12,7 +12,6 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Base64;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -89,19 +88,23 @@ class CompileInitializationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"(\\w+)\\X", "(\\w+)\\b{g}"})
-  void concurrentCompilationsAndFirstCapturesShareGraphemeTables(String regex)
+  @ValueSource(strings = {"([a-z])", "(\\w+)", "(\\w+)\\X", "(\\w+)\\b{g}"})
+  void firstCaptureDoesNotInitializeSharedUnicodeTables(String regex)
       throws IOException, InterruptedException, URISyntaxException {
-    String output = runFreshProcess(regex, "", "concurrent");
-    for (String className : List.of("UnicodeGeneratedTables", "GraphemeSupport")) {
-      assertThat(
-              output
-                  .lines()
-                  .filter(line -> line.contains("Initializing 'org/safere/" + className + "'"))
-                  .count())
-          .as("shared initialization for %s", className)
-          .isEqualTo(1);
-    }
+    String output = runFreshProcess(regex, "", "search");
+    String marker = "SafeRE pattern compiled";
+    assertThat(output).contains(marker);
+    assertThat(output.substring(output.indexOf(marker) + marker.length()))
+        .as("Unicode table initialization after compilation for %s", regex)
+        .doesNotContain("Initializing 'org/safere/UnicodeGeneratedTables'")
+        .doesNotContain("Initializing 'org/safere/GraphemeSupport'");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"(\\w+)\\X", "(\\w+)\\b{g}"})
+  void concurrentCompilationsAndFirstSearchesReturnExpectedCaptures(String regex)
+      throws IOException, InterruptedException, URISyntaxException {
+    runFreshProcess(regex, "", "concurrent");
   }
 
   @ParameterizedTest
