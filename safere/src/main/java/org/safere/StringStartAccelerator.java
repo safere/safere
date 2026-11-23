@@ -363,6 +363,10 @@ sealed interface StringStartAccelerator {
      * the earliest. Without the clamp a wide offset span loses the leftmost match: on {@code
      * (aq|b[a-z]{9})z} the {@code z} at index 5 admits only the start at 3, while the {@code z} at
      * index 10 starts the match at 0.
+     *
+     * <p>The clamp can land between the halves of a surrogate pair before the occurrence, so it
+     * moves past the pair: matches only start at code point boundaries, and callers derive the
+     * word-boundary context of the candidate from the code points around it.
      */
     private static int resolveMultiOffsetStart(
         CharSequence text,
@@ -376,8 +380,14 @@ sealed interface StringStartAccelerator {
         if (start >= fromIndex
             && start < text.length()
             && firstCharClass.contains(Character.codePointAt(text, start))) {
-          return Math.max(
-              fromIndex, Math.min(start, literalStart + 1 - fixedOffsetLiteral.maxOffset()));
+          int floor = literalStart + 1 - fixedOffsetLiteral.maxOffset();
+          if (floor > 0
+              && floor < start
+              && Character.isLowSurrogate(text.charAt(floor))
+              && Character.isHighSurrogate(text.charAt(floor - 1))) {
+            floor++;
+          }
+          return Math.max(fromIndex, Math.min(start, floor));
         }
       }
       return -1;
