@@ -67,6 +67,7 @@ class TargetManifestTest(unittest.TestCase):
             ['python3', str(ROOT / 'scripts/targets.py'), '--select', 'SplitFuzzer'], text=True)
         self.assertEqual(set(selected.splitlines()),
                          {'SplitFuzzer#split', 'SplitFuzzer#repeatedClassSplits',
+                          'SplitFuzzer#nullableDelimiterSplits',
                           'SplitFuzzer#unassignedControlSplits', 'SplitFuzzer#literalPrefixSplits'})
         result = subprocess.run(
             ['python3', str(ROOT / 'scripts/targets.py'), '--select', 'SplitFuzzer#missing'],

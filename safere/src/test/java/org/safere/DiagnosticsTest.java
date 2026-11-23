@@ -46,6 +46,23 @@ class DiagnosticsTest {
   }
 
   @Test
+  void continuingAnUnreadFindAttributesOnlyTheNewSearchToDiagnostics() {
+    Pattern pattern = Pattern.compile("((a?)*)y");
+    Matcher matcher = pattern.matcher("aay");
+    assertThat(matcher.find()).isTrue();
+
+    Pattern.setDiagnostics(diagnostics);
+    assertThat(matcher.find()).isFalse();
+    assertThat(operationsFor(pattern))
+        .singleElement()
+        .satisfies(event -> {
+          assertThat(event.boundaryStrategy()).isEqualTo(MatchStrategy.LENGTH);
+          assertThat(event.captureStrategy()).isEqualTo(MatchStrategy.NONE);
+          assertThat(event.forwardDfaSearchCount()).isZero();
+        });
+  }
+
+  @Test
   void anchoredOnePassUsesTerminalRejectionBeforeScanning() {
     Pattern.setDiagnostics(diagnostics);
     String input = "a".repeat(4096) + "c";

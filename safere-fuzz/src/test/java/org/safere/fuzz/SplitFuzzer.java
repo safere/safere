@@ -86,6 +86,28 @@ public final class SplitFuzzer {
   }
 
   @FuzzTest(maxDuration = "30s")
+  void nullableDelimiterSplits(FuzzedDataProvider data) {
+    String letter = data.pickValue(List.of("a", "b", "é", "😀"));
+    String quantifier = data.pickValue(List.of("*", "*?", "+", "{1,4}"));
+    String delimiter = "((" + letter + "?)" + quantifier + ")y";
+    // The previous-match assertion affects split dispatch even if its branch cannot match.
+    String unreachable = "\\G[" + letter + "&&[^" + letter + "]]";
+    String regex =
+        data.consumeBoolean() ? delimiter + "|" + unreachable : unreachable + "|" + delimiter;
+    String prefix = data.pickValue(List.of("x", "", "🦊"));
+    String separator = data.pickValue(List.of("z", "!", "é"));
+    String match = letter.repeat(data.consumeInt(0, 4)) + "y";
+    String input = prefix + (match + separator).repeat(data.consumeInt(1, 5)) + match;
+    int limit = data.pickValue(SPLIT_LIMITS);
+    FuzzSupport.CompiledPattern pattern = FuzzSupport.compileOrSkip(regex, 0);
+    if (pattern == null) {
+      return;
+    }
+    pattern.split(input, limit);
+    pattern.splitWithDelimiters(input, limit);
+  }
+
+  @FuzzTest(maxDuration = "30s")
   void literalPrefixSplits(FuzzedDataProvider data) {
     // Refs #1050. Generate short matching prefixes as well as complete and longer inputs.
     String literal = data.pickValue(List.of("a", "Ab", "a😀b")).repeat(data.consumeInt(1, 16));
