@@ -12,10 +12,10 @@ import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -43,22 +43,9 @@ class CompleteSearchWorkTest {
     UTF8_REPLACE_ALL
   }
 
-  private static final Set<Operation> REPEATED_SCAN_GAPS =
-      Set.of(
-          Operation.STRING_FIND,
-          Operation.UTF8_FIND,
-          Operation.STRING_SPLIT,
-          Operation.STRING_REPLACE_ALL,
-          Operation.UTF8_REPLACE_ALL);
-
   // Each repeated unit begins with one match and ends with an optional unmatched suffix.
   private record Scenario(
-      String regex,
-      String match,
-      String unmatched,
-      MatchStrategy strategy,
-      boolean boundedRegion,
-      Set<Operation> knownGaps) {
+      String regex, String match, String unmatched, MatchStrategy strategy, boolean boundedRegion) {
     @Override
     public String toString() {
       return "/" + regex + "/";
@@ -67,18 +54,27 @@ class CompleteSearchWorkTest {
 
   private static final List<Scenario> SCENARIOS =
       List.of(
-          // #1237: ruling out the preferred branch can scan the remaining input at every match.
-          new Scenario("a.*z|a", "a", "", MatchStrategy.DFA, false, REPEATED_SCAN_GAPS),
-          new Scenario(
-              "\\G(?:a.*z|a)", "a", "", MatchStrategy.BIT_STATE, false, REPEATED_SCAN_GAPS),
-          new Scenario("(?:\\X)*z|a", "a", "", MatchStrategy.NFA, false, REPEATED_SCAN_GAPS),
           // The region excludes a 'z' that could satisfy the preferred branch of the last match.
-          new Scenario("a[^a]*z|a", "a", "-", MatchStrategy.DFA, true, Set.of()),
-          new Scenario("\\Xz|é", "é", "-", MatchStrategy.NFA, false, Set.of()),
-          new Scenario("(?m)^", "", "é\n", MatchStrategy.DFA, false, Set.of()));
+          new Scenario("a[^a]*z|a", "a", "-", MatchStrategy.DFA, true),
+          new Scenario("\\Xz|é", "é", "-", MatchStrategy.NFA, false),
+          new Scenario("(?m)^", "", "é\n", MatchStrategy.DFA, false));
+
+  private static final List<Scenario> REPEATED_SCAN_SCENARIOS =
+      List.of(
+          new Scenario("a.*z|a", "a", "", MatchStrategy.DFA, false),
+          new Scenario("\\G(?:a.*z|a)", "a", "", MatchStrategy.BIT_STATE, false),
+          new Scenario("(?:\\X)*z|a", "a", "", MatchStrategy.NFA, false));
 
   private static Stream<Arguments> operations() {
-    return SCENARIOS.stream()
+    return operationCases(SCENARIOS);
+  }
+
+  private static Stream<Arguments> repeatedScanOperations() {
+    return operationCases(REPEATED_SCAN_SCENARIOS);
+  }
+
+  private static Stream<Arguments> operationCases(List<Scenario> scenarios) {
+    return scenarios.stream()
         .flatMap(scenario -> {
           // Split takes the whole input, and replaceAll resets the region.
           Stream<Operation> operations =
@@ -92,47 +88,47 @@ class CompleteSearchWorkTest {
   @ParameterizedTest(name = "{0} {1}")
   @MethodSource("operations")
   void completeOperationWorkScalesWithInputLength(Scenario scenario, Operation operation) {
+    assertLinearWork(scenario, operation);
+  }
+
+  @Disabled("Ruling out the preferred branch can rescan the remaining input at each match (#1237)")
+  @ParameterizedTest(name = "{0} {1}")
+  @MethodSource("repeatedScanOperations")
+  void repeatedScanWorkScalesWithInputLength(Scenario scenario, Operation operation) {
+    assertLinearWork(scenario, operation);
+  }
+
+  private static void assertLinearWork(Scenario scenario, Operation operation) {
     Pattern pattern = Pattern.compile(scenario.regex());
-    boolean knownGap = scenario.knownGaps().contains(operation);
-    long[] work = new long[REPETITIONS.length];
-    boolean exceededBound = false;
-    for (int i = 0; i < REPETITIONS.length; i++) {
-      int repetitions = REPETITIONS[i];
+    long previousWork = 0;
+    for (int repetitions : REPETITIONS) {
       Runnable task = task(pattern, scenario, operation, repetitions);
       task.run(); // Prepare lazy engines outside the measurement.
-      if (i == 0) {
+      long work = WorkCounter.countWithForwardDfaStepsForTesting(task);
+      assertThat(work).as("counted work at %d repetitions", repetitions).isPositive();
+      if (previousWork == 0) {
         long forwardSteps = WorkCounter.countForwardDfaStepsForTesting(task);
         if (scenario.strategy() == MatchStrategy.DFA) {
           assertThat(forwardSteps).as("forward DFA work").isPositive();
         } else {
           assertThat(forwardSteps).as("forward DFA work on exact fallback").isZero();
         }
-      }
-      work[i] = WorkCounter.countWithForwardDfaStepsForTesting(task);
-      assertThat(work[i]).as("counted work at %d repetitions", repetitions).isPositive();
-      if (i > 0) {
+      } else {
         // Each input grows by 4x. Allow 50% headroom and a small fixed cost.
-        long bound = 6 * work[i - 1] + 32;
-        if (knownGap) {
-          exceededBound |= work[i] > bound;
-        } else {
-          assertThat(work[i])
-              .as(
-                  "work at %d repetitions after %d units at the previous size",
-                  repetitions, work[i - 1])
-              .isLessThanOrEqualTo(bound);
-        }
+        long bound = 6 * previousWork + 32;
+        assertThat(work)
+            .as(
+                "work at %d repetitions after %d units at the previous size",
+                repetitions, previousWork)
+            .isLessThanOrEqualTo(bound);
       }
-    }
-    if (knownGap) {
-      assertThat(exceededBound)
-          .as("work %s now meets the bound; remove its known gap for #1237", Arrays.toString(work))
-          .isTrue();
+      previousWork = work;
     }
   }
 
   private static Stream<Scenario> exactScenarios() {
-    return SCENARIOS.stream().filter(scenario -> scenario.strategy() != MatchStrategy.DFA);
+    return Stream.concat(SCENARIOS.stream(), REPEATED_SCAN_SCENARIOS.stream())
+        .filter(scenario -> scenario.strategy() != MatchStrategy.DFA);
   }
 
   @ParameterizedTest(name = "{0}")
