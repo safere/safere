@@ -22623,6 +22623,28 @@
       }
     },
     {
+      "id": "ReverseDfaFindBenchmark.wordProseCapture.32768",
+      "operation": "findAllCount",
+      "patterns": [
+        "\\b(\\w+)\\b"
+      ],
+      "inputs": [
+        "reverseDfaFind.prose.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 6144
+      }
+    },
+    {
       "id": "ReverseDfaFindBenchmark.proseLines.32768",
       "operation": "findAllCount",
       "patterns": [

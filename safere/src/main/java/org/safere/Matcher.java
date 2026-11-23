@@ -798,10 +798,14 @@ public final class Matcher implements MatchResult {
 
   /**
    * Finds the next match and its start in one forward pass with the start-register search, for an
-   * unanchored, capture-free find without a region. Returns {@link #REGISTER_MATCH} or {@link
-   * #REGISTER_NO_MATCH} when the search answered. Otherwise returns the position from which the
-   * caller runs the ordinary DFA search: {@code effectiveStart} when the pattern is not eligible,
-   * the search backed off or it fell back, or a later position when it handed the search over.
+   * unanchored find without a region. Returns {@link #REGISTER_MATCH} or {@link #REGISTER_NO_MATCH}
+   * when the search answered. Otherwise returns the position from which the caller runs the
+   * ordinary DFA search: {@code effectiveStart} when the pattern is not eligible, the search backed
+   * off or it fell back, or a later position when it handed the search over.
+   *
+   * <p>The search only recovers group zero. As after the forward and reverse DFA, capture groups
+   * stay deferred until a caller reads them, and are then resolved by an exact engine anchored at
+   * the match start and bounded by the match end.
    */
   private int findWithStartRegister(InputScanner scanner, int effectiveStart, Prog prog) {
     releaseEnginesOwnedByOtherThread();

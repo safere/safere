@@ -999,8 +999,12 @@ class DiagnosticsTest {
   @Test
   void prefixCandidateFailureContinuesThroughDfa() {
     Pattern.setDiagnostics(diagnostics);
+    // The start-register search would answer this find before the candidate verification.
     Pattern pattern =
-        Pattern.compile("(?s)<block>\\n(\\s)*# (category|group)_defined:.*?\\n</block>");
+        Pattern.compile(
+            "(?s)<block>\\n(\\s)*# (category|group)_defined:.*?\\n</block>",
+            0,
+            EnginePathOptions.builder().startRegister(false).build());
     String input =
         "<block>\n  # comment\n</block> " + "<block>\n  # category_defined: alpha\n</block>";
 

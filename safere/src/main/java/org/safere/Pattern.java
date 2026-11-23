@@ -237,8 +237,9 @@ public final class Pattern implements Serializable {
 
   /**
    * Returns this thread's start-register search, or null when the pattern is not eligible. The
-   * search stands in for the reverse DFA of a capture-free DFA sandwich, so it is only built where
-   * that sandwich would give authoritative group-zero bounds.
+   * search stands in for the reverse DFA of the DFA sandwich, so it is only built where that
+   * sandwich would give authoritative group-zero bounds. Like the sandwich, it only finds group
+   * zero: capture groups are resolved later by an exact engine anchored to those bounds.
    */
   StartRegisterSearch startRegisterSearch(ThreadCache cache) {
     if (!cache.startRegisterLookedUp) {
@@ -246,7 +247,6 @@ public final class Pattern implements Serializable {
       if (enginePathOptions.startRegister()
           && enginePathOptions.dfa()
           && enginePathOptions.reverseDfa()
-          && prog.numCaptures() <= 1
           && dfaGroupZeroReliable()
           && forwardDfaSupported()
           && canUseReverseDfa()
