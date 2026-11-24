@@ -67,6 +67,28 @@
       "shared": true
     },
     {
+      "id": "colonEarlyDecoyLate.32768",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "note: open: note: open: note: open: request: ",
+        "unit": "note: open: ",
+        "suffix": "req:done",
+        "length": 32776
+      },
+      "shared": true
+    },
+    {
+      "id": "colonDenseDecoyLate.32768",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "note: open: request: ",
+        "suffix": "req:done",
+        "length": 32776
+      },
+      "shared": true
+    },
+    {
       "id": "colonEarly",
       "recipe": {
         "kind": "repeatToLength",
@@ -369,6 +391,62 @@
       ],
       "inputs": [
         "colonLate.32768"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Controls separator density, leading-candidate density, input size and consumer cost in the fixed-offset filter.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "FixedOffsetFilter.colonEarlyDecoyLate.32768",
+      "operation": "find",
+      "patterns": [
+        "(?:requisition|req):(\\S*)"
+      ],
+      "inputs": [
+        "colonEarlyDecoyLate.32768"
+      ],
+      "inputRepresentations": [
+        "javaString",
+        "preexistingUtf8"
+      ],
+      "inputRepresentationReason": "Controls separator density, leading-candidate density, input size and consumer cost in the fixed-offset filter.",
+      "requirements": [],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "FixedOffsetFilter.colonDenseDecoyLate.32768",
+      "operation": "find",
+      "patterns": [
+        "(?:requisition|req):(\\S*)"
+      ],
+      "inputs": [
+        "colonDenseDecoyLate.32768"
       ],
       "inputRepresentations": [
         "javaString",
