@@ -30,7 +30,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 @Isolated
 @Execution(ExecutionMode.SAME_THREAD)
 class CompleteSearchWorkTest {
-  private static final int[] REPETITIONS = {64, 256, 1024};
+  // Start after fixed lookahead costs dominate and stay below the checkpoint threshold.
+  private static final int[] REPETITIONS = {256, 1024, 4096};
   private static final String REGION_PREFIX = "éaz";
   private static final String REGION_SUFFIX = "zéa";
   private static final Utf8Input UTF8_REPLACEMENT = utf8("x");
@@ -45,10 +46,46 @@ class CompleteSearchWorkTest {
 
   // Each repeated unit begins with one match and ends with an optional unmatched suffix.
   private record Scenario(
-      String regex, String match, String unmatched, MatchStrategy strategy, boolean boundedRegion) {
+      String regex,
+      String match,
+      String unmatched,
+      MatchStrategy strategy,
+      MatchStrategy utf8Strategy,
+      boolean boundedRegion,
+      EnginePathOptions engineOptions) {
+    Scenario(
+        String regex,
+        String match,
+        String unmatched,
+        MatchStrategy strategy,
+        boolean boundedRegion) {
+      this(
+          regex,
+          match,
+          unmatched,
+          strategy,
+          strategy,
+          boundedRegion,
+          EnginePathOptions.allEnabled());
+    }
+
+    MatchStrategy strategyFor(Operation operation) {
+      return switch (operation) {
+        case UTF8_FIND, UTF8_REPLACE_ALL -> utf8Strategy;
+        default -> strategy;
+      };
+    }
+
     @Override
     public String toString() {
-      return "/" + regex + "/";
+      return "/"
+          + regex
+          + "/"
+          + (boundedRegion ? " in region" : "")
+          + " ("
+          + strategy
+          + (engineOptions.startRegister() ? "" : ", reverse DFA")
+          + ")";
     }
   }
 
@@ -62,6 +99,38 @@ class CompleteSearchWorkTest {
   private static final List<Scenario> REPEATED_SCAN_SCENARIOS =
       List.of(
           new Scenario("a.*z|a", "a", "", MatchStrategy.DFA, false),
+          new Scenario(
+              "a.*z|a",
+              "a",
+              "",
+              MatchStrategy.DFA,
+              MatchStrategy.BIT_STATE,
+              true,
+              EnginePathOptions.allEnabled()),
+          new Scenario(
+              "a.*z|a",
+              "a",
+              "",
+              MatchStrategy.DFA,
+              MatchStrategy.DFA,
+              false,
+              EnginePathOptions.builder().startRegister(false).build()),
+          new Scenario(
+              "a.*z|a",
+              "a",
+              "",
+              MatchStrategy.BIT_STATE,
+              MatchStrategy.BIT_STATE,
+              false,
+              EnginePathOptions.builder().dfa(false).build()),
+          new Scenario(
+              "a.*z|a",
+              "a",
+              "",
+              MatchStrategy.NFA,
+              MatchStrategy.NFA,
+              false,
+              EnginePathOptions.builder().dfa(false).bitState(false).build()),
           new Scenario("\\G(?:a.*z|a)", "a", "", MatchStrategy.BIT_STATE, false),
           new Scenario("(?:\\X)*z|a", "a", "", MatchStrategy.NFA, false));
 
@@ -99,7 +168,7 @@ class CompleteSearchWorkTest {
   }
 
   private static void assertLinearWork(Scenario scenario, Operation operation) {
-    Pattern pattern = Pattern.compile(scenario.regex());
+    Pattern pattern = Pattern.compile(scenario.regex(), 0, scenario.engineOptions());
     long previousWork = 0;
     for (int repetitions : REPETITIONS) {
       Runnable task = task(pattern, scenario, operation, repetitions);
@@ -108,7 +177,7 @@ class CompleteSearchWorkTest {
       assertThat(work).as("counted work at %d repetitions", repetitions).isPositive();
       if (previousWork == 0) {
         long forwardSteps = WorkCounter.countForwardDfaStepsForTesting(task);
-        if (scenario.strategy() == MatchStrategy.DFA) {
+        if (scenario.strategyFor(operation) == MatchStrategy.DFA) {
           assertThat(forwardSteps).as("forward DFA work").isPositive();
         } else {
           assertThat(forwardSteps).as("forward DFA work on exact fallback").isZero();
@@ -134,7 +203,7 @@ class CompleteSearchWorkTest {
   @ParameterizedTest(name = "{0}")
   @MethodSource("exactScenarios")
   void findSequencesUseTheExactFallback(Scenario scenario) {
-    Pattern pattern = Pattern.compile(scenario.regex());
+    Pattern pattern = Pattern.compile(scenario.regex(), 0, scenario.engineOptions());
     EnumSet<MatchStrategy> strategies = EnumSet.noneOf(MatchStrategy.class);
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
     try {
@@ -152,7 +221,7 @@ class CompleteSearchWorkTest {
         task(pattern, scenario, operation, REPETITIONS[0]).run();
         assertThat(strategies)
             .as("successful matches for %s", operation)
-            .containsExactly(scenario.strategy());
+            .containsExactly(scenario.strategyFor(operation));
       }
     } finally {
       Pattern.setDiagnostics(previous);
