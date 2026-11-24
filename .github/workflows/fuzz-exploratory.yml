@@ -18,6 +18,7 @@ jobs:
         with:
           java-version-file: .sdkmanrc
           cache: maven
+          # Keep these Maven cache inputs in sync with ci.yml.
           cache-dependency-path: |
             **/pom.xml
             **/.mvn/wrapper/maven-wrapper.properties
