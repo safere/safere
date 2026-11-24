@@ -36,9 +36,9 @@ leading filter from that floor, and resume interior scanning no earlier than the
 next leading candidate plus `minOffset`. Both scan floors advance monotonically;
 a cached leading candidate avoids rescanning it while it remains above the floor.
 Statically unselective leading classes use the plain multi-offset loop. Short
-tails retain the original filter. A leading scan that skips too little is
-disabled for the remainder of the call. This filter supplies a lower bound, never
-a preferred match or capture result.
+tails retain the original filter. Several consecutive fresh leading scans with
+short skips disable the filter for the rest of the call. Reusing the cached
+candidate does not count as a scan. The filter supplies only a lower bound.
 
 ## Captures survive compilation
 

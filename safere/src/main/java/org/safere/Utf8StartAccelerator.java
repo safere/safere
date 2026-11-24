@@ -548,7 +548,7 @@ sealed interface Utf8StartAccelerator {
       return -1;
     }
 
-    /** Alternates monotonic scans, abandoning the leading filter after an unprofitable skip. */
+    /** Alternates monotonic scans, abandoning the leading filter after dense probes. */
     private static int findFilteredMultiOffsetCandidate(
         Utf8InputScanner scanner,
         FixedOffsetLiteral fixedOffsetLiteral,
@@ -559,10 +559,12 @@ sealed interface Utf8StartAccelerator {
       int minOffset = fixedOffsetLiteral.minOffset();
       int[] discreteOffsets = fixedOffsetLiteral.discreteOffsets();
       int nextLeading = -1;
+      int shortProbes = 0;
       while (literalFrom <= scanner.length()) {
         // A later hit cannot imply a start below this floor, even across widely spaced offsets.
         int leadingFrom = Math.max(searchFrom, literalFrom - fixedOffsetLiteral.maxOffset());
-        if (nextLeading < leadingFrom) {
+        boolean freshLeading = nextLeading < leadingFrom;
+        if (freshLeading) {
           nextLeading =
               leadingLiteral != null
                   ? leadingLiteral.findCandidate(scanner, leadingFrom)
@@ -572,9 +574,15 @@ sealed interface Utf8StartAccelerator {
           return -1;
         }
         int nextLiteralFrom = Math.max(literalFrom, nextLeading + minOffset);
-        if (nextLiteralFrom - literalFrom < AcceleratorPolicy.LITERAL.minProfitableSkip()) {
-          return findUnfilteredMultiOffsetCandidate(
-              scanner, fixedOffsetLiteral, charClassPrefix, nextLiteralFrom, searchFrom);
+        // A cached candidate still owns its window. Reusing it is not a leading scan.
+        if (freshLeading) {
+          if (nextLiteralFrom - literalFrom
+              >= AcceleratorPolicy.FIXED_OFFSET_LITERAL_MIN_LEADING_SKIP) {
+            shortProbes = 0;
+          } else if (++shortProbes == AcceleratorPolicy.FIXED_OFFSET_SHORT_PROBE_LIMIT) {
+            return findUnfilteredMultiOffsetCandidate(
+                scanner, fixedOffsetLiteral, charClassPrefix, nextLiteralFrom, searchFrom);
+          }
         }
         literalFrom = nextLiteralFrom;
         int hit =

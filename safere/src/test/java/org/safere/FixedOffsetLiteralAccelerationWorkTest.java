@@ -68,7 +68,30 @@ class FixedOffsetLiteralAccelerationWorkTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void denseLeadingCharactersDefeatTheAlternateScanAfterOneProbe(boolean utf8) {
+  void rejectedLeadingCandidateDoesNotDisableFiltering(boolean utf8) {
+    Pattern pattern = Pattern.compile("(?:requisition|req):(\\S*)");
+    String input = "note: open: ".repeat(3) + "request: " + "note: open: ".repeat(3_000);
+    InputScanner scanner =
+        utf8 ? new Utf8InputScanner(input.getBytes(UTF_8)) : new StringInputScanner(input);
+    long prefixWork =
+        WorkCounter.countForTesting(
+            () -> assertThat(scanner.indexOfAscii('q', 100, scanner.length())).isEqualTo(-1));
+    long work =
+        WorkCounter.countForTesting(() -> {
+          int candidate =
+              utf8
+                  ? Utf8StartAccelerator.findNextCandidate(
+                      pattern.utf8StartAccelerator(), (Utf8InputScanner) scanner, 0)
+                  : StringStartAccelerator.findNextCandidate(
+                      pattern.stringStartAccelerator(), input, 0, false);
+          assertThat(candidate).isEqualTo(-1);
+        });
+    assertThat(work).isLessThanOrEqualTo(prefixWork + 512);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void denseLeadingCharactersDefeatTheAlternateScanAfterBoundedProbes(boolean utf8) {
     Pattern pattern = Pattern.compile("(?:alpha|beta)=(\\w*)");
     String input = "a________=_______".repeat(2_000);
     long work =

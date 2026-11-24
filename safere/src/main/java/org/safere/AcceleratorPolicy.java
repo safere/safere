@@ -75,6 +75,12 @@ record AcceleratorPolicy(
   /** Rejected multi-offset literal hits before consulting a small ASCII leading class. */
   static final int FIXED_OFFSET_LITERAL_CHEAP_REJECTIONS = 4;
 
+  /** Consecutive fresh leading probes with short skips before abandoning the filter. */
+  static final int FIXED_OFFSET_SHORT_PROBE_LIMIT = 4;
+
+  /** Skip required to repay restarting the literal scan after a fresh leading probe. */
+  static final int FIXED_OFFSET_LITERAL_MIN_LEADING_SKIP = 32;
+
   /** Minimum remaining window over which an alternate multi-offset filter can repay setup. */
   static final int FIXED_OFFSET_LITERAL_MIN_REMAINING = 256;
 
