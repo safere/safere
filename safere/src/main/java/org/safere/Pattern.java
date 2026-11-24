@@ -10,7 +10,6 @@ package org.safere;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
 import java.lang.ref.SoftReference;
 import java.nio.charset.StandardCharsets;
@@ -59,14 +58,12 @@ public final class Pattern implements Serializable {
   // Avoid another DFA setup for tiny unproved candidates; longer ones benefit from its scan.
   private static final int MIN_DFA_END_VERIFICATION_UNITS = 64;
   private static final AtomicLong NEXT_PATTERN_ID = new AtomicLong(1);
-  private static final MethodType DIAGNOSTICS_TYPE =
-      MethodType.methodType(SafeReMatchDiagnostics.class);
-  private static final MutableCallSite DIAGNOSTICS_SITE = new MutableCallSite(DIAGNOSTICS_TYPE);
+  // Start with the actual target: a type-only site builds a throwing method-handle adapter
+  // during cold initialization, even though the target is replaced before it can be invoked.
+  private static final MutableCallSite DIAGNOSTICS_SITE =
+      new MutableCallSite(
+          MethodHandles.constant(SafeReMatchDiagnostics.class, SafeReMatchDiagnostics.NONE));
   private static final MethodHandle DIAGNOSTICS_INVOKER = DIAGNOSTICS_SITE.dynamicInvoker();
-
-  static {
-    setDiagnosticsTarget(SafeReMatchDiagnostics.NONE);
-  }
 
   /**
    * Enables Unix lines mode. In this mode, only {@code '\n'} is recognized as a line terminator.
@@ -559,6 +556,12 @@ public final class Pattern implements Serializable {
         compiled.hasGraphemeSemantics() && startsWithGraphemeClusterBoundary(metadataAst);
     boolean hasInternalGcb =
         compiled.hasGraphemeSemantics() && hasInternalExplicitGraphemeBoundary(re);
+    if (compiled.hasGraphemeSemantics()) {
+      // Ordinary search and capture recovery reach these tables for grapheme programs in both
+      // representations. Keep that initialization out of first execution, even when the other
+      // character classes are ASCII-only. Eliminated grapheme operands need no preparation.
+      GraphemeSupport.prepareTables();
+    }
     // The constructor eagerly prepares the applicable engine analysis and setup.
     return new Pattern(
         regex,
