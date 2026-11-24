@@ -198,29 +198,6 @@ class MatcherLinearTimeTest {
     assertThat(matcher.find()).isFalse();
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"a.*z|a", "\\G(?:a.*z|a)", "(?:\\X)*z|a"})
-  void replaceAllStaysLinearAfterPreferredBranchFails(String regex) {
-    Pattern pattern = Pattern.compile(regex);
-    assertLinearSequence(
-        "replaceAll " + regex,
-        size ->
-            assertThat(pattern.matcher("a".repeat(size)).replaceAll("x"))
-                .isEqualTo("x".repeat(size)));
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"a.*z|a", "\\G(?:a.*z|a)", "(?:\\X)*z|a"})
-  void splitStaysLinearAfterPreferredBranchFails(String regex) {
-    Pattern pattern = Pattern.compile(regex);
-    assertLinearSequence(
-        "split " + regex,
-        size ->
-            assertThat(pattern.split("a".repeat(size), -1))
-                .hasSize(size + 1)
-                .allMatch(String::isEmpty));
-  }
-
   @Test
   void repeatedSearchPreservesPriorityAndCapturesAcrossRegionsAndResets() {
     String shortMatches = "a".repeat(512);

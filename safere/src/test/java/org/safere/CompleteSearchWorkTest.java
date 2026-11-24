@@ -9,13 +9,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -69,11 +68,17 @@ class CompleteSearchWorkTest {
           EnginePathOptions.allEnabled());
     }
 
-    MatchStrategy strategyFor(Operation operation) {
+    MatchStrategy initialStrategyFor(Operation operation) {
       return switch (operation) {
         case UTF8_FIND, UTF8_REPLACE_ALL -> utf8Strategy;
         default -> strategy;
       };
+    }
+
+    boolean usesForwardDfa(Operation operation) {
+      // Bounded UTF-8 finds can use a rejection pass before an exact engine selects the match.
+      return initialStrategyFor(operation) == MatchStrategy.DFA
+          || (boundedRegion && operation == Operation.UTF8_FIND && engineOptions.dfa());
     }
 
     @Override
@@ -160,7 +165,6 @@ class CompleteSearchWorkTest {
     assertLinearWork(scenario, operation);
   }
 
-  @Disabled("Ruling out the preferred branch can rescan the remaining input at each match (#1237)")
   @ParameterizedTest(name = "{0} {1}")
   @MethodSource("repeatedScanOperations")
   void repeatedScanWorkScalesWithInputLength(Scenario scenario, Operation operation) {
@@ -177,7 +181,7 @@ class CompleteSearchWorkTest {
       assertThat(work).as("counted work at %d repetitions", repetitions).isPositive();
       if (previousWork == 0) {
         long forwardSteps = WorkCounter.countForwardDfaStepsForTesting(task);
-        if (scenario.strategyFor(operation) == MatchStrategy.DFA) {
+        if (scenario.usesForwardDfa(operation)) {
           assertThat(forwardSteps).as("forward DFA work").isPositive();
         } else {
           assertThat(forwardSteps).as("forward DFA work on exact fallback").isZero();
@@ -195,16 +199,19 @@ class CompleteSearchWorkTest {
     }
   }
 
-  private static Stream<Scenario> exactScenarios() {
+  private static Stream<Arguments> exactFinds() {
     return Stream.concat(SCENARIOS.stream(), REPEATED_SCAN_SCENARIOS.stream())
-        .filter(scenario -> scenario.strategy() != MatchStrategy.DFA);
+        .flatMap(scenario ->
+            Stream.of(Operation.STRING_FIND, Operation.UTF8_FIND)
+                .filter(operation -> scenario.initialStrategyFor(operation) != MatchStrategy.DFA)
+                .map(operation -> Arguments.of(scenario, operation)));
   }
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("exactScenarios")
-  void findSequencesUseTheExactFallback(Scenario scenario) {
+  @ParameterizedTest(name = "{0} {1}")
+  @MethodSource("exactFinds")
+  void findSequencesUseTheExactFallback(Scenario scenario, Operation operation) {
     Pattern pattern = Pattern.compile(scenario.regex(), 0, scenario.engineOptions());
-    EnumSet<MatchStrategy> strategies = EnumSet.noneOf(MatchStrategy.class);
+    List<MatchStrategy> strategies = new ArrayList<>();
     SafeReMatchDiagnostics previous = Pattern.diagnostics();
     try {
       Pattern.setDiagnostics(
@@ -216,13 +223,13 @@ class CompleteSearchWorkTest {
               }
             }
           });
-      for (Operation operation : List.of(Operation.STRING_FIND, Operation.UTF8_FIND)) {
-        strategies.clear();
-        task(pattern, scenario, operation, REPETITIONS[0]).run();
-        assertThat(strategies)
-            .as("successful matches for %s", operation)
-            .containsExactly(scenario.strategyFor(operation));
-      }
+      task(pattern, scenario, operation, REPETITIONS[0]).run();
+      MatchStrategy first = scenario.initialStrategyFor(operation);
+      // The matcher can hand off repeated tail scans from BitState to the NFA.
+      assertThat(strategies)
+          .as("successful matches for %s", operation)
+          .startsWith(first)
+          .allMatch(strategy -> strategy == first || strategy == MatchStrategy.NFA);
     } finally {
       Pattern.setDiagnostics(previous);
     }
