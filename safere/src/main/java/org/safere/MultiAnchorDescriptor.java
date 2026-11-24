@@ -159,9 +159,6 @@ final class MultiAnchorDescriptor {
     record FixedOffset(
         Pattern.FixedOffsetLiteral fol, CharClassScanInfo leadingClass, String leadingLiteral)
         implements StartPlan {
-      FixedOffset(Pattern.FixedOffsetLiteral fol, CharClassScanInfo leadingClass) {
-        this(fol, leadingClass, null);
-      }
 
       public FixedOffset {
         Objects.requireNonNull(fol, "fol");

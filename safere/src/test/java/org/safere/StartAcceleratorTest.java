@@ -320,7 +320,8 @@ class StartAcceleratorTest {
       return new MultiAnchorDescriptor.StartPlan.Literal(prefix, prefixFoldCase);
     }
     if (fixedOffsetLiteral != null) {
-      return new MultiAnchorDescriptor.StartPlan.FixedOffset(fixedOffsetLiteral, charClassPrefix);
+      return new MultiAnchorDescriptor.StartPlan.FixedOffset(
+          fixedOffsetLiteral, charClassPrefix, null);
     }
     if (charClassPrefix != null) {
       return new MultiAnchorDescriptor.StartPlan.CharClass(charClassPrefix);
