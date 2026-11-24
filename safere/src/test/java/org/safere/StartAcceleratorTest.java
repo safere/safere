@@ -636,6 +636,31 @@ class StartAcceleratorTest {
     assertThat(Utf8StartAccelerator.findNextCandidate(utf8Acc, utf8Scanner(text), 5)).isEqualTo(-1);
   }
 
+  @Test
+  void discreteOffsetFloorIsACodePointBoundary() {
+    MultiAnchorDescriptor.StartPlan plan = Pattern.compile("a{1,3}b").startPlan();
+    assertThat(plan).isInstanceOf(MultiAnchorDescriptor.StartPlan.FixedOffset.class);
+
+    // The b at the end admits the start at the a before it, and the floor for later occurrences is
+    // two units before that b, which is inside the character before the a. The candidate moves to
+    // the a: a start inside a character would give the engine the wrong word-boundary context.
+    StringStartAccelerator strAcc = StringStartAccelerator.create(plan, false);
+    assertThat(StringStartAccelerator.findNextCandidate(strAcc, "z\uD801\uDC00ab", 1, false))
+        .isEqualTo(3);
+
+    Utf8StartAccelerator utf8Acc = Utf8StartAccelerator.create(plan, false);
+    // é is two bytes, 中 three, and 𐐀 four.
+    assertThat(Utf8StartAccelerator.findNextCandidate(utf8Acc, utf8Scanner("z\u00e9ab"), 1))
+        .isEqualTo(3);
+    assertThat(Utf8StartAccelerator.findNextCandidate(utf8Acc, utf8Scanner("z\u4e2dab"), 1))
+        .isEqualTo(4);
+    assertThat(Utf8StartAccelerator.findNextCandidate(utf8Acc, utf8Scanner("z\uD801\uDC00ab"), 1))
+        .isEqualTo(5);
+    // An ASCII floor is unchanged.
+    assertThat(Utf8StartAccelerator.findNextCandidate(utf8Acc, utf8Scanner("zxyab"), 1))
+        .isEqualTo(2);
+  }
+
   private static Utf8InputScanner utf8Scanner(String text) {
     byte[] bytes = text.getBytes(UTF_8);
     return new Utf8InputScanner(bytes, 0, bytes.length);

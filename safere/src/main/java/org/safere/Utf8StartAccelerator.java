@@ -511,6 +511,9 @@ sealed interface Utf8StartAccelerator {
      * index 10 starts the match at 0.
      *
      * <p>Discrete offsets are only recorded for all-ASCII prefixes, so they are byte counts here.
+     * The clamp can then land inside a multi-byte character before the occurrence, so it moves to
+     * the next code point boundary: matches only start at boundaries, and callers derive the
+     * word-boundary context of the candidate from the code points around it.
      */
     private static int resolveMultiOffsetStart(
         InputScanner scanner,
@@ -524,8 +527,11 @@ sealed interface Utf8StartAccelerator {
         if (start >= searchFrom
             && start < scanner.length()
             && charClassPrefix.contains(scanner.codePointAt(start))) {
-          return Math.max(
-              searchFrom, Math.min(start, literalStart + 1 - fixedOffsetLiteral.maxOffset()));
+          int floor = literalStart + 1 - fixedOffsetLiteral.maxOffset();
+          while (floor > 0 && floor < start && !scanner.isCodePointBoundary(floor)) {
+            floor++;
+          }
+          return Math.max(searchFrom, Math.min(start, floor));
         }
       }
       return -1;
