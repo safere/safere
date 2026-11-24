@@ -2162,8 +2162,8 @@ final class Dfa {
     // a different text) would produce a different result. See the class-level comment on
     // DFA caching invariants.
     int posDepThreshold = positionDependentThreshold(text);
-    // A self-loop proven in the cached prefix may accept at the final terminator or at EOF.
-    // Stop before the transition into that position so the ordered closure can evaluate MATCH.
+    // The cache threshold is at or before every eligible end, including in UNIX_LINES mode.
+    // Stop before a transition into that range so the uncached ordered closure can evaluate MATCH.
     int startSkipLimit =
         matchEndAssertion != 0 ? text.retreatByCodePoints(posDepThreshold, 1) : posDepThreshold - 1;
     int stateSkipLimit = matchEndAssertion != 0 ? startSkipLimit : textLen;
@@ -2904,9 +2904,10 @@ final class Dfa {
             }
           }
         }
-        if (canSkipRemainingPrefix(s, text, startLimit, longest)) {
-          return completeSearch(
-              new SearchResult(true, startLimit, ambiguous), Math.max(prevPos, startLimit));
+        // A character before the search floor can supply assertion context, but a frontier
+        // that consumed it cannot prove a match at the floor.
+        if (prevPos >= startLimit && canSkipRemainingPrefix(s, text, startLimit, longest)) {
+          return completeSearch(new SearchResult(true, startLimit, ambiguous), prevPos);
         }
       }
 

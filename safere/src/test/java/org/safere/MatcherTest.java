@@ -27,6 +27,25 @@ import org.junit.jupiter.params.provider.ValueSource;
 class MatcherTest {
   private static final Duration PERFORMANCE_SCENARIO_TIMEOUT = Duration.ofSeconds(30);
 
+  @ParameterizedTest
+  @ValueSource(strings = {" ", "\r\n"})
+  void endAnchoredFindDoesNotConsumeBeforeExplicitStart(String suffix) {
+    String prefix = "é".repeat(1_100) + "c";
+    String input = prefix + suffix;
+    String regex = "(?s).*c\\s*\\z";
+    Pattern pattern = Pattern.compile(regex);
+    assertThat(pattern.matcher(input).find(prefix.length())).isFalse();
+  }
+
+  @Test
+  void utf8EndAnchoredFindDoesNotRepeatAtEndOfInput() {
+    Utf8Input input = Utf8Input.validated("é".repeat(1_100).getBytes(UTF_8));
+    Utf8Matcher matcher = Pattern.compile("(?s).+\\z").matcher(input);
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.end()).isEqualTo(input.length());
+    assertThat(matcher.find()).isFalse();
+  }
+
   @Test
   void capturesInImpossibleAlternativesRemainUnmatched() {
     for (String alternatives : List.of("(a)|(b)", "(a)|(b)|(c)|(d)|(e)", "((a)|(b))", "(é)|(😀)")) {

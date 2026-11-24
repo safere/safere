@@ -60,9 +60,17 @@ class SplitSearchPathTest {
             " foo",
             "foo\n",
             "");
-    return regexes.stream()
-        .flatMap(regex ->
-            Stream.of(0, Pattern.CASE_INSENSITIVE)
-                .flatMap(flags -> inputs.stream().map(input -> Arguments.of(regex, flags, input))));
+    Stream<Arguments> generalCases =
+        regexes.stream()
+            .flatMap(regex ->
+                Stream.of(0, Pattern.CASE_INSENSITIVE)
+                    .flatMap(
+                        flags -> inputs.stream().map(input -> Arguments.of(regex, flags, input))));
+    Stream<Arguments> terminalContinuation =
+        Stream.of(".+\\z", ".+$", ".+?\\z", ".*dog$", "(?:dog|.*dog)(\\s*)\\Z", ".*\\z", ".+|\\z")
+            .flatMap(regex ->
+                Stream.of(FILLER, FILLER + " dog", FILLER + " dog\r\n", "dog")
+                    .map(input -> Arguments.of(regex, Pattern.DOTALL, input)));
+    return Stream.concat(generalCases, terminalContinuation);
   }
 }

@@ -1,0 +1,779 @@
+{
+  "schemaVersion": 2,
+  "configuration": {
+    "collection": {
+      "allocationWorkloadPrefixes": []
+    }
+  },
+  "inputs": [
+    {
+      "id": "issue1214.lazyFindCrlf.96",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "key=value\r\n",
+        "length": 96
+      }
+    },
+    {
+      "id": "issue1214.lazyFindCrlf.65536",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "key=value\r\n",
+        "length": 65536
+      }
+    },
+    {
+      "id": "Issue1214WordTail.lineAssertionFallback.65536",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "\nkey=value\r\n",
+        "length": 65536
+      }
+    },
+    {
+      "id": "Issue1214LineTail.unicodeLineStart.32768",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "é😀 worker ",
+        "suffix": " key=valueé ",
+        "length": 32768
+      }
+    },
+    {
+      "id": "Issue1214LineTail.internalTextEnd.65536",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "\nkey=value\r\n",
+        "length": 65536
+      }
+    },
+    {
+      "id": "followup.ascii.crlf",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "word worker ",
+        "suffix": " key=valueé\r\n",
+        "length": 32768
+      }
+    },
+    {
+      "id": "followup.ascii.unicode",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "word worker ",
+        "suffix": " key=valueé ",
+        "length": 32768
+      }
+    },
+    {
+      "id": "followup.multibyte.crlf",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "é😀 worker ",
+        "suffix": " key=valueé\r\n",
+        "length": 32768
+      }
+    },
+    {
+      "id": "followup.multibyte.unicode",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "é😀 worker ",
+        "suffix": " key=valueé ",
+        "length": 32768
+      }
+    },
+    {
+      "id": "followup.reject.65536",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "\n worker power key=old",
+        "suffix": "\n key=value\r\n",
+        "length": 65536
+      }
+    },
+    {
+      "id": "followup.reject.1048576",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "\n worker power key=old",
+        "suffix": "\n key=value\r\n",
+        "length": 1048576
+      }
+    },
+    {
+      "id": "followup.suffix.63",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n",
+        "length": 1048576
+      }
+    },
+    {
+      "id": "followup.suffix.65",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n",
+        "length": 1048576
+      }
+    },
+    {
+      "id": "followup.suffix.65z",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "length": 1048576
+      }
+    },
+    {
+      "id": "followup.region",
+      "recipe": {
+        "kind": "suffixToLength",
+        "prefixUnit": "worker pool ",
+        "suffix": "\nkey=value\r\nIGNORE",
+        "length": 65542
+      }
+    }
+  ],
+  "workloads": [
+    {
+      "id": "Issue1214LineTail.internalTextEnd.65536",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?(?:\\z|(?m:$))\\Z"
+      ],
+      "inputs": [
+        "Issue1214LineTail.internalTextEnd.65536"
+      ],
+      "resultConsumption": "boolean",
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "Issue1214WordTail.lineAssertionFallback.65536",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "Issue1214WordTail.lineAssertionFallback.65536"
+      ],
+      "resultConsumption": "boolean",
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "Issue1214Ordered.internalTextEndFind.65536",
+      "operation": "find",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?(?:\\z|(?m:$))\\Z"
+      ],
+      "inputs": [
+        "Issue1214LineTail.internalTextEnd.65536"
+      ],
+      "resultConsumption": "boolean",
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "Issue1214Benchmark.lazyFindCrlf.65536",
+      "operation": "find",
+      "patterns": [
+        "(?s).*key=.+?$"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.65536"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": []
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214Ordered.split.65536",
+      "operation": "splitLengthSum",
+      "patterns": [
+        "(?s).*key=.+?$"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.65536"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "limit": -1
+      }
+    },
+    {
+      "id": "Issue1214Followup.region",
+      "operation": "matcherRegionFind",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.region"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": [
+          {
+            "kind": "region",
+            "start": 1024,
+            "end": 65536
+          }
+        ]
+      }
+    },
+    {
+      "id": "Issue1214Followup.reject.1048576",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.reject.1048576"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214Followup.multibyte.crlf",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.multibyte.crlf"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214LineTail.unicodeLineStart.32768",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "Issue1214LineTail.unicodeLineStart.32768"
+      ],
+      "resultConsumption": "boolean",
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "Issue1214Followup.ascii.crlf",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.ascii.crlf"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214Followup.ascii.unicode",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.ascii.unicode"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214Followup.multibyte.unicode",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.multibyte.unicode"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214Followup.multibyte.exactEnd",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\z"
+      ],
+      "inputs": [
+        "followup.multibyte.unicode"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214Followup.reject.65536",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.reject.65536"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214Followup.suffix.63",
+      "operation": "find",
+      "patterns": [
+        "key=[a-z]+$"
+      ],
+      "inputs": [
+        "followup.suffix.63"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214Followup.suffix.65",
+      "operation": "find",
+      "patterns": [
+        "key=[a-z]+$"
+      ],
+      "inputs": [
+        "followup.suffix.65"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214Followup.suffix.65z",
+      "operation": "find",
+      "patterns": [
+        "key=[a-z]+\\z"
+      ],
+      "inputs": [
+        "followup.suffix.65z"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214WarmSearch.stateSkip96B",
+      "operation": "lookingAt",
+      "patterns": [
+        "[^x]*?\\Z"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.96"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": []
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.stateSkip64KiB",
+      "operation": "lookingAt",
+      "patterns": [
+        "[^x]*?\\Z"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.65536"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": []
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.stateSkip96B",
+      "operation": "lookingAt",
+      "patterns": [
+        "[^x]*?\\Z"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.96"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": []
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.internalEnd64KiB",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?s).*(?m:^)\\bkey=.+?(?:\\z|(?m:$))\\Z"
+      ],
+      "inputs": [
+        "Issue1214LineTail.internalTextEnd.65536"
+      ],
+      "resultConsumption": "boolean",
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.lazyFind64KiB",
+      "operation": "find",
+      "patterns": [
+        "(?s).*key=.+?$"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.65536"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": []
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.unicodeCRLF",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\Z"
+      ],
+      "inputs": [
+        "followup.multibyte.crlf"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.unicodeExactEnd",
+      "operation": "lookingAt",
+      "patterns": [
+        "(?Us).*(?m:^)\\bkey=.+?\\z"
+      ],
+      "inputs": [
+        "followup.multibyte.unicode"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation"
+      }
+    },
+    {
+      "id": "Issue1214FirstSearch.stateSkip96BExactEnd",
+      "operation": "lookingAt",
+      "patterns": [
+        "[^x]*?\\z"
+      ],
+      "inputs": [
+        "issue1214.lazyFindCrlf.96"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      },
+      "lifecycle": {
+        "matcher": "newPerInvocation",
+        "steps": []
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      }
+    }
+  ]
+}
