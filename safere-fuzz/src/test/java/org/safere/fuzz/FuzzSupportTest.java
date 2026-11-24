@@ -37,4 +37,22 @@ final class FuzzSupportTest {
     assertThatThrownBy(() -> Pattern.compile(regex)).isInstanceOf(PatternSyntaxException.class);
     assertThat(FuzzSupport.compileCompatibleOrSkip(regex, 0)).isNull();
   }
+
+  @Test
+  void appendReplacementReportsMismatchedRejections() {
+    String input = "ax";
+    String regex = "(?<other>x)";
+    var safeRe = org.safere.Pattern.compile(regex).matcher(input);
+    // Give the JDK matcher the named group so it reaches the out-of-range reference.
+    var jdk = Pattern.compile("(?<part>x)").matcher(input);
+    assertThat(safeRe.find()).isTrue();
+    assertThat(jdk.find()).isTrue();
+    var pair = new FuzzSupport.MatcherPair(regex, 0, input, safeRe, jdk);
+
+    assertThatThrownBy(() -> pair.appendReplacement(new StringBuffer(), "lit${part}$9"))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("appendReplacement exception category")
+        .hasMessageContaining("IllegalArgumentException")
+        .hasMessageContaining("IndexOutOfBoundsException");
+  }
 }
