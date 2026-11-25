@@ -26,12 +26,36 @@ this_dir="$(cd "$(dirname "$0")" && pwd)"
 export JAVA_HOME="$this_dir/openjdk"
 printf -v classpath '%s:' "$this_dir"/*.jar
 export LD_LIBRARY_PATH="$this_dir/openjdk/lib/server:$this_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# Give libFuzzer time to exit before the ClusterFuzz session timer sends SIGTERM.
+# Temporary workaround for https://github.com/google/clusterfuzz/issues/5599.
+shutdown_buffer=60
+args=("$@")
+minimize_crash=0
+for arg in "$@"; do
+  if [[ $arg == -minimize_crash=* ]]; then
+    minimize_crash=${arg#*=}
+  fi
+done
+# Crash minimization uses its time limit for each attempt.
+if [[ ! $minimize_crash =~ ^-?0*[1-9] ]]; then
+  for index in "${!args[@]}"; do
+    if [[ ${args[index]} =~ ^-max_total_time=0*([1-9][0-9]{0,9})$ ]]; then
+      seconds=${BASH_REMATCH[1]}
+      # libFuzzer stores this flag in a signed int.
+      if (( seconds > shutdown_buffer && seconds <= 2147483647 )); then
+        args[index]="-max_total_time=$((seconds - shutdown_buffer))"
+      fi
+    fi
+  done
+fi
+
 exec "$this_dir/jazzer_driver" \\
   --agent_path="$this_dir/jazzer_agent_deploy.jar" \\
   --cp="$classpath" \\
   --disabled_hooks=com.code_intelligence.jazzer.sanitizers.RegexInjection \\
   --jvm_args="-Xmx1900m:-Xss1024k:-Djdk.attach.allowAttachSelf=true:--enable-native-access=ALL-UNNAMED" \\
-  --target_class=''' + shlex.quote(entry['class']) + ' "$@"\n')
+  --target_class=''' + shlex.quote(entry['class']) + ' "${args[@]}"\n')
         launcher.chmod(0o755)
         launchers.append(name)
         if entry['seeds']:
