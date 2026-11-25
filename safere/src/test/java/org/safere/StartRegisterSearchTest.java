@@ -200,6 +200,38 @@ class StartRegisterSearchTest {
   }
 
   @Test
+  void longNearMissWithoutRegistersFallsBackEarly() {
+    // Over a run of a's about a dozen attempts at aaaaaaaaaaaaz stay live, so the oldest one has no
+    // register and every step moves the registers. The search gives up soon after
+    // HANDOFF_DISTANCE instead of walking the whole run in the slow branch.
+    String regex = "aaaaaaaaaaaaz|banana|cherry";
+    String input = "a".repeat(1 << 16) + "aaaaaaaaaaaaz";
+    StartRegisterSearch search =
+        StartRegisterSearch.create(Pattern.compile(regex).flatDfaProg(), null, null);
+    assertThat(search.searchForTesting(new StringInputScanner(input), 0))
+        .isEqualTo(StartRegisterSearch.FALLBACK);
+
+    Matcher matcher = Pattern.compile(regex).matcher(input);
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.start()).isEqualTo(input.length() - "aaaaaaaaaaaaz".length());
+    assertThat(matcher.end()).isEqualTo(input.length());
+    assertThat(matcher.find()).isFalse();
+  }
+
+  @Test
+  void shortNearMissStillAnswers() {
+    // Below HANDOFF_DISTANCE the search keeps going, and a later match from a registered attempt
+    // is still answered.
+    String regex = "aaaaaaaaaaaaz|banana|cherry";
+    String input = "a".repeat(512) + " banana";
+    StartRegisterSearch search =
+        StartRegisterSearch.create(Pattern.compile(regex).flatDfaProg(), null, null);
+    long result = search.searchForTesting(new StringInputScanner(input), 0);
+    assertThat(result)
+        .isEqualTo(((long) input.indexOf("banana") << 32) | (input.indexOf("banana") + 6));
+  }
+
+  @Test
   void matchOfAnAttemptWithoutRegisterFallsBack() {
     // The match "cdefg" belongs to the third live attempt.
     StartRegisterSearch search = search("\\w{2,5}\\b");
@@ -366,10 +398,12 @@ class StartRegisterSearchTest {
 
   @Test
   void stateBudgetResetsTheCacheAndEventuallyStops() {
-    // Unanchored [ab]*a[ab]{13} needs a state per window of the last 14 characters.
+    // [ab]*a[ab]{13} after the x needs a state per window of the last 14 characters. Only the
+    // attempt at the x stays live, so the registers keep its start and the search runs until the
+    // state budget does.
     StartRegisterSearch search =
-        StartRegisterSearch.create(Pattern.compile("a[ab]{13}c").flatDfaProg(), null, null);
-    StringBuilder input = new StringBuilder();
+        StartRegisterSearch.create(Pattern.compile("x[ab]*a[ab]{13}c").flatDfaProg(), null, null);
+    StringBuilder input = new StringBuilder("x");
     Random random = new Random(1);
     for (int i = 0; i < 200_000; i++) {
       input.append(random.nextBoolean() ? 'a' : 'b');
@@ -399,8 +433,8 @@ class StartRegisterSearchTest {
   @Test
   void answeredSearchesForgiveResets() {
     StartRegisterSearch search =
-        StartRegisterSearch.create(Pattern.compile("a[ab]{13}c").flatDfaProg(), null, null);
-    StringBuilder input = new StringBuilder();
+        StartRegisterSearch.create(Pattern.compile("x[ab]*a[ab]{13}c").flatDfaProg(), null, null);
+    StringBuilder input = new StringBuilder("x");
     Random random = new Random(1);
     for (int i = 0; i < 200_000; i++) {
       input.append(random.nextBoolean() ? 'a' : 'b');

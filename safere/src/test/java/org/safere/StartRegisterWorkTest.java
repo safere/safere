@@ -81,6 +81,23 @@ class StartRegisterWorkTest {
   }
 
   @Test
+  void longNearMissWithoutRegistersStopsSoonAfterTheHandoffDistance() {
+    // About a dozen overlapping attempts at aaaaaaaaaaaaz stay live over the run of a's, so the
+    // oldest has no register and the search can't vouch for its match. It falls back soon after
+    // HANDOFF_DISTANCE instead of scanning the whole run.
+    Pattern pattern = Pattern.compile("aaaaaaaaaaaaz|banana|cherry");
+    StartRegisterSearch search = StartRegisterSearch.create(pattern.flatDfaProg(), null, null);
+    InputScanner scanner = new StringInputScanner("a".repeat(1 << 16));
+
+    long steps =
+        WorkCounter.countForwardDfaStepsForTesting(() ->
+            assertThat(search.searchForTesting(scanner, 0))
+                .isEqualTo(StartRegisterSearch.FALLBACK));
+
+    assertThat(steps).isLessThanOrEqualTo(2L * StartRegisterSearch.HANDOFF_DISTANCE);
+  }
+
+  @Test
   void coldRankLookupsGrowWithTheNumberOfLiveThreads() {
     long smaller = rankLookups(64);
     long larger = rankLookups(128);
