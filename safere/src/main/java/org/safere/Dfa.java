@@ -98,12 +98,15 @@ final class Dfa {
   /** Maximum number of DFA states before bailing out to NFA. */
   private static final int DEFAULT_MAX_STATES = 10_000;
 
-  /** Budget for retained cache data. Array copies can briefly keep the old arrays live. */
+  /**
+   * Estimated retained data budget for each DFA cache. A Pattern can retain several caches per
+   * thread, and a resize can briefly keep both copies of an array live.
+   */
   private static final long CACHE_BYTE_BUDGET = 16L * 1024 * 1024;
 
   private static final int INITIAL_TRANSITION_CELLS = 1024;
-  // Budget uncompressed references. Object and array headers are VM-dependent, so allow an
-  // estimated fixed amount per state for them, the map entry and the optional state accelerator.
+  // Charge uncompressed references so the estimate stays conservative when the JVM compresses
+  // them. The fixed per-state estimate covers VM-dependent headers, a map entry and acceleration.
   private static final int REFERENCE_BYTES = Long.BYTES;
   private static final int STATE_OVERHEAD_BYTES = 256;
 

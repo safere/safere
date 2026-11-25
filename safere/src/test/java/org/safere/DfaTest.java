@@ -665,6 +665,21 @@ class DfaTest {
     }
 
     @Test
+    void byteBudgetCanRejectTheFirstLiveState() {
+      Prog prog = Compiler.compile(Parser.parse("a", FLAGS));
+      // Use a synthetic alphabet to reach the byte budget without compiling a huge pattern.
+      int[] boundaries = new int[750_000];
+      Arrays.setAll(boundaries, index -> index + 1);
+      int[] asciiClasses = new int[128];
+      Arrays.setAll(asciiClasses, index -> index);
+      Dfa.Setup setup = new Dfa.Setup(boundaries, boundaries.length + 2, asciiClasses, false);
+      Dfa dfa = new Dfa(prog, 10_000, setup, false);
+
+      assertThat(dfa.doSearch("a", 0, true, false)).isNull();
+      assertThat(dfa.lastSearchBailed()).isTrue();
+    }
+
+    @Test
     void wideAlphabetBudgetFallbackPreservesFullMatches() {
       String regex = wideAlternation(512, 4096);
       Pattern exact = Pattern.compile(regex, 0, EnginePathOptions.builder().dfa(false).build());
