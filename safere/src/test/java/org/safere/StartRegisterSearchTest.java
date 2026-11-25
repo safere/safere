@@ -327,7 +327,8 @@ class StartRegisterSearchTest {
 
   @Test
   void registerEventsCanExhaustTheBudgetWithoutAddingStates() {
-    String primer = "z" + "a".repeat(1012);
+    // Prime enough states to leave only a small event budget with either reference width.
+    String primer = "z" + "a".repeat(1013);
     Prog prog = Pattern.compile(primer + "|q(?s:.)|r" + wideClass(1950)).flatDfaProg();
     StartRegisterSearch search = StartRegisterSearch.create(prog, null, null);
     assertThat(search.find(new StringInputScanner(primer), 0, AdaptiveBackoff.NEUTRAL))

@@ -89,9 +89,6 @@ final class StartRegisterSearch {
 
   private static final int INITIAL_EVENT_CAPACITY = 64;
   private static final int EVENT_BYTES = 4 * Integer.BYTES;
-  // One int, four flags, two references and an allowance for hash table buckets per row.
-  private static final int ROW_METADATA_BYTES =
-      Integer.BYTES + 4 * Byte.BYTES + 5 * REFERENCE_BYTES;
   // Start-state references, array headers and the initial hash table allocation.
   private static final int FIXED_CACHE_BYTES = 1024;
 
@@ -229,7 +226,8 @@ final class StartRegisterSearch {
       this.eotColumn = 128;
     }
     this.row = eotColumn + 1;
-    this.cacheRowBytes = row * (long) Integer.BYTES + ROW_METADATA_BYTES;
+    // Per-row metadata includes one int, four flags, two references, and hash table buckets.
+    this.cacheRowBytes = (row + 1L) * Integer.BYTES + 4L * Byte.BYTES + 5L * REFERENCE_BYTES;
     // Four rows fit easily even at the maximum width allowed above. Program-sized search
     // scratch and the non-ASCII boundaries are independent of the cache.
     this.transitions = new int[row * INITIAL_STATE_CAPACITY];

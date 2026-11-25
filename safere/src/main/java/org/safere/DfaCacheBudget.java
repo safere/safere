@@ -5,6 +5,9 @@
 
 package org.safere;
 
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.lang.management.ManagementFactory;
+
 /** Conservative retained-memory estimates shared by the deterministic search caches. */
 final class DfaCacheBudget {
   /**
@@ -13,10 +16,30 @@ final class DfaCacheBudget {
    */
   static final long CACHE_BYTE_BUDGET = 16L * 1024 * 1024;
 
-  // Charge uncompressed references so the estimate stays conservative when the JVM compresses
-  // them. The fixed per-state estimate covers VM-dependent headers, a map entry and acceleration.
-  static final int REFERENCE_BYTES = Long.BYTES;
+  // Read the effective VM setting once, when the first cache needs its row size.
+  static final int REFERENCE_BYTES = referenceBytes();
+  // Allow for VM-dependent headers, a map entry, and the optional state accelerator.
   static final int STATE_OVERHEAD_BYTES = 256;
 
   private DfaCacheBudget() {}
+
+  private static int referenceBytes() {
+    Module management = ModuleLayer.boot().findModule("jdk.management").orElse(null);
+    if (management == null || !DfaCacheBudget.class.getModule().canRead(management)) {
+      return Long.BYTES;
+    }
+    return hotSpotReferenceBytes();
+  }
+
+  private static int hotSpotReferenceBytes() {
+    try {
+      var bean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
+      if (bean != null && Boolean.parseBoolean(bean.getVMOption("UseCompressedOops").getValue())) {
+        return Integer.BYTES;
+      }
+    } catch (IllegalArgumentException | SecurityException ignored) {
+      // The optional VM setting is unavailable. Keep the conservative estimate.
+    }
+    return Long.BYTES;
+  }
 }
