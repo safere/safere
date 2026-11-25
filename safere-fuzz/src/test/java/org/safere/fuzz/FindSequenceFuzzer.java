@@ -730,13 +730,17 @@ public final class FindSequenceFuzzer {
     String atom = data.pickValue(List.of("a", "ab", "é", "😀"));
     String regex = "(" + atom + ")";
     int advances = data.consumeInt(1, 8);
-    String input = atom.repeat(advances + 2);
+    boolean useIterator = data.consumeBoolean();
+    boolean exhausted = data.consumeBoolean();
+    String input = atom.repeat(exhausted ? advances : advances + 2);
     var matcher = org.safere.Pattern.compile(regex).matcher(input);
     var results = matcher.results();
     Runnable advance;
-    if (data.consumeBoolean()) {
+    Runnable checkExhausted;
+    if (useIterator) {
       var iterator = results.iterator();
       advance = () -> assertThat(iterator.next().group(1)).isEqualTo(atom);
+      checkExhausted = () -> assertThat(iterator.hasNext()).isFalse();
     } else {
       var spliterator = results.spliterator();
       advance =
@@ -744,19 +748,27 @@ public final class FindSequenceFuzzer {
               assertThat(
                       spliterator.tryAdvance(result -> assertThat(result.group(1)).isEqualTo(atom)))
                   .isTrue();
+      checkExhausted = () -> assertThat(spliterator.tryAdvance(result -> {})).isFalse();
     }
 
     for (int i = 0; i < advances; i++) {
       advance.run();
     }
+    if (exhausted) {
+      checkExhausted.run();
+    }
     switch (data.consumeInt(0, 3)) {
-      case 0 -> assertThat(matcher.find()).isTrue();
+      case 0 -> assertThat(matcher.find()).isEqualTo(!exhausted);
       case 1 -> matcher.reset();
       case 2 -> matcher.region(atom.length(), input.length());
       case 3 -> matcher.usePattern(org.safere.Pattern.compile(regex));
       default -> throw new AssertionError();
     }
-    assertThatThrownBy(advance::run).isInstanceOf(ConcurrentModificationException.class);
+    if (exhausted) {
+      checkExhausted.run();
+    } else {
+      assertThatThrownBy(advance::run).isInstanceOf(ConcurrentModificationException.class);
+    }
   }
 
   private record SearchStartContext(

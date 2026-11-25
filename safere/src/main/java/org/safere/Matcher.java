@@ -1760,10 +1760,15 @@ public final class Matcher implements MatchResult {
         new Spliterators.AbstractSpliterator<>(
             Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL) {
           private boolean started;
+          private boolean exhausted;
           private int expectedModCount;
 
           @Override
           public boolean tryAdvance(Consumer<? super MatchResult> action) {
+            Objects.requireNonNull(action);
+            if (exhausted) {
+              return false;
+            }
             if (started) {
               checkConcurrentModification(expectedModCount);
             }
@@ -1772,6 +1777,7 @@ public final class Matcher implements MatchResult {
             expectedModCount = modCountAfterFind;
             started = true;
             if (!found) {
+              exhausted = true;
               return false;
             }
             action.accept(toMatchResult());

@@ -78,6 +78,27 @@ class MatcherResultsStreamTest {
   }
 
   @Test
+  void resultsSpliteratorStaysExhaustedAfterMatcherChanges() {
+    for (String input : List.of("a ba", "bbb")) {
+      var matcher = Pattern.compile("a+").matcher(input);
+      var results = matcher.results().spliterator();
+      var matches = new ArrayList<String>();
+
+      results.forEachRemaining(result -> matches.add(result.group()));
+      int count = matches.size();
+
+      matcher.reset("aaa");
+      assertThat(results.tryAdvance(result -> matches.add(result.group()))).isFalse();
+      matcher.region(1, 3);
+      results.forEachRemaining(result -> matches.add(result.group()));
+
+      assertThat(matches).hasSize(count);
+      assertThat(matcher.find()).isTrue();
+      assertThat(matcher.start()).isEqualTo(1);
+    }
+  }
+
+  @Test
   void resultsIteratorStartsAfterFindBeforeFirstAdvance() {
     var matcher = Pattern.compile("a").matcher("aaa");
     var results = matcher.results().iterator();
