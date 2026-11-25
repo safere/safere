@@ -1786,8 +1786,8 @@ public final class Matcher implements MatchResult {
   private static final int DFA_MIN_TAIL_LOOKAHEAD = 192;
   private static final int DFA_LOOKAHEAD_PER_ADVANCE = 64;
   private static final int DFA_TAIL_OVERLAPS = 8;
-  // Native self-loop scans process input much more cheaply than the scalar NFA.
-  private static final int DFA_NATIVE_OVERLAP_DISCOUNT = 32;
+  // Charge scalar DFA overlaps more heavily than native self-loop scans.
+  private static final int DFA_SCALAR_OVERLAP_WEIGHT = 32;
   private int findScanStart;
   private int findScanEnd;
   private int findBitStateEndBound;
@@ -1857,9 +1857,9 @@ public final class Matcher implements MatchResult {
         findTailOverlaps = 0;
         findTailEnd = 0;
       }
-      findTailOverlaps += dfaEligible && !findMostlyAccelerated ? DFA_NATIVE_OVERLAP_DISCOUNT : 1;
+      findTailOverlaps += dfaEligible && !findMostlyAccelerated ? DFA_SCALAR_OVERLAP_WEIGHT : 1;
       findTailEnd = Math.max(findTailEnd, scanEnd);
-      int overlapLimit = dfaEligible ? DFA_TAIL_OVERLAPS * DFA_NATIVE_OVERLAP_DISCOUNT : 2;
+      int overlapLimit = dfaEligible ? DFA_TAIL_OVERLAPS * DFA_SCALAR_OVERLAP_WEIGHT : 2;
       if (findTailOverlaps >= overlapLimit) {
         findTailMemo = new FindTailMemo(parentPattern.nfaProg(prog), regionEnd - regionStart);
       }
@@ -1868,7 +1868,8 @@ public final class Matcher implements MatchResult {
     findTailEnd = Math.max(findTailEnd, scanEnd);
   }
 
-  private boolean hasFindTailMemo(InputScanner scanner, int start) {
+  /** Keeps the memo only while the next candidate is inside the failed tail. */
+  private boolean keepFindTailMemoFor(InputScanner scanner, int start) {
     if (findTailMemo == null) {
       return false;
     }
@@ -2113,7 +2114,7 @@ public final class Matcher implements MatchResult {
         effectiveStart = regionStart + candidate;
       }
     }
-    if (hasFindTailMemo(scanner, effectiveStart)) {
+    if (keepFindTailMemoFor(scanner, effectiveStart)) {
       return applyFullMatchResult(
           findWithTailMemo(scanner, effectiveStart, regionEnd, prog.numCaptures()));
     }
@@ -2287,7 +2288,7 @@ public final class Matcher implements MatchResult {
       }
     }
 
-    if (hasFindTailMemo(scanner, effectiveStart)) {
+    if (keepFindTailMemoFor(scanner, effectiveStart)) {
       return applyFullMatchResult(
           findWithTailMemo(scanner, effectiveStart, scanner.length(), prog.numCaptures()));
     }
@@ -2581,7 +2582,7 @@ public final class Matcher implements MatchResult {
     }
     if (accelerator instanceof Utf8StartAccelerator.LeadingExpansion le
         && le.canVerifyAtInner()
-        && !hasFindTailMemo(scanner, fromIndex)
+        && !keepFindTailMemoFor(scanner, fromIndex)
         && canUseForwardDfa()) {
       // UTF-8 inner candidates are already code point boundaries.
       int innerMatch = le.findInnerCandidate(scanner, fromIndex);
@@ -2626,7 +2627,7 @@ public final class Matcher implements MatchResult {
     }
     if (accelerator instanceof StringStartAccelerator.LeadingExpansion le
         && le.canVerifyAtInner()
-        && !hasFindTailMemo(scanner, fromIndex)
+        && !keepFindTailMemoFor(scanner, fromIndex)
         && canUseForwardDfa()) {
       int innerMatch = le.findInnerCandidate(startText, fromIndex, prog.lineStartUnixLines());
       // Literal scans use UTF-16 indices, but newly discovered scalar starts must be code point
@@ -4055,7 +4056,7 @@ public final class Matcher implements MatchResult {
         pos = idx;
       }
 
-      if (hasFindTailMemo(scanner, pos)) {
+      if (keepFindTailMemoFor(scanner, pos)) {
         int[] result = findWithTailMemo(scanner, pos, textLen, 1);
         if (result == null) {
           return 0;
@@ -5770,7 +5771,7 @@ public final class Matcher implements MatchResult {
       }
     }
 
-    if (hasFindTailMemo(scanner, effectiveStart)) {
+    if (keepFindTailMemoFor(scanner, effectiveStart)) {
       int[] result = findWithTailMemo(scanner, effectiveStart, scanner.length(), 1);
       return result == null ? -1L : packPositions(result[0], result[1]);
     }

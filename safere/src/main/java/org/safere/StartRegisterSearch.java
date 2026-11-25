@@ -576,7 +576,7 @@ final class StartRegisterSearch {
     // The start state's word context comes from the code points around the candidate, so it must
     // not split one. Accelerator candidates are boundaries; this keeps the search safe if not.
     if (!text.isCodePointBoundary(candidate)) {
-      return FALLBACK;
+      return stop(FALLBACK, candidate);
     }
     St s = startState(text, candidate);
     if (s == null || s.matchRank != NONE) {
