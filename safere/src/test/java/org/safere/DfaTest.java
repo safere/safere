@@ -1023,6 +1023,33 @@ class DfaTest {
   }
 
   @Test
+  void reversePrefixProofCannotConsumeBeforeStartLimit() {
+    for (String prefix : List.of("a", "é", "😀")) {
+      for (String suffix : List.of("", " ", "\r\n")) {
+        String input = prefix + suffix;
+        for (InputScanner scanner :
+            List.of(new StringInputScanner(input), new Utf8InputScanner(input.getBytes(UTF_8)))) {
+          int floor = scanner.length() - suffix.length();
+          for (String regex : List.of("(?s).+", "(?s).*[^\r\n ]\\s*")) {
+            Dfa reverse = Pattern.compile(regex).reverseDfa();
+            for (int pass = 0; pass < 2; pass++) {
+              Dfa.SearchResult result =
+                  reverse.doSearchReverse(scanner, scanner.length(), floor, true, true);
+              boolean match = java.util.regex.Pattern.compile(regex).matcher(suffix).matches();
+              assertThat(result.matched())
+                  .as("/%s/ on %s in %s", regex, input, scanner)
+                  .isEqualTo(match);
+              if (match) {
+                assertThat(result.pos()).isEqualTo(floor);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   void reverseDfaDecodesFromInteriorStartLimit() {
     for (String text : List.of("é", "€", "😀")) {
       for (InputScanner scanner :

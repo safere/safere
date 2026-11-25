@@ -153,7 +153,9 @@ class CompilerPreparationTest {
   @CsvSource({
     "'\\w+z', 'hello abcz', 6, 10",
     "'[a-z]+ing\\b', 'the running dog', 4, 11",
-    "'\\d+\\.\\d+', 'pi is 3.14 ok', 6, 10"
+    "'\\d+\\.\\d+', 'pi is 3.14 ok', 6, 10",
+    "'((a)+){2}b', 'xxaab', 2, 5",
+    "'([a-z]+)ing\\b', 'the running dog', 4, 11"
   })
   void startRegisterFindDoesNotBuildTheReverseDfaProgram(
       String regex, String text, int start, int end) throws ReflectiveOperationException {
@@ -169,21 +171,11 @@ class CompilerPreparationTest {
   }
 
   @Test
-  void capturingPatternsStillBuildTheReverseDfaProgram() throws ReflectiveOperationException {
-    String regex = "((a)+){2}b";
-    Pattern pattern = Pattern.compile(regex);
-    Matcher matcher = pattern.matcher("xxaab");
-    assertThat(matcher.find()).isTrue();
-    assertThat(matcher.start()).isEqualTo(2);
-    assertThat(pattern.startRegisterSearch(new Pattern.ThreadCache())).isNull();
-    assertReverseDfaPrepared(pattern, regex, true);
-  }
-
-  @Test
   void reverseDfaFirstUsePreservesCaptureBoundsInBothRepresentations() throws Exception {
     String regex = "([a-z]+)ing\\b";
-    Pattern stringPattern = Pattern.compile(regex);
-    Pattern utf8Pattern = Pattern.compile(regex);
+    // The start-register search stands in for the reverse DFA where it applies.
+    Pattern stringPattern = Pattern.compile(regex, 0, WITHOUT_START_REGISTER);
+    Pattern utf8Pattern = Pattern.compile(regex, 0, WITHOUT_START_REGISTER);
     String input = "élan running today";
 
     Matcher stringMatcher = stringPattern.matcher(input);

@@ -133,6 +133,19 @@ public final class SplitFuzzer {
   }
 
   @FuzzTest(maxDuration = "30s")
+  void endAnchoredDelimiterSplits(FuzzedDataProvider data) {
+    String atom = data.pickValue(List.of("a", "é", "😀"));
+    String end = data.pickValue(List.of("$", "\\Z", "\\z"));
+    String terminator = data.pickValue(List.of("", "\n", "\r\n", "\u2029"));
+    String delimiter = data.pickValue(List.of(".+", ".+?", ".*a\\s*", ".*", "(?:a|.*a)\\s*"));
+    String input = atom.repeat(data.consumeInt(1_020, 1_100)) + "a" + terminator;
+    int limit = data.pickValue(SPLIT_LIMITS);
+    FuzzSupport.CompiledPattern pattern = FuzzSupport.compileOrSkip("(?s)" + delimiter + end, 0);
+    pattern.split(input, limit);
+    pattern.splitWithDelimiters(input, limit);
+  }
+
+  @FuzzTest(maxDuration = "30s")
   void split(FuzzedDataProvider data) {
     fuzzerTestOneInput(data);
   }
