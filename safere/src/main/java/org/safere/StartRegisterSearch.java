@@ -51,11 +51,11 @@ final class StartRegisterSearch {
 
   /**
    * Distance after which a search that has seen no match hands over at the next position where a
-   * new search could begin. The start register only pays for itself on matches (it saves their
-   * reverse scan); long stretches without one are better served by the forward DFA's start-state
-   * acceleration.
+   * new search could begin, including while it stays in a start-like state that loops on itself.
+   * The start register only pays for itself on matches (it saves their reverse scan); long
+   * stretches without one are better served by the forward DFA's start-state acceleration.
    */
-  static final int HANDOFF_DISTANCE = 1024;
+  static final int HANDOFF_DISTANCE = 256;
 
   /**
    * Events after which a search may give up when the oldest live attempt has no register. Such a
@@ -1009,8 +1009,12 @@ final class StartRegisterSearch {
           switch (ns.matchRank) {
             case 0 -> ns.id | MATCH0;
             case 1 -> ns.id | MATCH1;
-            // Entering a start-like state from elsewhere is where the search may skip or hand over.
-            default -> startLikeOf[ns.id] && !startLikeOf[s.id] ? ns.id | START_ENTRY : ns.id;
+            // Entering a start-like state from elsewhere, or staying in one, is where the search
+            // may skip or hand over.
+            default ->
+                startLikeOf[ns.id] && (!startLikeOf[s.id] || ns.id == s.id)
+                    ? ns.id | START_ENTRY
+                    : ns.id;
           };
     } else {
       if (infoCount == infoNext.length) {

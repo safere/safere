@@ -200,6 +200,27 @@ class StartRegisterSearchTest {
   }
 
   @Test
+  void searchThatNeverLeavesTheStartStateHandsOver() {
+    // Digits and spaces keep [\\p{IsAlphabetic}]+\\d+ in its start state, which loops on itself.
+    // Without a start accelerator the search would walk the whole input in that loop.
+    String digits = "0123456789 9876543210 1357924680 ".repeat(128);
+    String input = digits + "\u00e9123";
+    StartRegisterSearch search =
+        StartRegisterSearch.create(
+            Pattern.compile("[\\p{IsAlphabetic}]+\\d+").flatDfaProg(), null, null);
+    long result = search.searchForTesting(new StringInputScanner(input), 0);
+    assertThat(result).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF);
+    int handoff = StartRegisterSearch.handoffPosition(result);
+    assertThat(handoff).isGreaterThan(StartRegisterSearch.HANDOFF_DISTANCE);
+    assertThat(handoff).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF_DISTANCE + 2);
+
+    Matcher matcher = Pattern.compile("[\\p{IsAlphabetic}]+\\d+").matcher(input);
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.start()).isEqualTo(digits.length());
+    assertThat(matcher.end()).isEqualTo(input.length());
+  }
+
+  @Test
   void longNearMissWithoutRegistersFallsBackEarly() {
     // Over a run of a's about a dozen attempts at aaaaaaaaaaaaz stay live, so the oldest one has no
     // register and every step moves the registers. The search gives up soon after
@@ -223,7 +244,7 @@ class StartRegisterSearchTest {
     // Below HANDOFF_DISTANCE the search keeps going, and a later match from a registered attempt
     // is still answered.
     String regex = "aaaaaaaaaaaaz|banana|cherry";
-    String input = "a".repeat(512) + " banana";
+    String input = "a".repeat(StartRegisterSearch.HANDOFF_DISTANCE / 2) + " banana";
     StartRegisterSearch search =
         StartRegisterSearch.create(Pattern.compile(regex).flatDfaProg(), null, null);
     long result = search.searchForTesting(new StringInputScanner(input), 0);
