@@ -27,6 +27,25 @@ import org.junit.jupiter.params.provider.ValueSource;
 class MatcherTest {
   private static final Duration PERFORMANCE_SCENARIO_TIMEOUT = Duration.ofSeconds(30);
 
+  @ParameterizedTest
+  @ValueSource(strings = {" ", "\r\n"})
+  void endAnchoredFindDoesNotConsumeBeforeExplicitStart(String suffix) {
+    String prefix = "é".repeat(1_100) + "c";
+    String input = prefix + suffix;
+    String regex = "(?s).*c\\s*\\z";
+    Pattern pattern = Pattern.compile(regex);
+    assertThat(pattern.matcher(input).find(prefix.length())).isFalse();
+  }
+
+  @Test
+  void utf8EndAnchoredFindDoesNotRepeatAtEndOfInput() {
+    Utf8Input input = Utf8Input.validated("é".repeat(1_100).getBytes(UTF_8));
+    Utf8Matcher matcher = Pattern.compile("(?s).+\\z").matcher(input);
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.end()).isEqualTo(input.length());
+    assertThat(matcher.find()).isFalse();
+  }
+
   @Test
   void capturesInImpossibleAlternativesRemainUnmatched() {
     for (String alternatives : List.of("(a)|(b)", "(a)|(b)|(c)|(d)|(e)", "((a)|(b))", "(é)|(😀)")) {
@@ -856,6 +875,82 @@ class MatcherTest {
     @DisplayName("find() does not overconsume before trailing terminator for end anchor")
     void findDoesNotOverconsumeBeforeTrailingTerminatorForEndAnchor() {
       assertAllFindsMatchJdk("(?:a+?|(?:[^x])*)$", "x".repeat(1100) + "a\n");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029"})
+    void findPreservesQuantifierPriorityAtEndAnchors(String terminator) {
+      for (String anchor : List.of("$", "\\Z", "\\z", "(?d:$)", "(?d:\\Z)")) {
+        for (String body :
+            List.of(
+                ".*c.+?",
+                ".*?c.+?",
+                ".*c.+",
+                ".*c(.+?)",
+                ".*c.*?",
+                "\\A.*c(.+?)",
+                "\\A.*c.+",
+                "\\A.*\\bc(.+?)",
+                "\\A.*c(.+?)\\b",
+                "\\A.*(?m:^)\\bc(.+?)",
+                "\\A.*c(.+?)(?m:$)",
+                "\\A.*c(.+?)(?dm:$)")) {
+          String regex = "(?s)" + body + anchor;
+          Pattern pattern = Pattern.compile(regex);
+          var jdkPattern = java.util.regex.Pattern.compile(regex);
+          for (String prefix :
+              List.of("", "ab", "é😀", "abc".repeat(450), "é😀".repeat(450) + "\n")) {
+            String input = prefix + "cx" + terminator;
+            Matcher matcher = pattern.matcher(input);
+            var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+            var jdk = jdkPattern.matcher(input);
+            String context =
+                "pattern %s, prefix length %s, terminator %s"
+                    .formatted(regex, prefix.length(), terminator.codePoints().boxed().toList());
+            while (jdk.find()) {
+              assertThat(matcher.find()).as(context).isTrue();
+              assertThat(utf8.find()).as(context).isTrue();
+              for (int group = 0; group <= jdk.groupCount(); group++) {
+                assertThat(matcher.group(group)).as(context).isEqualTo(jdk.group(group));
+                assertThat(matcher.start(group)).as(context).isEqualTo(jdk.start(group));
+                assertThat(matcher.end(group)).as(context).isEqualTo(jdk.end(group));
+                assertThat(utf8.start(group))
+                    .as(context)
+                    .isEqualTo(input.substring(0, jdk.start(group)).getBytes(UTF_8).length);
+                assertThat(utf8.end(group))
+                    .as(context)
+                    .isEqualTo(input.substring(0, jdk.end(group)).getBytes(UTF_8).length);
+              }
+            }
+            assertThat(matcher.find()).as(context).isFalse();
+            assertThat(utf8.find()).as(context).isFalse();
+          }
+        }
+      }
+    }
+
+    @Test
+    void endAnchorPriorityIsPreservedInOtherSpanOperations() {
+      String regex = "(?s).*c(.+?)\\Z";
+      String input = "c😀\r\n";
+      Pattern pattern = Pattern.compile(regex);
+      Matcher matcher =
+          pattern.matcher("outside" + input + "outside").region(7, 7 + input.length());
+      var utf8 = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+
+      assertThat(matcher.lookingAt()).isTrue();
+      assertThat(matcher.end()).isEqualTo(10);
+      assertThat(matcher.group(1)).isEqualTo("😀");
+      assertThat(utf8.lookingAt()).isTrue();
+      assertThat(utf8.end()).isEqualTo(5);
+      assertThat(matcher.matches()).isTrue();
+      assertThat(matcher.group(1)).isEqualTo("😀\r\n");
+      assertThat(utf8.matches()).isTrue();
+      assertThat(utf8.end()).isEqualTo(7);
+      assertThat(pattern.split(input, -1)).containsExactly("", "\r\n");
+      assertThat(pattern.matcher(input).replaceAll("$1")).isEqualTo("😀\r\n");
+      assertThat(Pattern.compile("(?s)\\A.*c.+?$").matcher(input).replaceFirst("X"))
+          .isEqualTo("X\r\n");
     }
 
     @Test

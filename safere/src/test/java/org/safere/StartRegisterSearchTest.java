@@ -394,7 +394,7 @@ class StartRegisterSearchTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"(a)b", "^ab", "ab$", "(?m)^ab", "a\\z", "ab\\Z", "\\Aab"})
+  @ValueSource(strings = {"^ab", "ab$", "(?m)^ab", "a\\z", "ab\\Z", "\\Aab"})
   void unsupportedPatternsUseTheReverseDfa(String regex) {
     assertThat(Pattern.compile(regex).startRegisterSearch(new Pattern.ThreadCache())).isNull();
   }

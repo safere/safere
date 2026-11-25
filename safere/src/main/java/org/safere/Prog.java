@@ -306,15 +306,10 @@ final class Prog {
   }
 
   private boolean computeHasWordBoundary() {
-    int mask =
-        EmptyOp.WORD_BOUNDARY
-            | EmptyOp.NON_WORD_BOUNDARY
-            | EmptyOp.UNICODE_WORD_BOUNDARY
-            | EmptyOp.UNICODE_NON_WORD_BOUNDARY;
     int n = size();
     for (int i = 0; i < n; i++) {
       Inst ip = inst(i);
-      if (ip.op == InstOp.EMPTY_WIDTH && (ip.arg & mask) != 0) {
+      if (ip.op == InstOp.EMPTY_WIDTH && (ip.arg & EmptyOp.WORD_BOUNDARIES) != 0) {
         return true;
       }
     }

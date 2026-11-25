@@ -150,6 +150,7 @@
       "repeatedClassSplits",
       "nullableDelimiterSplits",
       "literalPrefixSplits",
+      "endAnchoredDelimiterSplits",
       "split"
     ]
   },

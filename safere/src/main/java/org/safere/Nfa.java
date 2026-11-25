@@ -628,18 +628,18 @@ final class Nfa {
   }
 
   /**
-   * Unanchored search variant for programs consuming grapheme clusters.
+   * Search variant for programs consuming grapheme clusters.
    *
-   * <p>Active threads still consume Unicode code points, but new candidate matches are started at
-   * every Java character offset. That matches {@link java.util.regex.Matcher}'s character-index
-   * search contract for grapheme constructs without changing the code-point stepping used by
-   * ordinary SafeRE programs. A boundary assertion alone does not introduce new candidate starts;
-   * programs containing only scalar consumers and {@code \b{g}} use {@link #doSearch}.
+   * <p>Active threads consume Unicode code points. Unanchored String searches start candidates at
+   * every Java character offset to match {@link java.util.regex.Matcher}'s character-index search
+   * contract for grapheme constructs. A boundary assertion alone does not introduce new candidate
+   * starts. Programs containing only scalar consumers and {@code \b{g}} use {@link #doSearch}.
    */
   private void doSearchEveryCharPosition(boolean anchored) {
     InputScanner text = context.text();
     int startPos = context.searchStart();
     int searchLimit = context.searchLimit();
+    int lastStartPos = anchored ? Math.min(startPos, searchLimit) : searchLimit;
     int start = Math.max(0, startPos);
     QueueState runq = allocQueueState();
 
@@ -665,7 +665,7 @@ final class Nfa {
       } else {
         mergeDelayedQueue(delayedBuffer, pos, runq);
       }
-      if (!matched && pos <= searchLimit && (!anchored || pos == startPos)) {
+      if (!matched && pos <= lastStartPos) {
         Arrays.fill(initialCap, -1);
         initialCap[0] = pos;
         addToThreadq(runq, prog.start(), text, pos, initialCap, false);
@@ -687,7 +687,9 @@ final class Nfa {
           nextBoundaryPos = pos + 1;
         }
       }
-      if (matched
+      // This position has already had its chance to start a thread. Pending threads can still
+      // complete past the last allowed start.
+      if ((matched || pos >= lastStartPos)
           && runq.isEmpty()
           && (prog.hasGraphemeSemantics()
               ? delayedGrapheme.isEmpty()

@@ -208,6 +208,11 @@ final class Dfa {
   /** Whether consuming transitions can depend on the absolute input position. */
   private final boolean hasPositionDependentTransitions;
 
+  // A stripped dollar anchor guards MATCH in a forward first-match DFA. Other search modes
+  // retain their endpoint checks.
+  private final int matchEndAssertion;
+  private final boolean checkMatchEndAfterExpansion;
+
   private final int stateEmptyFlagsMask;
   private final int startCacheEmptyFlagsMask;
   private final int anchoredCacheBit;
@@ -462,6 +467,11 @@ final class Dfa {
       InnerLiteralSearch innerLiteralSearch,
       boolean anyMatch) {
     this.anyMatch = anyMatch;
+    this.matchEndAssertion =
+        prog.dollarAnchorEnd() && !prog.reversed() && !longest && !anyMatch
+            ? (prog.dollarAnchorUnixLines() ? EmptyOp.UNIX_DOLLAR_END : EmptyOp.DOLLAR_END)
+            : 0;
+    this.checkMatchEndAfterExpansion = prog.anchorEnd() && matchEndAssertion == 0;
     this.prog = prog;
     this.maxStates = maxStates;
     this.longest = longest;
@@ -774,9 +784,11 @@ final class Dfa {
           }
           case InstOp.OP_CHAR_RANGE, InstOp.OP_CHAR_CLASS -> frontier[frontierSize++] = id;
           case InstOp.OP_MATCH -> {
-            frontier[frontierSize++] = id;
-            if (!longest && !prog.anchorEnd()) {
-              stackTop = 0;
+            if ((matchEndAssertion & ~emptyFlags) == 0) {
+              frontier[frontierSize++] = id;
+              if (!longest && !checkMatchEndAfterExpansion) {
+                stackTop = 0;
+              }
             }
           }
           default -> {}
@@ -805,9 +817,11 @@ final class Dfa {
           }
           case InstOp.OP_CHAR_RANGE, InstOp.OP_CHAR_CLASS -> frontier[frontierSize++] = id;
           case InstOp.OP_MATCH -> {
-            frontier[frontierSize++] = id;
-            if (!longest && !prog.anchorEnd()) {
-              stackTop = 0;
+            if ((matchEndAssertion & ~emptyFlags) == 0) {
+              frontier[frontierSize++] = id;
+              if (!longest && !checkMatchEndAfterExpansion) {
+                stackTop = 0;
+              }
             }
           }
           default -> {}
@@ -1766,7 +1780,7 @@ final class Dfa {
             }
           }
           // Check if this match is valid.
-          if (!prog.anchorEnd()) {
+          if (!checkMatchEndAfterExpansion) {
             isMatchValid = true;
           } else {
             int textLen = text.length();
@@ -1843,13 +1857,11 @@ final class Dfa {
     // nextPos, not deterministic for cache). Unsatisfied EMPTY_WIDTH instructions will
     // remain in the frontier for re-evaluation when the next character arrives.
     int emptyFlags = emptyFlags(text, nextPos);
-    emptyFlags &=
-        ~(EmptyOp.WORD_BOUNDARY
-            | EmptyOp.NON_WORD_BOUNDARY
-            | EmptyOp.UNICODE_WORD_BOUNDARY
-            | EmptyOp.UNICODE_NON_WORD_BOUNDARY
-            | EmptyOp.END_LINE
-            | EmptyOp.UNIX_END_LINE);
+    // At an eligible end, resolve all assertions before pruning the ordered frontier.
+    // These transitions bypass the cache because their destination is position dependent.
+    if (matchEndAssertion == 0 || (emptyFlags & matchEndAssertion) == 0) {
+      emptyFlags &= ~(EmptyOp.WORD_BOUNDARIES | EmptyOp.END_LINE | EmptyOp.UNIX_END_LINE);
+    }
 
     int[] nextInsts = expand(computeBuf, successorCount, emptyFlags);
 
@@ -2022,11 +2034,11 @@ final class Dfa {
   private int fastForward(
       InputScanner text,
       int pos,
-      int posDepThreshold,
+      int startSkipLimit,
       State startState,
       Utf8StartAccelerator.SearchCursor utf8Cursor,
       boolean allowInnerProbe) {
-    int candidate = findStartCandidate(text, pos, posDepThreshold, startState, utf8Cursor);
+    int candidate = findStartCandidate(text, pos, startSkipLimit, startState, utf8Cursor);
     if (candidate < 0 || !allowInnerProbe) {
       return candidate;
     }
@@ -2044,10 +2056,10 @@ final class Dfa {
     }
     // Preserve the ordinary accelerator's terminal context boundary. The DFA evaluates
     // position-dependent transitions from there rather than skipping over that boundary.
-    if (hasPositionDependentTransitions && narrowed >= posDepThreshold - 1) {
-      return Math.max(candidate, posDepThreshold - 1);
+    if (hasPositionDependentTransitions && narrowed >= startSkipLimit) {
+      return Math.max(candidate, startSkipLimit);
     }
-    return findStartCandidate(text, narrowed, posDepThreshold, startState, utf8Cursor);
+    return findStartCandidate(text, narrowed, startSkipLimit, startState, utf8Cursor);
   }
 
   private void updateInnerProbeState(int pos) {
@@ -2060,7 +2072,7 @@ final class Dfa {
   private int findStartCandidate(
       InputScanner text,
       int pos,
-      int posDepThreshold,
+      int startSkipLimit,
       State startState,
       Utf8StartAccelerator.SearchCursor utf8Cursor) {
     if (text instanceof Utf8InputScanner utf8Scanner && utf8StartAccelerator != null) {
@@ -2068,7 +2080,7 @@ final class Dfa {
           utf8Cursor != null
               ? utf8Cursor.findCandidate(utf8Scanner, pos)
               : Utf8StartAccelerator.findNextCandidate(utf8StartAccelerator, utf8Scanner, pos);
-      return idx >= 0 ? Math.min(idx, posDepThreshold - 1) : -1;
+      return idx >= 0 ? Math.min(idx, startSkipLimit) : -1;
     }
     if (text instanceof StringInputScanner stringScanner && stringStartAccelerator != null) {
       return StringStartAccelerator.findNextCandidate(
@@ -2078,16 +2090,13 @@ final class Dfa {
       return StringStartAccelerator.findNextCandidate(
           stringStartAccelerator, region, pos, prog.lineStartUnixLines());
     }
-    return fastForwardStartState(text, pos, posDepThreshold, startState);
+    return fastForwardStartState(text, pos, startSkipLimit, startState);
   }
 
   private int fastForwardStartState(
-      InputScanner text, int pos, int posDepThreshold, State startState) {
+      InputScanner text, int pos, int startSkipLimit, State startState) {
     if (startState != null && startState.accelerator != null) {
-      int limit =
-          hasPositionDependentTransitions
-              ? Math.min(text.length(), posDepThreshold - 1)
-              : text.length();
+      int limit = hasPositionDependentTransitions ? startSkipLimit : text.length();
       int idx = StateAccelerator.findNextEscape(startState.accelerator, text, pos, limit);
       if (idx >= 0) {
         return idx;
@@ -2139,8 +2148,8 @@ final class Dfa {
     int pos = startPos;
     int textLen = text.length();
     // If the compiled program requires end-of-text matching (stripped $ or \z), enforce it.
-    boolean needEndMatch = prog.anchorEnd();
-    boolean dollarEnd = prog.dollarAnchorEnd();
+    boolean needEndMatch = checkMatchEndAfterExpansion;
+    boolean dollarEnd = needEndMatch && prog.dollarAnchorEnd();
     // $ allows matching before a trailing line terminator at end of text (JDK default $
     // behavior).
     // Compute the start position of the trailing line terminator for dollarAnchorEnd matching.
@@ -2153,6 +2162,11 @@ final class Dfa {
     // a different text) would produce a different result. See the class-level comment on
     // DFA caching invariants.
     int posDepThreshold = positionDependentThreshold(text);
+    // The cache threshold is at or before every eligible end, including in UNIX_LINES mode.
+    // Stop before a transition into that range so the uncached ordered closure can evaluate MATCH.
+    int startSkipLimit =
+        matchEndAssertion != 0 ? text.retreatByCodePoints(posDepThreshold, 1) : posDepThreshold - 1;
+    int stateSkipLimit = matchEndAssertion != 0 ? startSkipLimit : textLen;
 
     State s = startStateOrReset(text, startPos, anchored, false);
     if (s == null) {
@@ -2230,7 +2244,7 @@ final class Dfa {
       if (s.isStartState
           && ((pos >= accelerationResumePos && pos != preselectedPos && textLen - pos >= minSkip)
               || (!matched && innerProbeState == INNER_PROBE_READY))) {
-        int nextPos = fastForward(text, pos, posDepThreshold, s, utf8Cursor, !matched);
+        int nextPos = fastForward(text, pos, startSkipLimit, s, utf8Cursor, !matched);
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.recordStartScan(nextPos < 0 ? textLen - pos : nextPos - pos);
         }
@@ -2251,7 +2265,7 @@ final class Dfa {
         accelerationResumePos = AdaptiveBackoff.resumePos(backoff);
         if (nextPos > pos) {
           pos = nextPos;
-          if (pos >= textLen) {
+          if (pos >= textLen && matchEndAssertion == 0) {
             break;
           }
           s = startStateOrReset(text, pos, anchored, false);
@@ -2277,10 +2291,10 @@ final class Dfa {
           }
         }
       }
-      if (s.accelerator != null && (!s.isStartState || anchored) && (textLen - pos >= 16)) {
-        int nextPos = StateAccelerator.findNextEscape(s.accelerator, text, pos, textLen);
+      if (s.accelerator != null && (!s.isStartState || anchored) && (stateSkipLimit - pos >= 16)) {
+        int nextPos = StateAccelerator.findNextEscape(s.accelerator, text, pos, stateSkipLimit);
         if (nextPos == -1) {
-          pos = textLen;
+          pos = stateSkipLimit;
           break;
         }
         if (nextPos > pos) {
@@ -2443,7 +2457,7 @@ final class Dfa {
       if (s.isStartState
           && ((pos >= accelerationResumePos && pos != preselectedPos && textLen - pos >= minSkip)
               || (!matched && innerProbeState == INNER_PROBE_READY))) {
-        int nextPos = fastForward(text, pos, posDepThreshold, s, utf8Cursor, !matched);
+        int nextPos = fastForward(text, pos, startSkipLimit, s, utf8Cursor, !matched);
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.recordStartScan(nextPos < 0 ? textLen - pos : nextPos - pos);
         }
@@ -2492,10 +2506,12 @@ final class Dfa {
               ? (int) Math.min(Integer.MAX_VALUE, innerProbeResumePos)
               : Integer.MAX_VALUE;
       do {
-        if (s.accelerator != null && (textLen - pos >= 16) && (!s.isStartState || anchored)) {
-          int nextPos = StateAccelerator.findNextEscape(s.accelerator, text, pos, textLen);
+        if (s.accelerator != null
+            && (stateSkipLimit - pos >= 16)
+            && (!s.isStartState || anchored)) {
+          int nextPos = StateAccelerator.findNextEscape(s.accelerator, text, pos, stateSkipLimit);
           if (nextPos == -1) {
-            pos = textLen;
+            pos = stateSkipLimit;
           } else if (nextPos > pos) {
             pos = nextPos;
             if (pos > textLen) {
@@ -2888,9 +2904,10 @@ final class Dfa {
             }
           }
         }
-        if (canSkipRemainingPrefix(s, text, startLimit, longest)) {
-          return completeSearch(
-              new SearchResult(true, startLimit, ambiguous), Math.max(prevPos, startLimit));
+        // A character before the search floor can supply assertion context, but a frontier
+        // that consumed it cannot prove a match at the floor.
+        if (prevPos >= startLimit && canSkipRemainingPrefix(s, text, startLimit, longest)) {
+          return completeSearch(new SearchResult(true, startLimit, ambiguous), prevPos);
         }
       }
 
