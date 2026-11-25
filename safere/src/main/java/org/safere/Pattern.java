@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Spliterator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.regex.PatternSyntaxException;
@@ -1401,8 +1400,9 @@ public final class Pattern implements Serializable {
 
   /**
    * Creates a stream of strings split from the given input sequence around matches of this pattern.
-   * The stream contains the same strings that {@link #split(CharSequence)} would return, produced
-   * lazily.
+   * The stream produces the same strings as {@link #split(CharSequence)} and searches for
+   * delimiters as needed. It uses {@link String} inputs directly and copies other character
+   * sequences when it first accesses the input.
    *
    * @param input the character sequence to be split
    * @return a sequential stream of strings computed by splitting the input around matches of this
@@ -1410,8 +1410,8 @@ public final class Pattern implements Serializable {
    */
   public Stream<String> splitAsStream(CharSequence input) {
     return StreamSupport.stream(
-        () -> Arrays.spliterator(split(input, 0)),
-        Spliterator.ORDERED | Spliterator.NONNULL,
+        () -> matcher(charSequenceToString(input)).splitSpliterator(),
+        Matcher.SPLIT_STREAM_CHARACTERISTICS,
         false);
   }
 
