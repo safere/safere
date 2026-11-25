@@ -315,6 +315,20 @@ class DiagnosticsTest {
   }
 
   @Test
+  void preparedSearchResumesAfterShortMatchesInsideAFailedTail() {
+    Pattern.setDiagnostics(diagnostics);
+    Pattern pattern = Pattern.compile("x[\\w ]*z|x|\\w+");
+    Matcher matcher = pattern.matcher("x".repeat(32) + " " + "word ".repeat(1024));
+    for (int i = 0; i < 1056; i++) {
+      assertThat(matcher.find()).isTrue();
+    }
+    List<OperationDiagnostics> operations = operationsFor(pattern);
+    assertThat(operations).anyMatch(event -> event.boundaryStrategy() == MatchStrategy.NFA);
+    assertThat(operations.subList(operations.size() - 100, operations.size()))
+        .allMatch(event -> event.boundaryStrategy() == MatchStrategy.DFA);
+  }
+
+  @Test
   void forcedBitStateAndNfaReportTheExactEngine() {
     Pattern.setDiagnostics(diagnostics);
     EnginePathOptions bitStateOnly =

@@ -755,7 +755,10 @@ final class Nfa {
   private boolean repeatedTail(
       FindTailMemo memo, int pos, QueueState runq, Map<Integer, QueueState> delayed) {
     if (!memo.atCheckpoint(
-        pos, context.text(), delayed != null && !(context.text() instanceof Utf8InputScanner))) {
+        pos,
+        context.text(),
+        delayed != null && !(context.text() instanceof Utf8InputScanner),
+        runq.size)) {
       return false;
     }
     if (WorkCounterConfig.ENABLED) {

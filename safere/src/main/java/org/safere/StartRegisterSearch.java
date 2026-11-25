@@ -280,20 +280,11 @@ final class StartRegisterSearch {
     this.startBackoff = startBackoff;
     searchEnd = startPos;
     nativeScanUnits = 0;
-    if (pause > 0) {
-      pause--;
+    if (!prepareSearch()) {
       return SKIPPED;
     }
-    if (overflowed) {
-      clearCache();
-      if (++resets > MAX_RESETS) {
-        releaseCache();
-        resets = 0;
-        pause = RESET_PAUSE;
-        return SKIPPED;
-      }
-    }
-    long result = text.isCodePointBoundary(startPos) ? search(text, startPos) : FALLBACK;
+    long result =
+        text.isCodePointBoundary(startPos) ? search(text, startPos, text.length()) : FALLBACK;
     if (result == FALLBACK) {
       credit -= FALLBACK_COST;
       if (credit <= 0) {
@@ -301,15 +292,36 @@ final class StartRegisterSearch {
         credit = RETRY_CREDIT;
       }
     } else {
-      if (credit < MAX_CREDIT) {
-        credit += HIT_GAIN;
-      }
-      if (resets > 0 && ++answeredSinceReset >= RESET_DECAY) {
-        resets--;
-        answeredSinceReset = 0;
-      }
+      recordAnswer();
     }
     return result;
+  }
+
+  private boolean prepareSearch() {
+    if (pause > 0) {
+      pause--;
+      return false;
+    }
+    if (overflowed) {
+      clearCache();
+      if (++resets > MAX_RESETS) {
+        releaseCache();
+        resets = 0;
+        pause = RESET_PAUSE;
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private void recordAnswer() {
+    if (credit < MAX_CREDIT) {
+      credit += HIT_GAIN;
+    }
+    if (resets > 0 && ++answeredSinceReset >= RESET_DECAY) {
+      resets--;
+      answeredSinceReset = 0;
+    }
   }
 
   /** Returns the position at which a {@link #HANDOFF} result continues. */
@@ -336,7 +348,7 @@ final class StartRegisterSearch {
     if (overflowed) {
       clearCache();
     }
-    return text.isCodePointBoundary(startPos) ? search(text, startPos) : FALLBACK;
+    return text.isCodePointBoundary(startPos) ? search(text, startPos, text.length()) : FALLBACK;
   }
 
   /** The remaining credit, for tests. */
@@ -364,14 +376,25 @@ final class StartRegisterSearch {
     return resets;
   }
 
+  /** A bounded retry can return a complete match or ask the exact engine to continue. */
+  long probe(InputScanner text, int start, int budget) {
+    if (!prepareSearch() || !text.isCodePointBoundary(start)) {
+      return SKIPPED;
+    }
+    long result = search(text, start, start + Math.min(budget, text.length() - start));
+    if (result >= 0 || result == NO_MATCH) {
+      recordAnswer();
+    }
+    return result;
+  }
+
   @MaxBytecodeSize(
       value = 856,
       reason =
           "The scalar loop of the start-register find. Keep event handling in the slow branch;"
               + " A/B ReverseDfaFindBenchmark.wordProse and RepeatedClassFind with -f 6 before"
               + " raising this.")
-  private long search(InputScanner text, int startPos) {
-    int len = text.length();
+  private long search(InputScanner text, int startPos, int len) {
     St s = startState(text, startPos);
     if (s == null || s.matchRank != NONE) {
       // An empty match at the start position: leave it to the ordinary search.
@@ -388,7 +411,9 @@ final class StartRegisterSearch {
     int sid = s.id;
     // The first position at which the start accelerator may run, or MAX_VALUE when it never may.
     int resumePos =
-        startPolicy(text) != null ? AdaptiveBackoff.resumePos(startBackoff) : Integer.MAX_VALUE;
+        len == text.length() && startPolicy(text) != null
+            ? AdaptiveBackoff.resumePos(startBackoff)
+            : Integer.MAX_VALUE;
     // Set on entering a start-like state, with no match seen, when a handoff or skip may be due.
     boolean startEntry = false;
     while (true) {
@@ -454,6 +479,9 @@ final class StartRegisterSearch {
       int nextPos;
       int column;
       if (pos >= len) {
+        if (len < text.length()) {
+          return FALLBACK;
+        }
         cp = -1;
         nextPos = pos;
         column = eotColumn;
@@ -469,6 +497,9 @@ final class StartRegisterSearch {
         long decoded = text.decodeForward(pos);
         cp = InputScanner.codePoint(decoded);
         nextPos = InputScanner.position(decoded);
+        if (nextPos > len) {
+          return FALLBACK;
+        }
         column = nonAsciiColumn(cp);
         if (column < 0) {
           return stop(FALLBACK, pos);
@@ -476,7 +507,8 @@ final class StartRegisterSearch {
         t = transitions[sid * row + column];
       }
       if (t == ACCEL) {
-        pos = selfLoopEnd(text, sid, nextPos, len);
+        // Some String intrinsics scan to the real input end before checking the limit.
+        pos = len == text.length() ? selfLoopEnd(text, sid, nextPos, len) : nextPos;
         continue;
       }
       if (t == 0) {

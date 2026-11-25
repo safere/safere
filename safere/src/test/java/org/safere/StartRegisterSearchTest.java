@@ -67,6 +67,16 @@ class StartRegisterSearchTest {
   };
 
   @Test
+  void probeRequiresACompleteAnswerInsideItsBudget() {
+    StartRegisterSearch search =
+        StartRegisterSearch.create(Pattern.compile("a[^z]*z|a").flatDfaProg(), null, null);
+    StringInputScanner input = new StringInputScanner("a" + "b".repeat(128) + "z");
+    assertThat(search.probe(input, 0, 32)).isEqualTo(StartRegisterSearch.FALLBACK);
+    assertThat(search.probe(input, 0, input.length())).isEqualTo(input.length());
+    assertThat(search.probe(new StringInputScanner("a"), 0, 32)).isEqualTo(1);
+  }
+
+  @Test
   void curatedPatternsAgreeWithTheReverseDfa() {
     Tally tally = new Tally();
     for (String regex : PATTERNS) {
@@ -330,6 +340,24 @@ class StartRegisterSearchTest {
     }
     assertThat(search.find(text, 0, AdaptiveBackoff.NEUTRAL))
         .isEqualTo(StartRegisterSearch.FALLBACK);
+  }
+
+  @Test
+  void boundedRetriesRecoverAfterCacheExhaustionAndPause() {
+    StartRegisterSearch search =
+        StartRegisterSearch.create(Pattern.compile("a[ab]{13}c").flatDfaProg(), null, null);
+    StringBuilder input = new StringBuilder();
+    new Random(1).ints(200_000, 0, 2).forEach(bit -> input.append(bit == 0 ? 'a' : 'b'));
+    InputScanner hard = new StringInputScanner(input.toString());
+    for (int i = 0; i <= StartRegisterSearch.MAX_RESETS; i++) {
+      assertThat(search.find(hard, 0, AdaptiveBackoff.NEUTRAL))
+          .isEqualTo(StartRegisterSearch.FALLBACK);
+    }
+    InputScanner easy = new StringInputScanner("aaaaaaaaaaaaaac" + " ".repeat(100));
+    for (int i = 0; i <= StartRegisterSearch.RESET_PAUSE; i++) {
+      assertThat(search.probe(easy, 0, 64)).isEqualTo(StartRegisterSearch.SKIPPED);
+    }
+    assertThat(search.probe(easy, 0, 64)).isEqualTo(15);
   }
 
   @Test

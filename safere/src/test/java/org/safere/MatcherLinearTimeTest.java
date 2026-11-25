@@ -334,6 +334,42 @@ class MatcherLinearTimeTest {
         });
   }
 
+  @Test
+  void alternatingShortMatchesAndLongTailsBoundPreparedRetries() {
+    Pattern pattern = Pattern.compile("x[\\w ]*z|x|\\w+");
+    assertLinearSequence(
+        "repeated DFA retries",
+        blocks -> {
+          Matcher matcher = pattern.matcher("x one two three ".repeat(blocks));
+          int count = 0;
+          while (matcher.find()) {
+            count++;
+          }
+          assertThat(count).isEqualTo(4 * blocks);
+        });
+  }
+
+  @Test
+  void inactiveWideAlternativeKeepsNearbySparseCheckpoints() {
+    Pattern simple = Pattern.compile("a.*z|a");
+    Pattern wide = Pattern.compile("a.*z|a|" + "b".repeat(8192));
+    String input = "a".repeat(4096);
+    long simpleWork = completeFindWork(simple, input);
+    long wideWork = completeFindWork(wide, input);
+    assertThat(wideWork).isLessThan(3 * simpleWork);
+  }
+
+  private static long completeFindWork(Pattern pattern, String input) {
+    return WorkCounter.countWithForwardDfaStepsForTesting(() -> {
+      Matcher matcher = pattern.matcher(input);
+      int count = 0;
+      while (matcher.find()) {
+        count++;
+      }
+      assertThat(count).isEqualTo(input.length());
+    });
+  }
+
   private static long multibyteFindWork(Pattern pattern, int repetitions) {
     Utf8Input input = Utf8Input.validated("💡é".repeat(repetitions).getBytes(UTF_8));
     return WorkCounter.countWithForwardDfaStepsForTesting(() -> {

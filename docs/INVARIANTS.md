@@ -17,9 +17,14 @@ work bounds; a linear inner search alone does not establish those bounds.
 
 Repeated searches charge scans up to the selected match and bounded lookahead to cursor
 advancement. When scans overlap beyond that allowance, the matcher uses the exact NFA and records
-failures at bounded intervals. A continuation after the final match cannot accept on the same
+failures at bounded intervals. Scalar scan units and accelerated scan units carry different
+positive charges. Activation compares the excess over the advancing matches' allowance with
+the cost of covering the outstanding tail. After short searches that use no cached failure,
+the start-register engine can retry within a fixed window. Only a completed search can supply
+a result. Exhausting the window restarts the exact search with the existing memo. A continuation after the final match cannot accept on the same
 input and bounds. Scalar programs with independent instructions record each failure by instruction
-and position. A later search stops when all its live instructions have failed there. Both searches
+and position. Dense sets use bitmaps. The scalar program width can increase the checkpoint
+spacing by a factor fixed for that program. A later search stops when all its live instructions have failed there. Both searches
 check only positions past the previous-match boundary, where any future `\G` assertion fails.
 For programs that need extra state, the key preserves the whole frontier, including thread order,
 progress state, and pending grapheme work. The matcher discards old checkpoints as the cursor

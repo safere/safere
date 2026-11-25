@@ -45,6 +45,24 @@ class FindTailMemoTest {
     assertThat(seen(memo, 4_103, 2)).isFalse();
   }
 
+  @Test
+  void sparseAndDenseProofsCanGrowAtTheSameCheckpoint() {
+    FindTailMemo memo = new FindTailMemo(Pattern.compile("a{200}b").prog(), 8192);
+    memo.beginSearch(0, 0);
+    assertThat(seen(memo, 64, 100)).isFalse();
+    memo.finishSearch(1);
+    memo.beginSearch(0, 1);
+    assertThat(seen(memo, 64, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)).isFalse();
+    memo.finishSearch(2);
+    memo.beginSearch(0, 2);
+    assertThat(seen(memo, 64, 1, 9, 100)).isTrue();
+    assertThat(seen(memo, 64, 100, 130)).isFalse();
+    memo.finishSearch(3);
+    memo.beginSearch(0, 3);
+    assertThat(seen(memo, 64, 2, 100, 130)).isTrue();
+    assertThat(seen(memo, 64, 131)).isFalse();
+  }
+
   private static boolean seen(FindTailMemo memo, int pos, int... instructions) {
     IntArrayList key = memo.key();
     for (int instruction : instructions) {

@@ -808,18 +808,9 @@ public final class Matcher implements MatchResult {
    * the search backed off or it fell back, or a later position when it handed the search over.
    */
   private int findWithStartRegister(InputScanner scanner, int effectiveStart, Prog prog) {
-    releaseEnginesOwnedByOtherThread();
-    StartRegisterSearch search = cachedStartRegister;
+    StartRegisterSearch search = preparedStartRegister();
     if (search == null) {
-      if (startRegisterLookedUp) {
-        return effectiveStart;
-      }
-      startRegisterLookedUp = true;
-      search = parentPattern.startRegisterSearch(threadCache());
-      cachedStartRegister = search;
-      if (search == null) {
-        return effectiveStart;
-      }
+      return effectiveStart;
     }
     long result = search.find(scanner, effectiveStart, startBackoff);
     if (result == StartRegisterSearch.SKIPPED) {
@@ -845,6 +836,15 @@ public final class Matcher implements MatchResult {
     }
     applyDeferredMatchResult((int) (result >>> 32), (int) result, prog.numCaptures(), true, false);
     return REGISTER_MATCH;
+  }
+
+  private StartRegisterSearch preparedStartRegister() {
+    releaseEnginesOwnedByOtherThread();
+    if (!startRegisterLookedUp) {
+      startRegisterLookedUp = true;
+      cachedStartRegister = parentPattern.startRegisterSearch(threadCache());
+    }
+    return cachedStartRegister;
   }
 
   /** Returns the Pattern's thread-local cached reverse DFA (or null), caching it for reuse. */
@@ -1783,7 +1783,7 @@ public final class Matcher implements MatchResult {
   private static final int FIND_LOOKAHEAD_LIMIT = 64;
   // The DFA processes input more cheaply than the NFA. Allow more lookahead when advancing
   // between matches already pays for it, and let short sequences finish without checkpoints.
-  private static final int DFA_MIN_TAIL_LOOKAHEAD = 192;
+  private static final int DFA_MIN_TAIL_LOOKAHEAD = 256;
   private static final int DFA_LOOKAHEAD_PER_ADVANCE = 64;
   private static final int DFA_TAIL_OVERLAPS = 8;
   // Charge scalar DFA overlaps more heavily than native self-loop scans.
@@ -1792,15 +1792,17 @@ public final class Matcher implements MatchResult {
   private int findScanEnd;
   private int findBitStateEndBound;
   private long findBitStateWork;
-  private boolean findMostlyAccelerated;
+  private int findNativeScanUnits;
+  private int shortMemoSearches;
   private FindTailMemo findTailMemo;
   private int findTailEnd;
-  private int findTailOverlaps;
+  private long findTailDebt;
 
   private void clearFindTail() {
     findTailMemo = null;
     findTailEnd = 0;
-    findTailOverlaps = 0;
+    findTailDebt = 0;
+    shortMemoSearches = 0;
   }
 
   private void startFindWork(int start) {
@@ -1808,7 +1810,7 @@ public final class Matcher implements MatchResult {
     findScanEnd = -1;
     findBitStateEndBound = -1;
     findBitStateWork = 0;
-    findMostlyAccelerated = false;
+    findNativeScanUnits = 0;
   }
 
   private int findInputOffset(InputScanner scanner) {
@@ -1816,15 +1818,19 @@ public final class Matcher implements MatchResult {
   }
 
   private void recordFindScanEnd(InputScanner scanner, int end) {
-    findScanEnd = Math.max(findScanEnd, end + findInputOffset(scanner));
+    int absoluteEnd = end + findInputOffset(scanner);
+    if (absoluteEnd >= findScanEnd) {
+      findScanEnd = absoluteEnd;
+      findNativeScanUnits = 0;
+    }
   }
 
   private void recordDfaFindScan(InputScanner scanner, int start, int end, int nativeUnits) {
     int span = end - start;
     if (span > FIND_LOOKAHEAD_LIMIT && end + findInputOffset(scanner) >= findScanEnd) {
       // Single-ASCII intrinsic scans are much cheaper than walking those units in the NFA.
-      findMostlyAccelerated = 2L * nativeUnits >= span;
       recordFindScanEnd(scanner, end);
+      findNativeScanUnits = nativeUnits;
     }
   }
 
@@ -1849,21 +1855,32 @@ public final class Matcher implements MatchResult {
             ? Math.max(
                 DFA_MIN_TAIL_LOOKAHEAD, DFA_LOOKAHEAD_PER_ADVANCE * (end - findScanStart + 1L))
             : FIND_LOOKAHEAD_LIMIT;
-    if (scanEnd - end <= lookahead) {
+    int tail = scanEnd - end;
+    if (tail <= lookahead) {
+      return;
+    }
+    int weight = dfaEligible ? DFA_SCALAR_OVERLAP_WEIGHT : 1;
+    int nativeUnits =
+        dfaEligible && scanEnd == findScanEnd ? Math.min(tail, findNativeScanUnits) : 0;
+    // The default UTF-8 byte search scans a machine word at a time. String uses the
+    // JVM indexOf intrinsic, which amortizes more bytes per iteration on long runs.
+    int nativeWeight =
+        textScanner instanceof Utf8InputScanner ? DFA_SCALAR_OVERLAP_WEIGHT / Long.BYTES : 1;
+    long cost = (long) weight * (tail - nativeUnits) + (long) nativeWeight * nativeUnits;
+    long excess = cost - weight * lookahead;
+    if (excess <= 0) {
       return;
     }
     if (findTailMemo == null) {
       if (findTailEnd - end <= FIND_LOOKAHEAD_LIMIT) {
-        findTailOverlaps = 0;
-        findTailEnd = 0;
+        findTailDebt = 0;
       }
-      findTailOverlaps += dfaEligible && !findMostlyAccelerated ? DFA_SCALAR_OVERLAP_WEIGHT : 1;
-      findTailEnd = Math.max(findTailEnd, scanEnd);
-      int overlapLimit = dfaEligible ? DFA_TAIL_OVERLAPS * DFA_SCALAR_OVERLAP_WEIGHT : 2;
-      if (findTailOverlaps >= overlapLimit) {
+      findTailDebt += excess;
+      long budget =
+          (long) weight * (dfaEligible ? DFA_TAIL_OVERLAPS : 1) * Math.max(tail, findTailEnd - end);
+      if (findTailDebt >= budget) {
         findTailMemo = new FindTailMemo(parentPattern.nfaProg(prog), regionEnd - regionStart);
       }
-      return;
     }
     findTailEnd = Math.max(findTailEnd, scanEnd);
   }
@@ -3338,6 +3355,28 @@ public final class Matcher implements MatchResult {
 
   private int[] findWithTailMemo(InputScanner scanner, int start, int end, int nsubmatch) {
     findTailMemo.beginSearch(regionStart - findInputOffset(scanner), start);
+    if (shortMemoSearches >= 2
+        && regionStart == 0
+        && regionEnd == getTextLength()
+        && parentPattern.prog().numCaptures() == 1) {
+      StartRegisterSearch search = preparedStartRegister();
+      if (search != null) {
+        long match = search.probe(scanner, start, FIND_LOOKAHEAD_LIMIT);
+        if (diagnosticOperation != null && match != StartRegisterSearch.SKIPPED) {
+          diagnosticOperation.accumulator().incrementForwardDfaSearchCount();
+        }
+        if (match >= 0) {
+          if (groups == null || groups.length < 2) {
+            groups = new int[2];
+          }
+          groups[0] = (int) (match >>> 32);
+          groups[1] = (int) match;
+          diagnosticExact(MatchStrategy.DFA, false);
+          return groups;
+        }
+        shortMemoSearches = 0;
+      }
+    }
     int[] result =
         searchNfa(
             parentPattern.prog(),
@@ -3351,6 +3390,13 @@ public final class Matcher implements MatchResult {
             false,
             groups,
             findTailMemo);
+    if (result != null
+        && !findTailMemo.stoppedEarly()
+        && findScanEnd - findInputOffset(scanner) - result[1] <= FIND_LOOKAHEAD_LIMIT) {
+      shortMemoSearches = Math.min(2, shortMemoSearches + 1);
+    } else {
+      shortMemoSearches = 0;
+    }
     diagnosticExact(MatchStrategy.NFA, nsubmatch > 1 && result != null);
     return result;
   }
