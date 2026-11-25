@@ -293,7 +293,7 @@ class StartRegisterSearchTest {
     StartRegisterSearch search = StartRegisterSearch.create(pattern.flatDfaProg(), null, null);
 
     assertThat(search.searchForTesting(new StringInputScanner(input), 0)).isEqualTo(input.length());
-    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(Dfa.CACHE_BYTE_BUDGET);
+    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
   }
 
   @Test
@@ -306,7 +306,7 @@ class StartRegisterSearchTest {
     assertThat(search.find(new StringInputScanner(wide), 0, AdaptiveBackoff.NEUTRAL))
         .isEqualTo(StartRegisterSearch.FALLBACK);
     long full = search.estimatedCacheBytes();
-    assertThat(full).isLessThanOrEqualTo(Dfa.CACHE_BYTE_BUDGET);
+    assertThat(full).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
     assertThat(search.find(new StringInputScanner(shortMatch), 0, AdaptiveBackoff.NEUTRAL))
         .isEqualTo(shortMatch.length());
     assertThat(search.resetsForTesting()).isEqualTo(1);
@@ -322,7 +322,7 @@ class StartRegisterSearchTest {
     StartRegisterSearch search = search(regex);
     assertThat(search.find(new StringInputScanner(input), 0, AdaptiveBackoff.NEUTRAL))
         .isEqualTo(input.length());
-    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(Dfa.CACHE_BYTE_BUDGET);
+    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
   }
 
   @Test
@@ -349,7 +349,7 @@ class StartRegisterSearchTest {
     }
     assertThat(result).isEqualTo(StartRegisterSearch.FALLBACK);
     assertThat(search.stateCount()).isEqualTo(states);
-    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(Dfa.CACHE_BYTE_BUDGET);
+    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
     assertThat(search.find(new StringInputScanner(first), 0, AdaptiveBackoff.NEUTRAL))
         .isEqualTo(first.length());
     assertThat(search.resetsForTesting()).isEqualTo(1);

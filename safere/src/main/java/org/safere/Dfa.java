@@ -5,6 +5,10 @@
 
 package org.safere;
 
+import static org.safere.DfaCacheBudget.CACHE_BYTE_BUDGET;
+import static org.safere.DfaCacheBudget.REFERENCE_BYTES;
+import static org.safere.DfaCacheBudget.STATE_OVERHEAD_BYTES;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -98,14 +102,7 @@ final class Dfa {
   /** Maximum number of DFA states before bailing out to NFA. */
   private static final int DEFAULT_MAX_STATES = 10_000;
 
-  /** Budget for retained cache data. Array copies can briefly keep the old arrays live. */
-  static final long CACHE_BYTE_BUDGET = 16L * 1024 * 1024;
-
   private static final int INITIAL_TRANSITION_CELLS = 1024;
-  // Budget uncompressed references. Object and array headers are VM-dependent, so allow an
-  // estimated fixed amount per state for them, the map entry and the optional state accelerator.
-  static final int REFERENCE_BYTES = Long.BYTES;
-  static final int STATE_OVERHEAD_BYTES = 256;
 
   /**
    * Input positions of progress per cached state that this DFA must have covered before the state

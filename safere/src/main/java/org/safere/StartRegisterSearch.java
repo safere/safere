@@ -5,9 +5,9 @@
 
 package org.safere;
 
-import static org.safere.Dfa.CACHE_BYTE_BUDGET;
-import static org.safere.Dfa.REFERENCE_BYTES;
-import static org.safere.Dfa.STATE_OVERHEAD_BYTES;
+import static org.safere.DfaCacheBudget.CACHE_BYTE_BUDGET;
+import static org.safere.DfaCacheBudget.REFERENCE_BYTES;
+import static org.safere.DfaCacheBudget.STATE_OVERHEAD_BYTES;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -552,6 +552,11 @@ final class StartRegisterSearch {
     }
     if (candidate == pos) {
       return ((long) pos << 32) | sid;
+    }
+    // The start state's word context comes from the code points around the candidate, so it must
+    // not split one. Accelerator candidates are boundaries; this keeps the search safe if not.
+    if (!text.isCodePointBoundary(candidate)) {
+      return FALLBACK;
     }
     St s = startState(text, candidate);
     if (s == null || s.matchRank != NONE) {
