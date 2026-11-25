@@ -29,6 +29,15 @@ public final class CompileInitializationProbe {
         System.out.println(COMPILED);
         checkFirstCaptures(pattern);
       }
+      case "cache-budget" -> {
+        Pattern pattern = Pattern.compile(regex);
+        System.out.println(COMPILED);
+        Dfa dfa = pattern.forwardLongestMatchDfa();
+        if (dfa == null || !dfa.doSearch("abc", 0, true, true).matched()) {
+          throw new AssertionError("expected the DFA to match");
+        }
+        System.out.println("SafeRE reference bytes: " + DfaCacheBudget.REFERENCE_BYTES);
+      }
       case "compile" -> Pattern.compile(regex);
       default -> throw new IllegalArgumentException(args[1]);
     }

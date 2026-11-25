@@ -668,7 +668,7 @@ class DfaTest {
     void byteBudgetCanRejectTheFirstLiveState() {
       Prog prog = Compiler.compile(Parser.parse("a", FLAGS));
       // Use a synthetic alphabet to reach the byte budget without compiling a huge pattern.
-      int[] boundaries = new int[750_000];
+      int[] boundaries = new int[1_100_000];
       Arrays.setAll(boundaries, index -> index + 1);
       int[] asciiClasses = new int[128];
       Arrays.setAll(asciiClasses, index -> index);

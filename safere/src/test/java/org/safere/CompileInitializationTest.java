@@ -6,12 +6,15 @@
 package org.safere;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -21,6 +24,7 @@ class CompileInitializationTest {
   private static final String INDEX_NAME = "org/safere/UnicodeCaseFolding$UnicodeCaseClosureIndex";
   // Generated crosscheck tests copy this disabled test without its SafeRE-only probe class.
   private static final String PROBE_CLASS_NAME = "org.safere.CompileInitializationProbe";
+  private static final String DFA_CACHE_BUDGET_NAME = "org/safere/DfaCacheBudget";
 
   @ParameterizedTest
   @ValueSource(strings = {"hello", "\\w+", "\\p{L}+", "(foo|bar)+"})
@@ -140,6 +144,33 @@ class CompileInitializationTest {
     assertThat(runFreshProcess("[Θθϑϴ]", locale)).contains(INDEX_NAME);
   }
 
+  @Test
+  void compilationDoesNotReadTheDfaCacheReferenceSize()
+      throws IOException, InterruptedException, URISyntaxException {
+    assertThat(runFreshProcess("a[bc]+")).doesNotContain(DFA_CACHE_BUDGET_NAME);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void firstDfaSearchUsesTheEffectiveHotSpotReferenceSize(boolean compressed)
+      throws IOException, InterruptedException, URISyntaxException {
+    String vm = System.getProperty("java.vm.name");
+    assumeTrue(vm.contains("HotSpot") || vm.startsWith("OpenJDK"), "Requires HotSpot");
+    String option = compressed ? "-XX:+UseCompressedOops" : "-XX:-UseCompressedOops";
+    String expected = "SafeRE reference bytes: " + (compressed ? Integer.BYTES : Long.BYTES);
+
+    assertThat(runFreshProcess("a[bc]+", "", "cache-budget", option))
+        .containsSubsequence(
+            "SafeRE pattern compiled", "Initializing '" + DFA_CACHE_BUDGET_NAME + "'", expected);
+  }
+
+  @Test
+  void firstDfaSearchUsesConservativeSizeWithoutManagement()
+      throws IOException, InterruptedException, URISyntaxException {
+    assertThat(runFreshProcess("a[bc]+", "", "cache-budget", "--limit-modules=java.base"))
+        .contains("SafeRE reference bytes: " + Long.BYTES);
+  }
+
   private static String runFreshProcess(String regex)
       throws IOException, InterruptedException, URISyntaxException {
     return runFreshProcess(regex, "");
@@ -150,7 +181,8 @@ class CompileInitializationTest {
     return runFreshProcess(regex, locale, "compile");
   }
 
-  private static String runFreshProcess(String regex, String locale, String mode)
+  private static String runFreshProcess(
+      String regex, String locale, String mode, String... vmOptions)
       throws IOException, InterruptedException, URISyntaxException {
     String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
     String pathSeparator = System.getProperty("path.separator");
@@ -166,17 +198,10 @@ class CompileInitializationTest {
     // Process arguments use the platform's native encoding, which may be ASCII in isolation.
     String encodedRegex =
         Base64.getEncoder().encodeToString(regex.getBytes(StandardCharsets.UTF_8));
-    ProcessBuilder processBuilder =
-        new ProcessBuilder(
-                java,
-                "-Xmx12m",
-                "-Xlog:class+init=info",
-                "-cp",
-                classPath,
-                PROBE_CLASS_NAME,
-                encodedRegex,
-                mode)
-            .redirectErrorStream(true);
+    List<String> command = new ArrayList<>(List.of(java, "-Xmx12m", "-Xlog:class+init=info"));
+    command.addAll(List.of(vmOptions));
+    command.addAll(List.of("-cp", classPath, PROBE_CLASS_NAME, encodedRegex, mode));
+    ProcessBuilder processBuilder = new ProcessBuilder(command).redirectErrorStream(true);
     if (!locale.isEmpty()) {
       processBuilder.environment().put("LC_ALL", locale);
     }
