@@ -309,9 +309,15 @@ class DiagnosticsTest {
     }
     assertThat(stringMatcher.find()).isFalse();
     assertThat(utf8Matcher.find()).isFalse();
-    assertThat(pattern.matcher(input).replaceAll("x")).isEqualTo("x".repeat(16) + tail);
     assertThat(operationsFor(pattern))
         .noneMatch(event -> event.boundaryStrategy() == MatchStrategy.NFA);
+
+    assertThat(pattern.matcher(input).replaceAll("x")).isEqualTo("x".repeat(16) + tail);
+    OperationDiagnostics replacement = operationsFor(pattern).getLast();
+    assertThat(replacement.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+    // The first boundary strategy misses later handoffs. Expect one DFA search per match
+    // and one final search that rejects the rest of the input.
+    assertThat(replacement.forwardDfaSearchCount()).isEqualTo(17);
   }
 
   @ParameterizedTest
