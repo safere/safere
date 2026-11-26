@@ -63,6 +63,23 @@ class FindTailMemoTest {
     assertThat(seen(memo, 64, 131)).isFalse();
   }
 
+  @Test
+  void learningOnePositionDoesNotChangeItsNeighbor() {
+    for (int[] failures : new int[][] {{1, 2}, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}}) {
+      FindTailMemo memo = new FindTailMemo(Pattern.compile("a{200}b").prog(), 128);
+      memo.beginSearch(0, 0);
+      assertThat(seen(memo, 32, failures)).isFalse();
+      assertThat(seen(memo, 64, failures)).isFalse();
+      memo.finishSearch(1);
+      memo.beginSearch(0, 1);
+      assertThat(seen(memo, 32, 15)).isFalse();
+      memo.finishSearch(2);
+      memo.beginSearch(0, 2);
+      assertThat(seen(memo, 32, 15)).isTrue();
+      assertThat(seen(memo, 64, 15)).isFalse();
+    }
+  }
+
   private static boolean seen(FindTailMemo memo, int pos, int... instructions) {
     IntArrayList key = memo.key();
     for (int instruction : instructions) {

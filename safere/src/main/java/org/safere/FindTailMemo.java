@@ -125,7 +125,7 @@ final class FindTailMemo {
         return true;
       }
     }
-    pending.add(new Checkpoint(pos, key.toArray()));
+    stage(new Checkpoint(pos, key.toArray()));
     return false;
   }
 
@@ -136,12 +136,27 @@ final class FindTailMemo {
     return checkpoint;
   }
 
+  private void stage(Checkpoint checkpoint) {
+    if (!pending.isEmpty()) {
+      Checkpoint previous = pending.getLast();
+      if (WorkCounterConfig.ENABLED && previous.key.length == checkpoint.key.length) {
+        WorkCounter.record(checkpoint.key.length);
+      }
+      if (Arrays.equals(previous.key, checkpoint.key)) {
+        checkpoint.key = previous.key;
+        previous.shared = true;
+        checkpoint.shared = true;
+      }
+    }
+    pending.add(checkpoint);
+  }
+
   private boolean seenInstructions(int pos, Checkpoint prior) {
     if (WorkCounterConfig.ENABLED) {
       WorkCounter.record(key.size());
     }
     if (prior == null) {
-      pending.add(instructionSet(pos, key));
+      stage(instructionSet(pos, key));
       return false;
     }
     unproved.clear();
@@ -154,7 +169,7 @@ final class FindTailMemo {
     if (unproved.isEmpty()) {
       return true;
     }
-    pending.add(instructionSet(pos, unproved));
+    stage(instructionSet(pos, unproved));
     return false;
   }
 
@@ -226,16 +241,23 @@ final class FindTailMemo {
         known.addToBitmap(words);
         known.key = words;
         known.bitmap = true;
+      } else if (known.shared) {
+        if (WorkCounterConfig.ENABLED) {
+          WorkCounter.record(known.key.length);
+        }
+        known.key = known.key.clone();
       }
+      known.shared = false;
       observed.addToBitmap(known.key);
       return;
     }
-    if (size > known.key.length) {
+    if (size > known.key.length || known.shared) {
       known.key = Arrays.copyOf(known.key, Math.max(size, known.key.length * 2));
     }
     if (WorkCounterConfig.ENABLED) {
       WorkCounter.record(size);
     }
+    known.shared = false;
     int oldIndex = known.keySize - 1;
     int newIndex = observed.keySize - 1;
     int out = size - 1;
@@ -257,6 +279,8 @@ final class FindTailMemo {
     private int[] key;
     private int keySize;
     private boolean bitmap;
+    // Adjacent observations can share their payload. Only a merge at this position may change it.
+    private boolean shared;
     private Checkpoint next;
 
     boolean contains(int id) {
