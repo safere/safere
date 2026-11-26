@@ -7,9 +7,17 @@ package org.safere;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 /**
  * {@link StringLiteralSearch} must be indistinguishable from {@link String#indexOf(String, int)}.
@@ -301,6 +309,358 @@ final class StringLiteralSearchTest {
         assertThat(dispatched).as("literal=%s fromIndex=%s", literal, from).isEqualTo(undispatched);
       }
     }
+  }
+
+  @Test
+  void compiledPlanMatchesStaticHelpersAndJdk() {
+    String text = "a q: b - c é d 😀 e a😀b f " + FILLER + " q: - é 😀 a😀b";
+    for (String literal :
+        new String[] {"", "-", "q:", "error:", "   ", "é", "日本", "😀", "a😀b", "x".repeat(140)}) {
+      StringLiteralSearch.Plan plan = StringLiteralSearch.Plan.compile(literal);
+      int expectedOffset = StringLiteralSearch.anchorOffset(literal);
+      assertThat(plan.literal()).isEqualTo(literal);
+      assertThat(plan.anchorOffset()).isEqualTo(expectedOffset);
+      assertThat(plan.anchor()).isEqualTo(StringLiteralSearch.anchorAt(literal, expectedOffset));
+      assertThat(plan.singleAsciiChar()).isEqualTo(StringLiteralSearch.singleAsciiChar(literal));
+      for (int from :
+          new int[] {-5, 0, 1, 10, text.length() - 1, text.length(), text.length() + 5}) {
+        assertThat(plan.indexOf(text, from))
+            .as("literal=%s fromIndex=%s", literal, from)
+            .isEqualTo(text.indexOf(literal, from));
+        assertThat(plan.indexOfAfterShortGap(text, from))
+            .as("afterShortGap literal=%s fromIndex=%s", literal, from)
+            .isEqualTo(text.indexOf(literal, from));
+      }
+    }
+  }
+
+  @Test
+  void indexOfAfterShortGapHandlesProbeBoundariesAndDenseToSparseTransitions() {
+    String tail = "y".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 128);
+    // Test short, medium, and max-anchored-length literals across every boundary around
+    // DENSE_PROBE_WINDOW so straddling matches are never missed.
+    String maxAnchored = "a".repeat(StringLiteralSearch.MAX_ANCHORED_LITERAL_LENGTH - 1) + ":";
+    assertThat(StringLiteralSearch.anchorOffset(maxAnchored))
+        .isNotEqualTo(StringLiteralSearch.NO_ANCHOR);
+    for (String literal : new String[] {"id:", "https://", maxAnchored}) {
+      StringLiteralSearch.Plan plan = StringLiteralSearch.Plan.compile(literal);
+      int w = StringLiteralSearch.DENSE_PROBE_WINDOW;
+      int len = literal.length();
+      for (int offset : new int[] {0, 1, w - len - 1, w - len, w - len + 1, w - 1, w, w + 500}) {
+        if (offset < 0) {
+          continue;
+        }
+        String text = "y".repeat(offset) + literal + tail;
+        assertThat(plan.indexOfAfterShortGap(text, 0))
+            .as("literalLen=%d offset=%d", len, offset)
+            .isEqualTo(offset);
+        // Also test non-zero fromIndex.
+        String shifted = "zzz" + text;
+        assertThat(plan.indexOfAfterShortGap(shifted, 3))
+            .as("shifted literalLen=%d offset=%d", len, offset)
+            .isEqualTo(offset + 3);
+      }
+      String absent = "y".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 512);
+      assertThat(plan.indexOfAfterShortGap(absent, 0)).isEqualTo(-1);
+    }
+
+    // Dense burst followed by a long sparse gap followed by more dense matches across all entry
+    // points.
+    String denseThenSparse =
+        "a https://b https://c https://"
+            + "y".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 512)
+            + "https://d https://e"
+            + "y".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 512);
+    Pattern safere = Pattern.compile("https://");
+    java.util.regex.Pattern jdk = java.util.regex.Pattern.compile("https://");
+    assertThat(collectFindBounds(safere, denseThenSparse))
+        .isEqualTo(collectJdkFindBounds(jdk, denseThenSparse));
+    assertThat(safere.matcher(denseThenSparse).replaceAll("http://"))
+        .isEqualTo(jdk.matcher(denseThenSparse).replaceAll("http://"));
+    assertThat(safere.split(denseThenSparse, -1)).containsExactly(jdk.split(denseThenSparse, -1));
+    assertThat(safere.splitAsStream(denseThenSparse).toList())
+        .isEqualTo(jdk.splitAsStream(denseThenSparse).toList());
+  }
+
+  @Test
+  void wholePatternLiteralEntryPointsAgreeWithJdk() {
+    String longText =
+        "alpha beta gamma ".repeat(80)
+            + "id:42 https://example.com; café 😀 a😀b "
+            + ":".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 100)
+            + "id:99 https://example.org; café 😀 a😀b tail";
+    String shortText = "id:1; café 😀 a😀b";
+    String noMatchLong = "alpha beta gamma ".repeat(120);
+    String[] inputs = {
+      "",
+      shortText,
+      longText,
+      noMatchLong,
+      "日本語;日本語https://日本語",
+      ":".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW * 2) + "id:" + ":".repeat(50),
+    };
+    String[] regexes = {
+      "id:",
+      "https://",
+      "error:",
+      ";",
+      "-",
+      "é",
+      "日本",
+      "😀",
+      "a😀b",
+      "   ",
+      "",
+      "x".repeat(StringLiteralSearch.MAX_ANCHORED_LITERAL_LENGTH + 5),
+      "(id:)",
+      "(;)",
+      "^id:",
+      "\\Aid:",
+    };
+    for (String regex : regexes) {
+      Pattern safere = Pattern.compile(regex);
+      java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex);
+      for (String input : inputs) {
+        assertThat(safere.asPredicate().test(input))
+            .as("asPredicate /%s/ len=%d", regex, input.length())
+            .isEqualTo(jdk.asPredicate().test(input));
+        assertThat(collectFindBounds(safere, input))
+            .as("findAll /%s/ len=%d", regex, input.length())
+            .isEqualTo(collectJdkFindBounds(jdk, input));
+        assertThat(safere.matcher(input).replaceFirst("X"))
+            .as("replaceFirst /%s/ len=%d", regex, input.length())
+            .isEqualTo(jdk.matcher(input).replaceFirst("X"));
+        assertThat(safere.matcher(input).replaceAll("X"))
+            .as("replaceAll /%s/ len=%d", regex, input.length())
+            .isEqualTo(jdk.matcher(input).replaceAll("X"));
+        for (int limit : new int[] {-1, 0, 2}) {
+          assertThat(safere.split(input, limit))
+              .as("split /%s/ limit=%d len=%d", regex, limit, input.length())
+              .containsExactly(jdk.split(input, limit));
+          assertThat(safere.splitWithDelimiters(input, limit))
+              .as("splitWithDelimiters /%s/ limit=%d len=%d", regex, limit, input.length())
+              .containsExactly(jdk.splitWithDelimiters(input, limit));
+        }
+        assertThat(safere.splitAsStream(input).toList())
+            .as("splitAsStream /%s/ len=%d", regex, input.length())
+            .isEqualTo(jdk.splitAsStream(input).toList());
+      }
+    }
+  }
+
+  @Test
+  void regionFindWithExactLiteralDoesNotScanPastRegionEnd() {
+    String prefix = "x".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 128);
+    String input = "id:" + prefix + "id:";
+    for (String regex : new String[] {"id:", ";", "😀"}) {
+      Pattern safere = Pattern.compile(regex);
+      java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex);
+      String text = regex + prefix + regex;
+      Matcher m = safere.matcher(text).region(regex.length(), regex.length() + prefix.length());
+      java.util.regex.Matcher jm =
+          jdk.matcher(text).region(regex.length(), regex.length() + prefix.length());
+      assertThat(m.find()).as("region /%s/", regex).isEqualTo(jm.find()).isFalse();
+    }
+    Matcher bounded = Pattern.compile("id:").matcher(input).region(3, input.length() - 3);
+    assertThat(bounded.find()).isFalse();
+  }
+
+  /**
+   * Verifies that all four whole-pattern String literal fast paths execute {@link
+   * StringLiteralSearch} and charge the exact same work without double- or under-counting.
+   *
+   * <p>Spaced false anchor occurrences cause {@link StringLiteralSearch#indexOf} to record strictly
+   * more than {@code text.length()} units (scan plus candidate verification), distinguishing it
+   * from both uncounted and manually counted bare {@link String#indexOf(String, int)} calls.
+   */
+  @Test
+  @Tag("work-counter")
+  void wholePatternLiteralEntryPointsMatchPlanWorkAccounting() {
+    // Anchor for "id:" is ':' at offset 2. False ':' hits every 300 chars stay sparse (no defeat),
+    // so StringLiteralSearch charges scan + verification (> text.length()).
+    String spacedFalseAnchors = ("y".repeat(299) + ":").repeat(6) + "y".repeat(200);
+    assertThat(spacedFalseAnchors.length()).isGreaterThan(StringLiteralSearch.MIN_ANCHORED_WINDOW);
+
+    Pattern anchoredPattern = Pattern.compile("id:");
+    StringLiteralSearch.Plan anchoredPlan = StringLiteralSearch.Plan.compile("id:");
+    long expectedAnchored =
+        WorkCounter.countForTesting(
+            () -> assertThat(anchoredPlan.indexOf(spacedFalseAnchors, 0)).isEqualTo(-1));
+    assertThat(expectedAnchored).isGreaterThan(spacedFalseAnchors.length());
+    assertAllEntryPointsCharge(anchoredPattern, spacedFalseAnchors, expectedAnchored, false);
+
+    // Capturing-group wrapper bypasses LiteralPreparedRunner for find(), but
+    // replaceAll/split/asPredicate
+    // still use Pattern.literalSearchPlan().
+    Pattern capturedLiteral = Pattern.compile("(id:)");
+    assertThat(
+            WorkCounter.countForTesting(
+                () -> assertThat(capturedLiteral.asPredicate().test(spacedFalseAnchors)).isFalse()))
+        .isEqualTo(expectedAnchored);
+    assertThat(
+            WorkCounter.countForTesting(() ->
+                assertThat(capturedLiteral.matcher(spacedFalseAnchors).replaceAll("X"))
+                    .isEqualTo(spacedFalseAnchors)))
+        .isEqualTo(expectedAnchored);
+    assertThat(
+            WorkCounter.countForTesting(
+                () -> assertThat(capturedLiteral.split(spacedFalseAnchors)).hasSize(1)))
+        .isEqualTo(expectedAnchored);
+
+    // Single-ASCII literal charges identical work across all entry points.
+    Pattern singleCharPattern = Pattern.compile(";");
+    StringLiteralSearch.Plan singleCharPlan = StringLiteralSearch.Plan.compile(";");
+    long expectedSingleChar =
+        WorkCounter.countForTesting(
+            () -> assertThat(singleCharPlan.indexOf(spacedFalseAnchors, 0)).isEqualTo(-1));
+    assertAllEntryPointsCharge(singleCharPattern, spacedFalseAnchors, expectedSingleChar, false);
+
+    // Repeated matches across a long input must stay linear (single-counted per gap).
+    String repeatedMatches = ("y".repeat(250) + "id:").repeat(10) + "y".repeat(250);
+    long findAllWork =
+        WorkCounter.countForTesting(
+            () -> assertThat(collectFindBounds(anchoredPattern, repeatedMatches)).hasSize(10));
+    long replaceAllWork =
+        WorkCounter.countForTesting(() ->
+            assertThat(anchoredPattern.matcher(repeatedMatches).replaceAll("X"))
+                .doesNotContain("id:"));
+    long splitWork =
+        WorkCounter.countForTesting(
+            () -> assertThat(anchoredPattern.split(repeatedMatches)).hasSize(11));
+    assertThat(findAllWork).isEqualTo(replaceAllWork).isEqualTo(splitWork);
+    assertThat(findAllWork).isLessThan(repeatedMatches.length() + 100L);
+
+    // Dense burst followed by a long sparse tail must remain strictly single-counted.
+    String denseThenSparse =
+        ("a".repeat(20) + "id:").repeat(6)
+            + "y".repeat(StringLiteralSearch.MIN_ANCHORED_WINDOW + 512)
+            + "id:tail";
+    long denseFindAll =
+        WorkCounter.countForTesting(
+            () -> assertThat(collectFindBounds(anchoredPattern, denseThenSparse)).hasSize(7));
+    long denseReplaceAll =
+        WorkCounter.countForTesting(() ->
+            assertThat(anchoredPattern.matcher(denseThenSparse).replaceAll("X"))
+                .doesNotContain("id:"));
+    long denseSplit =
+        WorkCounter.countForTesting(
+            () -> assertThat(anchoredPattern.split(denseThenSparse)).hasSize(8));
+    assertThat(denseFindAll).isEqualTo(denseReplaceAll).isEqualTo(denseSplit);
+    assertThat(denseFindAll).isLessThanOrEqualTo(denseThenSparse.length() + 10L);
+  }
+
+  /**
+   * Static bytecode guardrail ensuring all four whole-pattern String literal fast paths route
+   * through {@link StringLiteralSearch.Plan#indexOf} rather than bare {@link String#indexOf}.
+   */
+  @Test
+  void wholePatternLiteralFastPathsInvokeStringLiteralSearchPlan() throws IOException {
+    assertMethodUsesLiteralPlan(
+        Matcher.LiteralPreparedRunner.class, "find", "(Lorg/safere/Matcher;Z)Z");
+    assertMethodUsesLiteralPlan(
+        Matcher.class, "literalReplaceFastPath", "(Ljava/lang/String;I)Ljava/lang/String;");
+    assertMethodUsesLiteralPlan(
+        Matcher.class,
+        "findLiteralSplitPositions",
+        "(Lorg/safere/StringLiteralSearch$Plan;ILorg/safere/Matcher$SplitBuffer;)I");
+    assertMethodUsesLiteralPlan(Matcher.class, "findNextMatchPacked", "(II)J");
+    assertMethodUsesLiteralPlan(Pattern.class, "findInString", "(Ljava/lang/String;)Z");
+  }
+
+  private static void assertAllEntryPointsCharge(
+      Pattern pattern, String input, long expectedWork, boolean expectedMatch) {
+    assertThat(
+            WorkCounter.countForTesting(
+                () -> assertThat(pattern.matcher(input).find()).isEqualTo(expectedMatch)))
+        .as("Matcher.find /%s/", pattern.pattern())
+        .isEqualTo(expectedWork);
+    assertThat(
+            WorkCounter.countForTesting(
+                () -> assertThat(pattern.asPredicate().test(input)).isEqualTo(expectedMatch)))
+        .as("Pattern.asPredicate /%s/", pattern.pattern())
+        .isEqualTo(expectedWork);
+    assertThat(WorkCounter.countForTesting(() -> pattern.matcher(input).replaceFirst("X")))
+        .as("Matcher.replaceFirst /%s/", pattern.pattern())
+        .isEqualTo(expectedWork);
+    assertThat(WorkCounter.countForTesting(() -> pattern.matcher(input).replaceAll("X")))
+        .as("Matcher.replaceAll /%s/", pattern.pattern())
+        .isEqualTo(expectedWork);
+    assertThat(WorkCounter.countForTesting(() -> pattern.split(input)))
+        .as("Pattern.split /%s/", pattern.pattern())
+        .isEqualTo(expectedWork);
+  }
+
+  private static void assertMethodUsesLiteralPlan(
+      Class<?> owner, String methodName, String methodDescriptor) throws IOException {
+    String resource = owner.getName().replace('.', '/') + ".class";
+    boolean[] foundMethod = {false};
+    boolean[] callsPlan = {false};
+    List<String> bareStringIndexOfCalls = new ArrayList<>();
+    try (InputStream in = owner.getClassLoader().getResourceAsStream(resource)) {
+      assertThat(in).as("class bytes for %s", resource).isNotNull();
+      new ClassReader(in)
+          .accept(
+              new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public MethodVisitor visitMethod(
+                    int access,
+                    String name,
+                    String descriptor,
+                    String signature,
+                    String[] exceptions) {
+                  if (!name.equals(methodName) || !descriptor.equals(methodDescriptor)) {
+                    return null;
+                  }
+                  foundMethod[0] = true;
+                  return new MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitMethodInsn(
+                        int opcode,
+                        String callOwner,
+                        String callName,
+                        String callDescriptor,
+                        boolean isInterface) {
+                      if (callOwner.equals("org/safere/StringLiteralSearch$Plan")
+                          && callName.equals("indexOf")
+                          && callDescriptor.equals("(Ljava/lang/String;I)I")) {
+                        callsPlan[0] = true;
+                      }
+                      if (callOwner.equals("java/lang/String")
+                          && callName.equals("indexOf")
+                          && (callDescriptor.equals("(Ljava/lang/String;)I")
+                              || callDescriptor.equals("(Ljava/lang/String;I)I"))) {
+                        bareStringIndexOfCalls.add(callOwner + "." + callName + callDescriptor);
+                      }
+                    }
+                  };
+                }
+              },
+              ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+    }
+    String target = owner.getSimpleName() + "." + methodName;
+    assertThat(foundMethod[0]).as("method %s exists", target).isTrue();
+    assertThat(callsPlan[0]).as("%s calls StringLiteralSearch.Plan.indexOf", target).isTrue();
+    assertThat(bareStringIndexOfCalls)
+        .as("%s must not call bare String.indexOf(String)", target)
+        .isEmpty();
+  }
+
+  private static List<String> collectFindBounds(Pattern pattern, String input) {
+    List<String> bounds = new ArrayList<>();
+    Matcher matcher = pattern.matcher(input);
+    while (matcher.find()) {
+      bounds.add(matcher.start() + ":" + matcher.end());
+    }
+    return bounds;
+  }
+
+  private static List<String> collectJdkFindBounds(java.util.regex.Pattern pattern, String input) {
+    List<String> bounds = new ArrayList<>();
+    java.util.regex.Matcher matcher = pattern.matcher(input);
+    while (matcher.find()) {
+      bounds.add(matcher.start() + ":" + matcher.end());
+    }
+    return bounds;
   }
 
   private static int planned(String text, String literal, int fromIndex) {

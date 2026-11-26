@@ -5247,6 +5247,78 @@
       },
       "shared": true
     }
+,
+    {
+      "id": "literalSearch.noMatch.32768",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "the quick brown fox jumps over the lazy dog and writes clean code every single day\n",
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
+      "id": "literalSearch.sparseMulti.32768",
+      "recipe": {
+        "kind": "sparseMatchToLength",
+        "match": "https://example.com",
+        "nonMatch": "the quick brown fox jumps over the lazy dog",
+        "nonMatchRepeats": 90,
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
+      "id": "literalSearch.sparseChar.32768",
+      "recipe": {
+        "kind": "sparseMatchToLength",
+        "match": ";",
+        "nonMatch": "the quick brown fox jumps over the lazy dog",
+        "nonMatchRepeats": 90,
+        "delimiterAlphabet": " ",
+        "seed": 42,
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
+      "id": "literalSearch.denseMulti.4096",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "visit https://example.com/item next ",
+        "length": 4096
+      },
+      "shared": true
+    },
+    {
+      "id": "literalSearch.denseChar.4096",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "alpha,beta,gamma,delta,",
+        "length": 4096
+      },
+      "shared": true
+    },
+    {
+      "id": "literalSearch.denseAnchorMiss.32768",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "key=abc seq=123 tag=xyz mode=ok ",
+        "length": 32768
+      },
+      "shared": true
+    },
+    {
+      "id": "literalSearch.short.noMatch.256",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "the quick brown fox jumps over the lazy dog ",
+        "length": 256
+      },
+      "shared": true
+    }
   ],
   "workloads": [
     {
@@ -25118,6 +25190,428 @@
         "constraints": [
           "prematerializedInput"
         ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.find.noMatch.32768",
+      "operation": "find",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.noMatch.32768"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.find.charNoMatch.32768",
+      "operation": "find",
+      "patterns": [
+        ";"
+      ],
+      "inputs": [
+        "literalSearch.noMatch.32768"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.find.denseAnchorMiss.32768",
+      "operation": "find",
+      "patterns": [
+        "val=200"
+      ],
+      "inputs": [
+        "literalSearch.denseAnchorMiss.32768"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.find.shortNoMatch.256",
+      "operation": "find",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.short.noMatch.256"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.findAll.sparse.32768",
+      "operation": "findAllCount",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.sparseMulti.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.findAll.denseMulti.4096",
+      "operation": "findAllCount",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.denseMulti.4096"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.findAll.denseChar.4096",
+      "operation": "findAllCount",
+      "patterns": [
+        ","
+      ],
+      "inputs": [
+        "literalSearch.denseChar.4096"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.replaceAll.noMatch.32768",
+      "operation": "replaceAll",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.noMatch.32768"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "replacement": "http://"
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.replaceAll.sparse.32768",
+      "operation": "replaceAll",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.sparseMulti.32768"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "replacement": "http://"
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.replaceAll.denseMulti.4096",
+      "operation": "replaceAll",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.denseMulti.4096"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "replacement": "http://"
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.replaceAll.denseAnchorMiss.32768",
+      "operation": "replaceAll",
+      "patterns": [
+        "val=200"
+      ],
+      "inputs": [
+        "literalSearch.denseAnchorMiss.32768"
+      ],
+      "resultConsumption": "string",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "arguments": {
+        "replacement": "val=201"
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.split.noMatch.32768",
+      "operation": "splitLengthSum",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.noMatch.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.split.sparse.32768",
+      "operation": "splitLengthSum",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.sparseMulti.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.split.charSparse.32768",
+      "operation": "splitLengthSum",
+      "patterns": [
+        ";"
+      ],
+      "inputs": [
+        "literalSearch.sparseChar.32768"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.split.denseMulti.4096",
+      "operation": "splitLengthSum",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.denseMulti.4096"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.split.denseChar.4096",
+      "operation": "splitLengthSum",
+      "patterns": [
+        ","
+      ],
+      "inputs": [
+        "literalSearch.denseChar.4096"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.split.shortNoMatch.256",
+      "operation": "splitLengthSum",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.short.noMatch.256"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.exists.noMatch.32768",
+      "operation": "exists",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.noMatch.32768"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.exists.charNoMatch.32768",
+      "operation": "exists",
+      "patterns": [
+        ";"
+      ],
+      "inputs": [
+        "literalSearch.noMatch.32768"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.exists.denseAnchorMiss.32768",
+      "operation": "exists",
+      "patterns": [
+        "val=200"
+      ],
+      "inputs": [
+        "literalSearch.denseAnchorMiss.32768"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "LiteralSearchBenchmark.exists.shortNoMatch.256",
+      "operation": "exists",
+      "patterns": [
+        "https://"
+      ],
+      "inputs": [
+        "literalSearch.short.noMatch.256"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
       }
     }
   ]

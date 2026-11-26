@@ -137,6 +137,7 @@ public final class Pattern implements Serializable {
   private final transient int[] literalMatchFailure;
   private final transient int[] literalMatchShifts;
   private final transient int literalMatchRareByteOffset;
+  private final transient StringLiteralSearch.Plan literalSearchPlan;
   private final transient byte[] prefixUtf8;
   private final transient String anchoredPrefix;
   private final transient byte[] anchoredPrefixUtf8;
@@ -348,6 +349,10 @@ public final class Pattern implements Serializable {
         literalMatchUtf8 == null || this.matchDescriptor.literalFoldCase()
             ? -1
             : RarityOracle.rarestUtf8LiteralByteOffset(literalMatchUtf8);
+    this.literalSearchPlan =
+        literalMatch == null || this.matchDescriptor.literalFoldCase()
+            ? null
+            : StringLiteralSearch.Plan.compile(literalMatch);
     this.startsWithGraphemeClusterBoundary = startsWithGraphemeClusterBoundary;
     this.hasInternalGraphemeClusterBoundary = hasInternalGraphemeClusterBoundary;
     this.charClassPrefix = this.multiAnchor.charClassPrefix();
@@ -1440,10 +1445,11 @@ public final class Pattern implements Serializable {
     if (matchDescriptor.minMatchLength() > 0 && length < matchDescriptor.minMatchLength()) {
       return false;
     }
-    // literalMatchUtf8 is non-null only when literal fast paths are enabled.
-    if (literalMatchUtf8 != null && !literalFoldCase()) {
-      String literal = matchDescriptor.literalMatch();
-      return prog.anchorStart() ? input.startsWith(literal) : input.indexOf(literal) >= 0;
+    // literalSearchPlan is non-null only for exact-case literals with literal fast paths enabled.
+    if (literalSearchPlan != null) {
+      return prog.anchorStart()
+          ? input.startsWith(literalSearchPlan.literal())
+          : literalSearchPlan.indexOf(input, 0) >= 0;
     }
     StringInputScanner scanner = new StringInputScanner(input);
     if (enginePathOptions.keywordAlternationFastPath()
@@ -1609,6 +1615,7 @@ public final class Pattern implements Serializable {
       return new Matcher.LiteralPreparedRunner(
           literal,
           matchDescriptor.literalFoldCase(),
+          literalSearchPlan,
           literalMatchUtf8,
           literalMatchFailure,
           literalMatchShifts,
@@ -2306,6 +2313,10 @@ public final class Pattern implements Serializable {
 
   int[] literalMatchShifts() {
     return literalMatchShifts;
+  }
+
+  StringLiteralSearch.Plan literalSearchPlan() {
+    return literalSearchPlan;
   }
 
   byte[] prefixUtf8() {

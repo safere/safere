@@ -241,4 +241,25 @@ class LiteralFlagTest {
     Matcher m = p.matcher("A b a B A");
     assertThat(m.replaceAll("x")).isEqualTo("x b x B x");
   }
+
+  @Test
+  void literalFastPathsOnLongInputsAcrossEntryPoints() {
+    String filler = "the quick brown fox jumps over the lazy dog ".repeat(40);
+    for (String literal : new String[] {"a.b", "https://", ";", "é", "😀", "a😀b"}) {
+      Pattern p = Pattern.compile(literal, Pattern.LITERAL);
+      String absent = filler + "end";
+      String present = filler + literal + filler + literal + "end";
+
+      assertThat(p.asPredicate().test(absent)).isFalse();
+      assertThat(p.asPredicate().test(present)).isTrue();
+      assertThat(p.matcher(absent).find()).isFalse();
+      assertThat(p.matcher(absent).replaceAll("Z")).isEqualTo(absent);
+      assertThat(p.matcher(present).replaceFirst("Z"))
+          .isEqualTo(filler + "Z" + filler + literal + "end");
+      assertThat(p.matcher(present).replaceAll("Z")).isEqualTo(filler + "Z" + filler + "Z" + "end");
+      assertThat(p.split(absent)).containsExactly(absent);
+      assertThat(p.split(present)).containsExactly(filler, filler, "end");
+      assertThat(p.splitAsStream(present).toList()).containsExactly(filler, filler, "end");
+    }
+  }
 }

@@ -486,6 +486,14 @@ public final class Matcher implements MatchResult {
    */
   private long startBackoff;
 
+  /**
+   * Whether the preceding whole-pattern literal search in this matcher's sequence found a match
+   * within {@link StringLiteralSearch#DENSE_GAP_THRESHOLD} characters. Cleared on reset, region,
+   * and pattern changes. Only selects between direct-probe and anchored entry points, so a stale
+   * value can affect throughput but never changes a match result.
+   */
+  private boolean literalDenseHint;
+
   private InputScanner graphemeContextInput;
   private int graphemeContextStart;
   private int graphemeContextEnd;
@@ -615,6 +623,7 @@ public final class Matcher implements MatchResult {
     previousMatchEnd = 0;
     operationPreviousMatchEnd = 0;
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    literalDenseHint = false;
   }
 
   private void resetSearchStateForRegionStart() {
@@ -623,6 +632,7 @@ public final class Matcher implements MatchResult {
     previousMatchEnd = regionStart;
     operationPreviousMatchEnd = regionStart;
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    literalDenseHint = false;
   }
 
   private void rememberPreviousMatchEnd() {
@@ -680,6 +690,7 @@ public final class Matcher implements MatchResult {
     cachedStartRegister = null;
     startRegisterLookedUp = false;
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    literalDenseHint = false;
     if (bitStateBorrowed && cachedBitState != null) {
       bitStateBorrowed = false;
       cachedBitState = null;
@@ -4115,6 +4126,8 @@ public final class Matcher implements MatchResult {
     }
 
     boolean foldCase = parentPattern.literalFoldCase();
+    StringLiteralSearch.Plan literalSearchPlan =
+        foldCase ? null : parentPattern.literalSearchPlan();
     int anchorOffset = 0;
     char anchorLow = 0;
     char anchorHigh = 0;
@@ -4150,7 +4163,7 @@ public final class Matcher implements MatchResult {
         foldCase
             ? indexOfIgnoreCase(
                 text, literal, anchorOffset, anchorLow, anchorHigh, classHashChain, searchFrom)
-            : indexOfReplacementLiteral(literal, searchFrom);
+            : literalSearchPlan.indexOf(text, searchFrom);
     if (matchStart == -1) {
       if (accumulator != null) {
         accumulator.boundary(MatchStrategy.LITERAL);
@@ -4164,6 +4177,7 @@ public final class Matcher implements MatchResult {
     int firstMatchEnd = -1;
 
     ReplacementSegment[] compiledTemplate = null;
+    boolean shortGap = !foldCase && matchStart < StringLiteralSearch.DENSE_GAP_THRESHOLD;
 
     do {
       if (sb == null) {
@@ -4202,7 +4216,12 @@ public final class Matcher implements MatchResult {
           foldCase
               ? indexOfIgnoreCase(
                   text, literal, anchorOffset, anchorLow, anchorHigh, classHashChain, searchFrom)
-              : indexOfReplacementLiteral(literal, searchFrom);
+              : (shortGap
+                  ? literalSearchPlan.indexOfAfterShortGap(text, searchFrom)
+                  : literalSearchPlan.indexOf(text, searchFrom));
+      if (!foldCase && matchStart >= 0) {
+        shortGap = matchStart - searchFrom < StringLiteralSearch.DENSE_GAP_THRESHOLD;
+      }
     } while (matchStart != -1);
 
     if (sb == null) {
@@ -4235,15 +4254,6 @@ public final class Matcher implements MatchResult {
     }
 
     return sb.toString();
-  }
-
-  private int indexOfReplacementLiteral(String literal, int fromIndex) {
-    int matchStart = text.indexOf(literal, fromIndex);
-    if (WorkCounterConfig.ENABLED) {
-      int examinedEnd = matchStart >= 0 ? matchStart + literal.length() : text.length();
-      WorkCounter.record(Math.max(0, examinedEnd - fromIndex));
-    }
-    return matchStart;
   }
 
   private String charClassReplaceFastPath(String replacement, int limit) {
@@ -5204,6 +5214,12 @@ public final class Matcher implements MatchResult {
       }
       return buffer.size / 2;
     }
+    StringLiteralSearch.Plan literalSearchPlan = parentPattern.literalSearchPlan();
+    if (literalSearchPlan != null
+        && !literalSearchPlan.literal().isEmpty()
+        && !parentPattern.prog().anchorStart()) {
+      return findLiteralSplitPositions(literalSearchPlan, limit, buffer);
+    }
     int firstEndAnchoredStart = probeFirstSplitDelimiter(false);
     if (firstEndAnchoredStart == -1) {
       return 0;
@@ -5213,6 +5229,7 @@ public final class Matcher implements MatchResult {
     int textLen = text.length();
     // This loop has its own search position, so it starts and leaves the backoff state neutral.
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    literalDenseHint = false;
 
     while (searchFrom <= textLen) {
       long packed = findNextMatchPacked(searchFrom, firstEndAnchoredStart);
@@ -5237,6 +5254,27 @@ public final class Matcher implements MatchResult {
       searchFrom = nextSplitSearchPosition(start, end);
     }
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    literalDenseHint = false;
+    return buffer.size / 2;
+  }
+
+  private int findLiteralSplitPositions(
+      StringLiteralSearch.Plan plan, int limit, SplitBuffer buffer) {
+    int literalLength = plan.literal().length();
+    int maxMatches = limit > 0 ? limit - 1 : Integer.MAX_VALUE;
+    int searchFrom = 0;
+    boolean shortGap = false;
+    while (buffer.size / 2 < maxMatches) {
+      int start =
+          shortGap ? plan.indexOfAfterShortGap(text, searchFrom) : plan.indexOf(text, searchFrom);
+      if (start < 0) {
+        break;
+      }
+      shortGap = start - searchFrom < StringLiteralSearch.DENSE_GAP_THRESHOLD;
+      int end = start + literalLength;
+      buffer.add(start, end);
+      searchFrom = end;
+    }
     return buffer.size / 2;
   }
 
@@ -5427,7 +5465,12 @@ public final class Matcher implements MatchResult {
             indexOfIgnoreCase(
                 text, literal, anchorOffset, anchorLow, anchorHigh, classHashChain, fromIndex);
       } else {
-        idx = text.indexOf(literal, fromIndex);
+        StringLiteralSearch.Plan plan = parentPattern.literalSearchPlan();
+        idx =
+            literalDenseHint
+                ? plan.indexOfAfterShortGap(text, fromIndex)
+                : plan.indexOf(text, fromIndex);
+        literalDenseHint = idx >= 0 && idx - fromIndex < StringLiteralSearch.DENSE_GAP_THRESHOLD;
       }
       if (idx < 0) {
         return -1L;
@@ -5695,6 +5738,7 @@ public final class Matcher implements MatchResult {
   static final class LiteralPreparedRunner implements PreparedMatchRunner {
     private final String literal;
     private final boolean foldCase;
+    private final StringLiteralSearch.Plan literalSearchPlan;
     private final byte[] literalUtf8;
     private final int[] failure;
     private final int[] shifts;
@@ -5711,6 +5755,7 @@ public final class Matcher implements MatchResult {
     LiteralPreparedRunner(
         String literal,
         boolean foldCase,
+        StringLiteralSearch.Plan literalSearchPlan,
         byte[] literalUtf8,
         int[] failure,
         int[] shifts,
@@ -5720,6 +5765,7 @@ public final class Matcher implements MatchResult {
         ClassHashChain classHashChain) {
       this.literal = literal;
       this.foldCase = foldCase;
+      this.literalSearchPlan = literalSearchPlan;
       this.literalUtf8 = literalUtf8;
       this.failure = failure;
       this.shifts = shifts;
@@ -5812,10 +5858,12 @@ public final class Matcher implements MatchResult {
                 : utf8Scanner.indexOf(literalUtf8, failure, shifts, matcher.searchFrom);
         matchLength = matchLengthBytes;
       } else if (matcher.text != null) {
-        if (WorkCounterConfig.ENABLED) {
-          WorkCounter.record(Math.max(0, matcher.text.length() - matcher.searchFrom));
-        }
-        idx = matcher.text.indexOf(literal, matcher.searchFrom);
+        int from = matcher.searchFrom;
+        idx =
+            matcher.literalDenseHint
+                ? literalSearchPlan.indexOfAfterShortGap(matcher.text, from)
+                : literalSearchPlan.indexOf(matcher.text, from);
+        matcher.literalDenseHint = idx >= 0 && idx - from < StringLiteralSearch.DENSE_GAP_THRESHOLD;
         matchLength = matchLengthChars;
       } else {
         return matcher.doFindCore(regionActive);

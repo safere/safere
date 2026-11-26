@@ -116,6 +116,25 @@ final class StringLiteralSearch {
   static final int MIN_ANCHORED_WINDOW = STRIKE_BUDGET * MIN_DENSITY_STRIDE;
 
   /**
+   * Match-to-match gap below which a repeated whole-pattern literal search probes directly with
+   * {@link String#indexOf(String, int, int)} before anchoring.
+   *
+   * <p>The anchored scan saves roughly 0.08–0.1 ns per character scanned and adds a fixed
+   * character-search plus {@code startsWith} transition cost of roughly 8 ns per match, so the
+   * break-even gap is around 90–100 characters.
+   */
+  static final int DENSE_GAP_THRESHOLD = 128;
+
+  /**
+   * Bounded direct probe length used by {@link Plan#indexOfAfterShortGap} after a short match gap.
+   *
+   * <p>Strictly greater than {@link #MAX_ANCHORED_LITERAL_LENGTH} so the resumed anchored search
+   * always advances past {@code fromIndex}, and strictly smaller than {@link #MIN_ANCHORED_WINDOW}
+   * so the probe stays inside the remaining text without overflow.
+   */
+  static final int DENSE_PROBE_WINDOW = 256;
+
+  /**
    * Chooses the offset within {@code literal} to anchor the scan on, or {@link #NO_ANCHOR} if this
    * literal is better served by {@link String#indexOf(String, int)} directly.
    *
@@ -294,11 +313,10 @@ final class StringLiteralSearch {
    * Searches with whichever kernel the plan chose, given a {@code singleAsciiChar} from {@link
    * #singleAsciiChar}.
    *
-   * <p>One method rather than the same conditional at both plan sites, and small enough that it
-   * costs a caller nothing beyond the call it replaces. There are only two: the third caller of
-   * {@link #indexOf}, {@code RejectPrefilter.Literal}, cannot reach this at all, because {@code
-   * MultiAnchorCompiler.extractRequiredLiteral} will not return a literal shorter than two
-   * characters.
+   * <p>One method rather than the same conditional at every plan site, and small enough that it
+   * costs a caller nothing beyond the call it replaces. {@code RejectPrefilter.Literal} cannot
+   * reach this at all, because {@code MultiAnchorCompiler.extractRequiredLiteral} will not return a
+   * literal shorter than two characters.
    */
   static int indexOfPlanned(
       String text,
@@ -310,6 +328,65 @@ final class StringLiteralSearch {
     return singleAsciiChar == NOT_SINGLE_ASCII
         ? indexOf(text, literal, anchorOffset, anchor, fromIndex)
         : indexOfChar(text, singleAsciiChar, fromIndex);
+  }
+
+  /**
+   * Precomputed search plan for an exact-case {@link String} literal.
+   *
+   * <p>Holding the anchor selection and single-character dispatch decision in one immutable record
+   * lets whole-pattern literal fast paths share a single plan across entry points without
+   * recomputing it per call.
+   */
+  record Plan(String literal, int anchorOffset, char anchor, int singleAsciiChar) {
+
+    /** Compiles a search plan for an exact-case literal. */
+    static Plan compile(String literal) {
+      int anchorOffset = StringLiteralSearch.anchorOffset(literal);
+      return new Plan(
+          literal,
+          anchorOffset,
+          StringLiteralSearch.anchorAt(literal, anchorOffset),
+          StringLiteralSearch.singleAsciiChar(literal));
+    }
+
+    /** Searches {@code text} for {@link #literal()} at or after {@code fromIndex}. */
+    int indexOf(String text, int fromIndex) {
+      return StringLiteralSearch.indexOfPlanned(
+          text, literal, anchorOffset, anchor, singleAsciiChar, fromIndex);
+    }
+
+    /**
+     * Searches {@code text} for {@link #literal()} at or after {@code fromIndex} after a short
+     * match gap.
+     *
+     * <p>Probes a bounded {@link #DENSE_PROBE_WINDOW}-character prefix with {@link
+     * String#indexOf(String, int, int)} so match-dense repeated searches stay on the fused JDK
+     * kernel while handing any long gap straight back to the anchored scan.
+     */
+    int indexOfAfterShortGap(String text, int fromIndex) {
+      if (anchorOffset == NO_ANCHOR) {
+        return indexOf(text, fromIndex);
+      }
+      int pos = Math.max(0, fromIndex);
+      int length = text.length();
+      if (pos > length) {
+        return -1;
+      }
+      int probeEnd = length - pos < MIN_ANCHORED_WINDOW ? length : pos + DENSE_PROBE_WINDOW;
+      int found = text.indexOf(literal, pos, probeEnd);
+      if (WorkCounterConfig.ENABLED) {
+        int scanned =
+            found >= 0
+                ? found - pos + literal.length()
+                : (probeEnd == length ? length : probeEnd - literal.length() + 1) - pos;
+        WorkCounter.record(Math.max(0, scanned));
+      }
+      if (found >= 0 || probeEnd == length) {
+        return found;
+      }
+      return StringLiteralSearch.indexOf(
+          text, literal, anchorOffset, anchor, probeEnd - literal.length() + 1);
+    }
   }
 
   private StringLiteralSearch() {}
