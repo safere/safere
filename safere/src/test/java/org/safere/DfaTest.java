@@ -10,10 +10,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -637,6 +639,115 @@ class DfaTest {
   @Nested
   @DisplayName("State budget")
   class Budget {
+    @Test
+    void firstMatchWithWideAlphabetBoundsTotalAllocation() throws ReflectiveOperationException {
+      Object bean =
+          Class.forName("java.lang.management.ManagementFactory")
+              .getMethod("getThreadMXBean")
+              .invoke(null);
+      Class<?> type = Class.forName("com.sun.management.ThreadMXBean");
+      Assumptions.assumeTrue(type.isInstance(bean));
+      Assumptions.assumeTrue(
+          (Boolean) type.getMethod("isThreadAllocatedMemorySupported").invoke(bean));
+      type.getMethod("setThreadAllocatedMemoryEnabled", boolean.class).invoke(bean, true);
+      Method allocated = type.getMethod("getThreadAllocatedBytes", long.class);
+      long thread = Thread.currentThread().threadId();
+      Pattern pattern = Pattern.compile(wideAlternation(512, 1024));
+      String input = "a".repeat(512) + Character.toString(0x11000);
+
+      long before = (long) allocated.invoke(bean, thread);
+      boolean matched = pattern.matcher(input).matches();
+      long bytes = (long) allocated.invoke(bean, thread) - before;
+
+      assertThat(matched).isTrue();
+      // Includes old arrays discarded during growth as well as retained storage.
+      assertThat(bytes).isLessThan(24L * 1024 * 1024);
+    }
+
+    @Test
+    void byteBudgetCanRejectTheFirstLiveState() {
+      Prog prog = Compiler.compile(Parser.parse("a", FLAGS));
+      // Use a synthetic alphabet to reach the byte budget without compiling a huge pattern.
+      int[] boundaries = new int[1_100_000];
+      Arrays.setAll(boundaries, index -> index + 1);
+      int[] asciiClasses = new int[128];
+      Arrays.setAll(asciiClasses, index -> index);
+      Dfa.Setup setup = new Dfa.Setup(boundaries, boundaries.length + 2, asciiClasses, false);
+      Dfa dfa = new Dfa(prog, 10_000, setup, false);
+
+      assertThat(dfa.doSearch("a", 0, true, false)).isNull();
+      assertThat(dfa.lastSearchBailed()).isTrue();
+    }
+
+    @Test
+    void wideAlphabetBudgetFallbackPreservesFullMatches() {
+      String regex = wideAlternation(512, 4096);
+      Pattern exact = Pattern.compile(regex, 0, EnginePathOptions.builder().dfa(false).build());
+      for (boolean utf8 : List.of(false, true)) {
+        Pattern pattern = Pattern.compile(regex);
+        for (String input :
+            List.of(
+                "a".repeat(512) + Character.toString(0x11000),
+                "b".repeat(512) + Character.toString(0x11002),
+                "a".repeat(512) + Character.toString(0x11001))) {
+          boolean matched =
+              utf8
+                  ? pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8))).matches()
+                  : pattern.matcher(input).matches();
+          assertThat(matched).isEqualTo(exact.matcher(input).matches());
+          Pattern.ThreadCache cache = pattern.getOrCreateThreadCache();
+          assertThat(cache.forwardLongestMatchDfa.lastSearchBailed()).isTrue();
+        }
+      }
+    }
+
+    @Test
+    void wideAlphabetCacheCanResetAfterMakingProgress() throws ReflectiveOperationException {
+      String regex = "x*" + wideAlternation(512, 1024);
+      Pattern pattern = Pattern.compile(regex);
+      Prog prog = pattern.flatDfaProg();
+      Dfa dfa = new Dfa(prog, 10_000, pattern.forwardDfaSetup(), true);
+      Field progress = Dfa.class.getDeclaredField("dfaStepsSinceReset");
+      progress.setAccessible(true);
+
+      String suffix = Character.toString(0x11000);
+      String first = "x".repeat(12_000) + "a".repeat(512) + suffix;
+      String second = "b".repeat(512) + suffix;
+      assertThat(dfa.doSearch(first, true, true))
+          .isEqualTo(new Dfa.SearchResult(true, first.length()));
+      assertThat(progress.getLong(dfa)).isGreaterThanOrEqualTo(12_000);
+      assertThat(dfa.doSearch(second, true, true))
+          .isEqualTo(new Dfa.SearchResult(true, second.length()));
+      assertThat(progress.getLong(dfa)).isLessThan(second.length());
+      // Entries from the old generation cannot be reused when the first branch is visited again.
+      assertThat(dfa.doSearch(first, true, true))
+          .isEqualTo(new Dfa.SearchResult(true, first.length()));
+    }
+
+    @Test
+    void spareTransitionRowsLeaveBudgetForLargerFrontiers() {
+      Pattern pattern = Pattern.compile("a{150}" + wideClass(2758) + "|bc{0,1000}d");
+      Dfa dfa = new Dfa(pattern.flatDfaProg(), 10_000, pattern.forwardDfaSetup(), true);
+      // The first branch grows the flat table with small frontiers. The second needs a wide
+      // frontier, which fits because the unused slots have no allocated successor rows.
+      String narrow = "a".repeat(150) + Character.toString(0x11000);
+      assertThat(dfa.doSearch(narrow, true, true))
+          .isEqualTo(new Dfa.SearchResult(true, narrow.length()));
+      assertThat(dfa.doSearch("bd", true, true)).isEqualTo(new Dfa.SearchResult(true, 2));
+    }
+
+    private static String wideAlternation(int repetitions, int ranges) {
+      return "(?:a{" + repetitions + "}|b{" + repetitions + "})" + wideClass(ranges);
+    }
+
+    private static String wideClass(int ranges) {
+      StringBuilder regex = new StringBuilder("[");
+      for (int i = 0; i < ranges; i++) {
+        regex.appendCodePoint(0x11000 + 2 * i);
+      }
+      return regex.append(']').toString();
+    }
+
     @Test
     void exceedBudgetReturnsNull() {
       // Alternation with many branches forces many DFA states.
