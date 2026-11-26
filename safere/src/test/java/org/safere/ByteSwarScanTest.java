@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Arrays;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisabledForCrosscheck("Tests the internal byte scanner directly")
 class ByteSwarScanTest {
@@ -97,19 +99,20 @@ class ByteSwarScanTest {
     }
   }
 
-  @Test
-  void nonAsciiBlockSkipStopsBeforeTheFirstPossibleAsciiMatch() {
+  @ParameterizedTest
+  @ValueSource(ints = {2, 4})
+  void nonAsciiBlockSkipStopsBeforeTheFirstPossibleAsciiMatch(int prefixWords) {
     for (int offset = 0; offset < 16; offset++) {
       for (int length : new int[] {128, 129, 255, 1024}) {
         byte[] storage = new byte[offset + length + 16];
         Arrays.fill(storage, (byte) 0xC3);
         Arrays.fill(storage, 0, offset, (byte) 'X');
         Arrays.fill(storage, offset + length, storage.length, (byte) 'X');
-        int skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0);
+        int skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0, prefixWords);
         assertThat(skipped).isBetween(length - 31, length);
         for (int hit = 0; hit < length; hit++) {
           storage[offset + hit] = 'X';
-          skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0);
+          skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0, prefixWords);
           assertThat(skipped).isBetween(Math.max(0, hit - 31), hit);
           storage[offset + hit] = (byte) 0xC3;
         }

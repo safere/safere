@@ -30,6 +30,8 @@ abstract class ByteSwarScan {
 
   static final int FILTER_LENGTH_FACTOR = 40;
 
+  static final int NON_ASCII_SKIP_MIN_LENGTH = 128;
+
   private static final VarHandle LONG_VIEW = byteArrayViewVarHandle(long[].class, nativeOrder());
 
   private static final boolean LITTLE_ENDIAN = nativeOrder() == ByteOrder.LITTLE_ENDIAN;
@@ -834,8 +836,13 @@ abstract class ByteSwarScan {
    * overlaps at most 32 bytes.
    */
   static int skipNonAsciiBlocks(byte[] bytes, int offset, int length, int start) {
+    return skipNonAsciiBlocks(bytes, offset, length, start, 2);
+  }
+
+  /** Checks {@code prefixWords} complete words before switching to 32-byte blocks. */
+  static int skipNonAsciiBlocks(byte[] bytes, int offset, int length, int start, int prefixWords) {
     int position = start;
-    int prologueEnd = start + 2 * Long.BYTES;
+    int prologueEnd = start + prefixWords * Long.BYTES;
     while (position < prologueEnd) {
       long word = (long) LONG_VIEW.get(bytes, offset + position);
       if ((word & BYTE_HIGH_BITS) != BYTE_HIGH_BITS) {

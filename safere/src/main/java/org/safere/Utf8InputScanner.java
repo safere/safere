@@ -120,7 +120,7 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
       }
       return -1;
     }
-    int res = scanBytePair(scanLen, (byte) c1, (byte) c2, start);
+    int res = scanAsciiPair(scanLen, (byte) c1, (byte) c2, start);
     return (res >= 0 && res < limit) ? res : -1;
   }
 
@@ -187,6 +187,19 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
         bytes, offset, scanLen, (byte) c1, (byte) c2, (byte) c3, start);
   }
 
+  private int scanAsciiPair(int scanLen, byte b0, byte b1, int start) {
+    int window = scanLen - start;
+    if (window >= NON_ASCII_SKIP_MIN_LENGTH
+        && (b0 | b1) >= 0
+        && bytes[offset + start] < 0
+        && VectorScanProviders.providerForPolicy(ScanKind.PAIR, window) == null) {
+      ScanAudit.recordConsultation(ScanKind.PAIR, window);
+      ScanAudit.record(ScanKind.PAIR, ScanDirection.FORWARD, window, ScanPath.SWAR);
+      return scanAsciiPairFromNonAscii(scanLen, b0, b1, start);
+    }
+    return scanBytePair(scanLen, b0, b1, start);
+  }
+
   private int scanBytePair(int scanLen, byte b0, byte b1, int start) {
     int window = scanLen - start;
     VectorScanProvider pairProvider = VectorScanProviders.providerFor(ScanKind.PAIR, window);
@@ -199,6 +212,21 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
     }
     ScanAudit.record(ScanKind.PAIR, ScanDirection.FORWARD, window, ScanPath.SWAR);
     return ByteSwarScan.indexOfBytePair(bytes, offset, scanLen, b0, b1, start);
+  }
+
+  private int scanAsciiPairFromNonAscii(int limit, byte first, byte second, int start) {
+    // A UTF-8 scalar can occupy up to four bytes. Resolve an escape immediately after it
+    // before setting up the word scan.
+    for (int i = start + 1; i <= start + 4; i++) {
+      byte value = bytes[offset + i];
+      if (value == first || value == second) {
+        return i;
+      }
+    }
+    // Check four complete words before trying wider blocks, so short multibyte runs
+    // stay on the cheaper word scan.
+    int next = ByteSwarScan.skipNonAsciiBlocks(bytes, offset, limit, start, 4);
+    return ByteSwarScan.indexOfBytePair(bytes, offset, limit, first, second, next);
   }
 
   private int scanByteTriple(int scanLen, byte b0, byte b1, byte b2, int start) {
@@ -407,12 +435,12 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
           return (res >= 0 && res < scanLen) ? res : -1;
         }
         if (high == low + 1) {
-          return scanBytePair(scanLen, (byte) low, (byte) high, start);
+          return scanAsciiPair(scanLen, (byte) low, (byte) high, start);
         }
       }
       case 4 -> {
         if (ranges[0] == ranges[1] && ranges[2] == ranges[3]) {
-          return scanBytePair(scanLen, (byte) ranges[0], (byte) ranges[2], start);
+          return scanAsciiPair(scanLen, (byte) ranges[0], (byte) ranges[2], start);
         }
       }
       case 6 -> {
@@ -855,7 +883,7 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
       return indexOfByte((byte) first, start);
     }
     if (last == second) {
-      return scanBytePair(length, (byte) first, (byte) second, start);
+      return scanAsciiPair(length, (byte) first, (byte) second, start);
     }
     return contiguous
         ? ByteSwarScan.indexOfByteRange(bytes, offset, length, first, last, start)
