@@ -10,8 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Arrays;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 @DisabledForCrosscheck("Tests the internal byte scanner directly")
 class ByteSwarScanTest {
@@ -99,20 +97,44 @@ class ByteSwarScanTest {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {2, 4})
-  void nonAsciiBlockSkipStopsBeforeTheFirstPossibleAsciiMatch(int prefixWords) {
+  @Test
+  void asciiPairSearchHonorsTheStartAndLimit() {
+    for (int offset = 0; offset < Long.BYTES; offset++) {
+      for (int length : new int[] {128, 129, 159, 160, 161, 255, 1024}) {
+        int start = 5;
+        int limit = start + length;
+        byte[] storage = new byte[offset + limit + Long.BYTES];
+        Arrays.fill(storage, (byte) 'X');
+        Arrays.fill(storage, offset + start, offset + limit, (byte) 0xC3);
+        assertThat(
+                ByteSwarScan.indexOfAsciiPairAfterNonAsciiPrefix(
+                    storage, offset, limit, (byte) 'X', (byte) 'Z', start))
+            .isEqualTo(-1);
+        for (int hit = start; hit < limit; hit++) {
+          storage[offset + hit] = (byte) (hit % 2 == 0 ? 'X' : 'Z');
+          assertThat(
+                  ByteSwarScan.indexOfAsciiPairAfterNonAsciiPrefix(
+                      storage, offset, limit, (byte) 'X', (byte) 'Z', start))
+              .isEqualTo(hit);
+          storage[offset + hit] = (byte) 0xC3;
+        }
+      }
+    }
+  }
+
+  @Test
+  void nonAsciiBlockSkipStopsBeforeTheFirstPossibleAsciiMatch() {
     for (int offset = 0; offset < 16; offset++) {
       for (int length : new int[] {128, 129, 255, 1024}) {
         byte[] storage = new byte[offset + length + 16];
         Arrays.fill(storage, (byte) 0xC3);
         Arrays.fill(storage, 0, offset, (byte) 'X');
         Arrays.fill(storage, offset + length, storage.length, (byte) 'X');
-        int skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0, prefixWords);
+        int skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0);
         assertThat(skipped).isBetween(length - 31, length);
         for (int hit = 0; hit < length; hit++) {
           storage[offset + hit] = 'X';
-          skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0, prefixWords);
+          skipped = ByteSwarScan.skipNonAsciiBlocks(storage, offset, length, 0);
           assertThat(skipped).isBetween(Math.max(0, hit - 31), hit);
           storage[offset + hit] = (byte) 0xC3;
         }

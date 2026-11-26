@@ -377,6 +377,47 @@ abstract class ByteSwarScan {
     return -1;
   }
 
+  /** Only ASCII bytes can match either target. Skip non-ASCII blocks before the exact scan. */
+  static int indexOfAsciiPairAfterNonAsciiPrefix(
+      byte[] bytes, int offset, int length, byte first, byte second, int start) {
+    int position = start;
+    int blockSize = 4 * Long.BYTES;
+    int blockEnd = lastLoadStart(length, 0, blockSize);
+    while (position <= blockEnd) {
+      long word = (long) LONG_VIEW.get(bytes, offset + position);
+      if ((word & BYTE_HIGH_BITS) == BYTE_HIGH_BITS) {
+        long secondWord = (long) LONG_VIEW.get(bytes, offset + position + Long.BYTES);
+        long third = (long) LONG_VIEW.get(bytes, offset + position + 2 * Long.BYTES);
+        long fourth = (long) LONG_VIEW.get(bytes, offset + position + 3 * Long.BYTES);
+        if ((secondWord & third & fourth & BYTE_HIGH_BITS) == BYTE_HIGH_BITS) {
+          position += blockSize;
+          continue;
+        }
+        if ((secondWord & BYTE_HIGH_BITS) != BYTE_HIGH_BITS) {
+          position += Long.BYTES;
+          word = secondWord;
+        } else if ((third & BYTE_HIGH_BITS) != BYTE_HIGH_BITS) {
+          position += 2 * Long.BYTES;
+          word = third;
+        } else {
+          position += 3 * Long.BYTES;
+          word = fourth;
+        }
+      }
+      long ascii = ~word & BYTE_HIGH_BITS;
+      int bit =
+          LITTLE_ENDIAN ? Long.numberOfTrailingZeros(ascii) : Long.numberOfLeadingZeros(ascii);
+      position += bit >>> 3;
+      byte value = bytes[offset + position];
+      if (value == first || value == second) {
+        return position;
+      }
+      position++;
+      break;
+    }
+    return indexOfBytePair(bytes, offset, length, first, second, position);
+  }
+
   static int indexOfBytePair(
       byte[] bytes, int offset, int length, byte first, byte second, int start) {
     int position = start;
@@ -836,13 +877,8 @@ abstract class ByteSwarScan {
    * overlaps at most 32 bytes.
    */
   static int skipNonAsciiBlocks(byte[] bytes, int offset, int length, int start) {
-    return skipNonAsciiBlocks(bytes, offset, length, start, 2);
-  }
-
-  /** Checks {@code prefixWords} complete words before switching to 32-byte blocks. */
-  static int skipNonAsciiBlocks(byte[] bytes, int offset, int length, int start, int prefixWords) {
     int position = start;
-    int prologueEnd = start + prefixWords * Long.BYTES;
+    int prologueEnd = start + 2 * Long.BYTES;
     while (position < prologueEnd) {
       long word = (long) LONG_VIEW.get(bytes, offset + position);
       if ((word & BYTE_HIGH_BITS) != BYTE_HIGH_BITS) {

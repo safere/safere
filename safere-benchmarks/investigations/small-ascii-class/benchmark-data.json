@@ -187,6 +187,17 @@
       "shared": true
     },
     {
+      "id": "classScan.pair.nonmemberGap12",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9xZ",
+        "suffix": "",
+        "length": 57344
+      },
+      "shared": true
+    },
+    {
       "id": "classScan.pair.gap24",
       "recipe": {
         "kind": "surroundToLength",
@@ -565,6 +576,28 @@
           48,
           96,
           192
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 4096
+      }
+    },
+    {
+      "id": "AsciiClassScan.pairFindAll.nonmemberGap12",
+      "operation": "findAllCount",
+      "patterns": [
+        "[YZ]"
+      ],
+      "inputs": [
+        "classScan.pair.nonmemberGap12"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
         ]
       },
       "expected": {
