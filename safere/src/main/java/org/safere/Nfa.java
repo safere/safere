@@ -275,7 +275,9 @@ final class Nfa {
 
   int[] runSearch(boolean anchored, MatchKind kind, int nsubmatch, int endPos, int[] reuseGroups) {
     QueueLayout layout = QueueLayout.THREADS;
-    if (prog.didFlatten() && ncapture == 2 && prog.supportsFlatNfa()) {
+    // Keep warm capture queues when a caller reuses this NFA for a bounds-only search.
+    boolean hasWarmThreadQueues = queueLayout == QueueLayout.THREADS && !queueStatePool.isEmpty();
+    if (!hasWarmThreadQueues && prog.didFlatten() && ncapture == 2 && prog.supportsFlatNfa()) {
       layout =
           nsubmatch > 0 || longest || reuseGroups != null
               ? QueueLayout.INSTRUCTIONS_AND_STARTS
