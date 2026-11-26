@@ -211,13 +211,31 @@ class StartRegisterSearchTest {
     long result = search.searchForTesting(new StringInputScanner(input), 0);
     assertThat(result).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF);
     int handoff = StartRegisterSearch.handoffPosition(result);
-    assertThat(handoff).isGreaterThan(StartRegisterSearch.HANDOFF_DISTANCE);
-    assertThat(handoff).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF_DISTANCE + 2);
+    assertThat(handoff).isGreaterThan(StartRegisterSearch.START_LOOP_HANDOFF_DISTANCE);
+    assertThat(handoff).isLessThanOrEqualTo(StartRegisterSearch.START_LOOP_HANDOFF_DISTANCE + 2);
 
     Matcher matcher = Pattern.compile("[\\p{IsAlphabetic}]+\\d+").matcher(input);
     assertThat(matcher.find()).isTrue();
     assertThat(matcher.start()).isEqualTo(digits.length());
     assertThat(matcher.end()).isEqualTo(input.length());
+  }
+
+  @Test
+  void searchThatLeavesTheStartStateHandsOverAfterTheFullDistance() {
+    // The search leaves the start state at every space and comes back a few characters later, so
+    // it only hands over after HANDOFF_DISTANCE, at the next return to the start state.
+    String input = "1111x 1x_".repeat(512);
+    String regex = " [0-9]{4,}";
+    StartRegisterSearch search =
+        StartRegisterSearch.create(Pattern.compile(regex).flatDfaProg(), null, null);
+    long result = search.searchForTesting(new StringInputScanner(input), 0);
+    assertThat(result).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF);
+    int handoff = StartRegisterSearch.handoffPosition(result);
+    assertThat(handoff).isGreaterThan(StartRegisterSearch.HANDOFF_DISTANCE);
+    assertThat(handoff)
+        .isLessThanOrEqualTo(StartRegisterSearch.HANDOFF_DISTANCE + "1111x 1x_".length());
+
+    assertThat(Pattern.compile(regex).matcher(input).find()).isFalse();
   }
 
   @Test

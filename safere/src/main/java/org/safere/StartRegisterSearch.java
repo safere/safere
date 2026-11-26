@@ -55,7 +55,16 @@ final class StartRegisterSearch {
    * The start register only pays for itself on matches (it saves their reverse scan); long
    * stretches without one are better served by the forward DFA's start-state acceleration.
    */
-  static final int HANDOFF_DISTANCE = 256;
+  static final int HANDOFF_DISTANCE = 1024;
+
+  /**
+   * The shorter {@link #HANDOFF_DISTANCE} of a search that has not left its start-like states, so
+   * no attempt has outlived the state it started in. Such a search is walking input that can't
+   * start a match, where the forward DFA's start-state acceleration is the better tool. A search
+   * that leaves and re-enters start-like states, as on inputs dense with near misses, hands over
+   * after the full distance only.
+   */
+  static final int START_LOOP_HANDOFF_DISTANCE = 256;
 
   /**
    * Events after which a search may give up when the oldest live attempt has no register. Such a
@@ -390,12 +399,15 @@ final class StartRegisterSearch {
         startPolicy(text) != null ? AdaptiveBackoff.resumePos(startBackoff) : Integer.MAX_VALUE;
     // Set on entering a start-like state, with no match seen, when a handoff or skip may be due.
     boolean startEntry = false;
+    // Where a handoff becomes due. Leaving the start-like states takes an event (the attempt that
+    // leaves needs a register), which moves it out to the full distance.
+    int handoffPos = startPos + START_LOOP_HANDOFF_DISTANCE;
     int blindEvents = 0;
     while (true) {
       if (startEntry) {
         // Every attempt but the fresh one died: no match starts before pos.
         startEntry = false;
-        if (pos - startPos > HANDOFF_DISTANCE) {
+        if (pos > handoffPos) {
           return HANDOFF - pos;
         }
         if (pos >= resumePos) {
@@ -438,7 +450,7 @@ final class StartRegisterSearch {
           } else {
             t -= START_ENTRY;
             // No start-like state follows a recorded match: the match cuts the unanchored loop.
-            if (pos - startPos > HANDOFF_DISTANCE || pos >= resumePos) {
+            if (pos > handoffPos || pos >= resumePos) {
               sid = t;
               startEntry = true;
               break;
@@ -519,9 +531,10 @@ final class StartRegisterSearch {
         matchEnd = pos;
       }
       int n0 = register(infoSrc0[info], r0, r1, pos);
-      int n1 = register(infoSrc1[info], r0, r1, pos);
+      r1 = register(infoSrc1[info], r0, r1, pos);
       r0 = n0;
-      r1 = n1;
+      // The search may have left the start-like states.
+      handoffPos = startPos + HANDOFF_DISTANCE;
       int next = infoNext[info];
       int rank = matchRankOf[next];
       if (rank != NONE) {
@@ -531,7 +544,7 @@ final class StartRegisterSearch {
       if (stopOf[next] || cp < 0) {
         return finish(matchStart, matchEnd);
       }
-      if (r0 < 0 && ++blindEvents > BLIND_EVENTS && blindFallback(startPos, nextPos, blindEvents)) {
+      if (r0 < 0 && blindFallback(startPos, nextPos, ++blindEvents)) {
         return FALLBACK;
       }
       sid = next;
@@ -605,12 +618,13 @@ final class StartRegisterSearch {
   }
 
   /**
-   * Returns whether a search should fall back: it scanned more than {@link #HANDOFF_DISTANCE} and
-   * at least a quarter of its steps were events that left the oldest live attempt untracked.
+   * Returns whether a search should fall back: it ran more than {@link #BLIND_EVENTS} events that
+   * left the oldest live attempt untracked, scanned more than {@link #HANDOFF_DISTANCE}, and at
+   * least a quarter of its steps were such events.
    */
   private static boolean blindFallback(int startPos, int pos, int blindEvents) {
     int scanned = pos - startPos;
-    return scanned > HANDOFF_DISTANCE && blindEvents >= scanned / 4;
+    return blindEvents > BLIND_EVENTS && scanned > HANDOFF_DISTANCE && blindEvents >= scanned / 4;
   }
 
   /** Start of the attempt with rank {@code rank} in a state entered at {@code entry}. */
