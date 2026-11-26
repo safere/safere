@@ -211,6 +211,27 @@ class LiteralAlternationTest {
   }
 
   @Test
+  void denseInitialsPreserveCrossingMatchesAndSourceOrder() {
+    for (String regex : List.of("nnnnook|west|south|east|nnnn", "nnnnook|west|south|east|nnno")) {
+      Pattern pattern = Pattern.compile(regex);
+      assertThat(pattern.preparedMatchRunner(false))
+          .isInstanceOf(Matcher.LiteralAlternationPreparedRunner.class);
+      java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex);
+      // On the padded inputs, eight false starts after the first window select dense search.
+      String prefix = "x".repeat(256) + "w".repeat(8);
+      for (int offset : new int[] {0, 1_020, 1_023, 1_024, 3_069, 3_072}) {
+        String before = prefix + "e".repeat(offset);
+        for (String tail : List.of("", "nnnno", "nnnnook", "knnnnook", "nnnowest", "west")) {
+          for (String padding : List.of("", "日".repeat(8_192))) {
+            String input = before + tail + padding;
+            compareFinds(pattern.matcher(input), jdk.matcher(input));
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   void longLiteralsCrossingTheProbeBoundaryStillSelectTheLeftmostMatch() {
     String literal = "a".repeat(2_048) + "z";
     for (String regex :

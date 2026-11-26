@@ -131,6 +131,21 @@ class LiteralAlternationWorkTest {
   }
 
   @Test
+  void anImmediateHitAfterTheFirstWindowDoesNotScanTheShortTail() {
+    Pattern pattern = Pattern.compile("red|green|blue|yellow|orange|purple");
+    for (String hit : new String[] {"purple", "ppurple", "ppppurple"}) {
+      String prefix = "x".repeat(256) + hit;
+      long shortWork = work(pattern, prefix + "x".repeat(16));
+      assertThat(shortWork).isPositive();
+      for (int length : new int[] {256, 512, 1_018, 1_024, 2_048}) {
+        assertThat(work(pattern, prefix + "x".repeat(length)))
+            .as("%s with tail length %s", hit, length)
+            .isLessThanOrEqualTo(shortWork * 2);
+      }
+    }
+  }
+
+  @Test
   void regionSearchWorkIsIndependentOfTheBackingStringTail() {
     Pattern pattern = Pattern.compile("north|south|east|west|upper|lower|front|back");
     for (String filler : new String[] {"x", "n"}) {
