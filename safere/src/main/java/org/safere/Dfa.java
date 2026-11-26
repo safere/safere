@@ -55,7 +55,9 @@ final class Dfa {
   /** Result of a multi-match DFA search. */
   // TODO(#98): Replace int[] with Guava ImmutableIntArray to get proper value semantics.
   @SuppressWarnings("ArrayRecordComponent")
-  record ManyMatchResult(boolean matched, int[] matchIds) {}
+  record ManyMatchResult(boolean matched, int[] matchIds) {
+    static final ManyMatchResult NO_MATCH = new ManyMatchResult(false, new int[0]);
+  }
 
   /** Flag bit: this state contains a MATCH instruction. */
   private static final int FLAG_MATCH = 1 << 14;
@@ -171,29 +173,33 @@ final class Dfa {
   private static final class StateKey {
     private int[] insts;
     private int flags;
+    private int[] wordBoundaryMatchIds;
 
     StateKey() {}
 
-    StateKey(int[] insts, int flags) {
+    StateKey(int[] insts, int flags, int[] wordBoundaryMatchIds) {
       this.insts = insts;
       this.flags = flags;
+      this.wordBoundaryMatchIds = wordBoundaryMatchIds;
     }
 
-    void reset(int[] insts, int flags) {
+    void reset(int[] insts, int flags, int[] wordBoundaryMatchIds) {
       this.insts = insts;
       this.flags = flags;
+      this.wordBoundaryMatchIds = wordBoundaryMatchIds;
     }
 
     @Override
     public int hashCode() {
-      return Arrays.hashCode(insts) * 31 + flags;
+      return (Arrays.hashCode(insts) * 31 + flags) * 31 + Arrays.hashCode(wordBoundaryMatchIds);
     }
 
     @Override
     public boolean equals(Object o) {
       return (o instanceof StateKey other)
           && flags == other.flags
-          && Arrays.equals(insts, other.insts);
+          && Arrays.equals(insts, other.insts)
+          && Arrays.equals(wordBoundaryMatchIds, other.wordBoundaryMatchIds);
     }
   }
 
@@ -963,6 +969,33 @@ final class Dfa {
     return ids;
   }
 
+  /** Records all match IDs (MATCH instruction arg values) from a DFA state's NFA instructions. */
+  private BitSet collectMatchIds(int[] insts, BitSet seen) {
+    for (int id : insts) {
+      Inst ip = prog.inst(id);
+      if (ip.opCode == InstOp.OP_MATCH) {
+        if (seen == null) {
+          seen = new BitSet();
+        }
+        seen.set(ip.arg);
+      }
+    }
+    return seen;
+  }
+
+  private static BitSet recordMatchIds(int[] ids, BitSet seen) {
+    if (ids.length == 0) {
+      return seen;
+    }
+    if (seen == null) {
+      seen = new BitSet();
+    }
+    for (int id : ids) {
+      seen.set(id);
+    }
+    return seen;
+  }
+
   /** Gets or creates a cached state. Returns null if the state budget is exceeded. */
   private State getOrCreate(int[] insts, int flags) {
     return getOrCreate(insts, flags, null);
@@ -978,9 +1011,9 @@ final class Dfa {
     if (insts.length == 0 && (flags & FLAG_MATCH) == 0) {
       return deadState;
     }
-    lookupKey.reset(insts, flags);
+    lookupKey.reset(insts, flags, wordBoundaryMatchIds);
     State s = cache.get(lookupKey);
-    lookupKey.reset(EMPTY_INSTS, 0);
+    lookupKey.reset(EMPTY_INSTS, 0, null);
     if (s != null) {
       return s;
     }
@@ -998,7 +1031,7 @@ final class Dfa {
       // that this leaves room for at least the new state and its transition row.
       growCache(cacheRowLimit(stateBytes - stateRowBytes * requiredRows));
     }
-    StateKey key = new StateKey(insts, flags);
+    StateKey key = new StateKey(insts, flags, wordBoundaryMatchIds);
     boolean isHighestPriorityMatch =
         (anyMatch && (flags & FLAG_MATCH) != 0)
             || (insts.length > 0 && prog.inst(insts[0]).opCode == InstOp.OP_MATCH);
@@ -1043,8 +1076,11 @@ final class Dfa {
     progressAnchor = pos;
   }
 
-  /** Records the visited span before returning from any DFA search. */
+  /** Records the visited span and releases per-search input state before returning. */
   private <T> T completeSearch(T result, int pos) {
+    if (hasGraphemeSemantics) {
+      graphemeContext = null;
+    }
     recordSearchProgress(pos);
     return result;
   }
@@ -2186,7 +2222,9 @@ final class Dfa {
       boolean longest,
       boolean startPositionPreselected,
       long startBackoff) {
-    graphemeContext = GraphemeSupport.Context.create(text, hasGraphemeSemantics);
+    if (hasGraphemeSemantics) {
+      graphemeContext = GraphemeSupport.Context.create(text, true);
+    }
     beginSearch(startPos);
     int pos = startPos;
     int textLen = text.length();
@@ -2706,7 +2744,9 @@ final class Dfa {
       boolean longest,
       int maxInputUnits) {
     int scanLimit = Math.max(startLimit, endPos - maxInputUnits);
-    graphemeContext = GraphemeSupport.Context.create(text, hasGraphemeSemantics);
+    if (hasGraphemeSemantics) {
+      graphemeContext = GraphemeSupport.Context.create(text, true);
+    }
     beginSearch(endPos);
     int pos = endPos;
     // The reversed program's "start of text" corresponds to endPos (the right edge of the match
@@ -2967,37 +3007,25 @@ final class Dfa {
   // ---------------------------------------------------------------------------
 
   /**
-   * Searches for all matching patterns in a multi-pattern program.
+   * Multi-match DFA search loop. Processes the entire text and collects all match IDs (from {@link
+   * Inst#arg}) of MATCH instructions reached along the way, sorted in ascending order.
    *
-   * <p>Unlike {@link #search}, this method does not stop at the first match. It processes the
-   * entire text and collects the match IDs (from {@link Inst#arg}) of all MATCH instructions
-   * reached. This is used by {@link PatternSet} to determine which patterns matched.
+   * <p>Unlike {@link #doSearch}, this method does not stop at the first match. This is used by
+   * {@link PatternSet} to determine which patterns matched.
    *
-   * @param prog the compiled multi-pattern program (built with HAVE_MATCH markers)
    * @param text the input text
    * @param anchored whether to anchor the search at the start
-   * @return multi-match result, or {@code null} if the DFA exceeded its state budget
-   */
-  static ManyMatchResult searchMany(Prog prog, String text, boolean anchored) {
-    return searchMany(prog, text, anchored, DEFAULT_MAX_STATES);
-  }
-
-  /** Multi-match search with explicit state budget. */
-  static ManyMatchResult searchMany(Prog prog, String text, boolean anchored, int maxStates) {
-    Dfa dfa = new Dfa(prog, maxStates, buildSetup(prog), true);
-    return dfa.doSearchMany(text, anchored);
-  }
-
-  /**
-   * Multi-match DFA search loop. Processes the entire text and collects all match IDs from match
-   * states reached along the way.
+   * @return multi-match result with sorted unique match IDs, or {@code null} if the DFA exceeded
+   *     its state budget
    */
   ManyMatchResult doSearchMany(String text, boolean anchored) {
     return doSearchMany(new StringInputScanner(text), anchored);
   }
 
   ManyMatchResult doSearchMany(InputScanner text, boolean anchored) {
-    graphemeContext = GraphemeSupport.Context.create(text, hasGraphemeSemantics);
+    if (hasGraphemeSemantics) {
+      graphemeContext = GraphemeSupport.Context.create(text, true);
+    }
     beginSearch(0);
     int pos = 0;
     int textLen = text.length();
@@ -3013,17 +3041,15 @@ final class Dfa {
       return completeSearch(null, pos);
     }
 
-    // Use a bitset to track which match IDs have been seen.
-    BitSet seen = new BitSet();
+    // Lazily allocate a bitset to track which match IDs have been seen.
+    BitSet seen = null;
 
     // Check if start state is already a match.
     if (s.isMatch()) {
       if (!needEndMatch
           || textLen == 0
           || (trailingTermStart < textLen && trailingTermStart == 0)) {
-        for (int id : collectMatchIds(s.insts)) {
-          seen.set(id);
-        }
+        seen = collectMatchIds(s.insts, seen);
       }
     }
 
@@ -3045,33 +3071,37 @@ final class Dfa {
         int nsId = transitions[sId + cls];
         if (nsId == 0) {
           s = statesById[stateId(sId)];
-          int effectiveNextPos = pos + 1;
-          State ns = computeNext(s, ch, text, effectiveNextPos);
+          State ns = s.next[cls];
           if (ns == null) {
-            // This loop is the only one that carries a state offset across iterations, and a
-            // reset renumbers every state, so re-derive sId from the re-created state.
-            if (!resetCache(pos)) {
-              return completeSearch(null, pos); // budget exceeded
-            }
-            s = recreateAfterReset(s);
-            if (s == null) {
-              budgetExhausted();
-              return completeSearch(null, pos); // budget exceeded
-            }
-            sId = s.id * numClasses;
+            int effectiveNextPos = pos + 1;
             ns = computeNext(s, ch, text, effectiveNextPos);
             if (ns == null) {
-              budgetExhausted();
-              return completeSearch(null, pos); // budget exceeded
+              // This loop is the only one that carries a state offset across iterations, and a
+              // reset renumbers every state, so re-derive sId from the re-created state.
+              if (!resetCache(pos)) {
+                return completeSearch(null, pos); // budget exceeded
+              }
+              s = recreateAfterReset(s);
+              if (s == null) {
+                budgetExhausted();
+                return completeSearch(null, pos); // budget exceeded
+              }
+              sId = s.id * numClasses;
+              ns = computeNext(s, ch, text, effectiveNextPos);
+              if (ns == null) {
+                budgetExhausted();
+                return completeSearch(null, pos); // budget exceeded
+              }
             }
+            addTransition(s, cls, ns);
+            transitions = this.transitions;
+            statesById = this.statesById;
+            nsId = transitions[sId + cls];
           }
-          addTransition(s, cls, ns);
-          transitions = this.transitions;
-          statesById = this.statesById;
-          nsId = transitions[sId + cls];
-        }
-        if (nsId == 0) { // deadState
-          break;
+          if (nsId == 0) { // deadState
+            sId = 0;
+            break;
+          }
         }
         int realNsId;
         if (nsId < 0) {
@@ -3086,13 +3116,9 @@ final class Dfa {
               || endPos == textLen
               || (trailingTermStart < textLen && endPos == trailingTermStart)) {
             // Collect match IDs from the state's instructions.
-            for (int id : collectMatchIds(ns.insts)) {
-              seen.set(id);
-            }
+            seen = collectMatchIds(ns.insts, seen);
             if (ns.wordBoundaryMatchIds != null) {
-              for (int id : ns.wordBoundaryMatchIds) {
-                seen.set(id);
-              }
+              seen = recordMatchIds(ns.wordBoundaryMatchIds, seen);
             }
           }
         } else {
@@ -3104,7 +3130,7 @@ final class Dfa {
       s = statesById[stateId(sId)];
 
       // General loop
-      while (pos <= textLen) {
+      while (s != deadState && pos <= textLen) {
         int cp;
         int nextPos;
         int cls;
@@ -3162,14 +3188,10 @@ final class Dfa {
               || endPos == textLen
               || (trailingTermStart < textLen && endPos == trailingTermStart)) {
             // Collect match IDs from the state's instructions.
-            for (int id : collectMatchIds(s.insts)) {
-              seen.set(id);
-            }
+            seen = collectMatchIds(s.insts, seen);
             // Also collect match IDs from word-boundary expansion (if any).
             if (s.wordBoundaryMatchIds != null) {
-              for (int id : s.wordBoundaryMatchIds) {
-                seen.set(id);
-              }
+              seen = recordMatchIds(s.wordBoundaryMatchIds, seen);
             }
           }
         }
@@ -3181,9 +3203,15 @@ final class Dfa {
       }
     }
 
-    boolean matched = !seen.isEmpty();
-    int[] matchIds = seen.stream().toArray();
-    return completeSearch(new ManyMatchResult(matched, matchIds), pos);
+    if (seen == null || seen.isEmpty()) {
+      return completeSearch(ManyMatchResult.NO_MATCH, pos);
+    }
+    int[] matchIds = new int[seen.cardinality()];
+    int idx = 0;
+    for (int id = seen.nextSetBit(0); id >= 0; id = seen.nextSetBit(id + 1)) {
+      matchIds[idx++] = id;
+    }
+    return completeSearch(new ManyMatchResult(true, matchIds), pos);
   }
 
   private boolean isMatchPrimary(int[] expanded) {

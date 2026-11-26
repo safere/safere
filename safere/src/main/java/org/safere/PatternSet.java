@@ -5,6 +5,9 @@
 
 package org.safere;
 
+import static java.util.Objects.requireNonNull;
+
+import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -55,6 +58,29 @@ public final class PatternSet {
   private final List<String> patterns;
   private final List<Pattern> fallbackPatterns;
   private final int maxDfaStates;
+
+  /** Lazily built immutable DFA setup shared across per-thread DFA instances. */
+  private volatile Dfa.Setup dfaSetup;
+
+  // Each PatternSet caches its multi-match DFA per thread so warm DFA state tables persist across
+  // repeated match() calls. The first thread to use the PatternSet keeps its DFA in ownerDfa, so a
+  // PatternSet used by one thread never adds an entry to a ThreadLocalMap. Other threads use
+  // otherThreadDfas, created when a second thread first needs a DFA. Holding each DFA behind a
+  // SoftReference lets GC reclaim cached state tables under memory pressure and avoids strongly
+  // pinning a child ClassLoader when PatternSet instances are stored in static final fields.
+
+  /** The {@link Thread#threadId} of the thread that owns {@link #ownerDfa}, or 0 if unclaimed. */
+  private volatile long ownerThreadId;
+
+  /** Only accessed by the thread whose ID is {@link #ownerThreadId}. */
+  private SoftReference<Dfa> ownerDfa;
+
+  // Per-PatternSet ThreadLocal is intentional, see above.
+  @SuppressWarnings("ThreadLocalUsage")
+  private volatile ThreadLocal<SoftReference<Dfa>> otherThreadDfas;
+
+  // Cache initialization must not compete with callers holding the PatternSet monitor.
+  private final Object dfaCacheLock = new Object();
 
   /** Parse flags for pattern set patterns: Perl-compatible without captures. */
   private static final int SET_PARSE_FLAGS = ParseFlags.LIKE_PERL | ParseFlags.NEVER_CAPTURE;
@@ -118,6 +144,7 @@ public final class PatternSet {
    * @return a sorted list of indices of matching patterns (may be empty)
    */
   public List<Integer> match(String text) {
+    requireNonNull(text, "text");
     boolean anchored = (anchor != Anchor.UNANCHORED);
 
     if (prog.hasGraphemeClusterInstruction() || prog.hasPreviousMatchEnd()) {
@@ -125,7 +152,7 @@ public final class PatternSet {
     }
 
     // Try DFA multi-match first.
-    Dfa.ManyMatchResult dfaResult = Dfa.searchMany(prog, text, anchored, maxDfaStates);
+    Dfa.ManyMatchResult dfaResult = getOrCreateDfa().doSearchMany(text, anchored);
     if (dfaResult != null) {
       if (!dfaResult.matched()) {
         return Collections.emptyList();
@@ -134,12 +161,87 @@ public final class PatternSet {
       for (int id : dfaResult.matchIds()) {
         result.add(id);
       }
-      Collections.sort(result);
       return Collections.unmodifiableList(result);
     }
 
     // DFA bailed out — fall back to running each pattern individually through NFA.
     return matchFallback(text);
+  }
+
+  Dfa.Setup dfaSetup() {
+    Dfa.Setup setup = dfaSetup;
+    if (setup == null) {
+      synchronized (dfaCacheLock) {
+        setup = dfaSetup;
+        if (setup == null) {
+          setup = Dfa.buildSetup(prog);
+          dfaSetup = setup;
+        }
+      }
+    }
+    return setup;
+  }
+
+  private Dfa getOrCreateDfa() {
+    long threadId = Thread.currentThread().threadId();
+    long owner = ownerThreadId;
+    if (owner == 0) {
+      synchronized (dfaCacheLock) {
+        owner = ownerThreadId;
+        if (owner == 0) {
+          owner = threadId;
+          ownerThreadId = owner;
+        }
+      }
+    }
+    if (owner == threadId) {
+      SoftReference<Dfa> ref = ownerDfa;
+      Dfa dfa = ref != null ? ref.get() : null;
+      if (dfa == null) {
+        dfa = new Dfa(prog, maxDfaStates, dfaSetup(), true);
+        ownerDfa = new SoftReference<>(dfa);
+      }
+      return dfa;
+    }
+    ThreadLocal<SoftReference<Dfa>> dfas = otherThreadDfas();
+    SoftReference<Dfa> ref = dfas.get();
+    Dfa dfa = ref != null ? ref.get() : null;
+    if (dfa == null) {
+      dfa = new Dfa(prog, maxDfaStates, dfaSetup(), true);
+      dfas.set(new SoftReference<>(dfa));
+    }
+    return dfa;
+  }
+
+  private ThreadLocal<SoftReference<Dfa>> otherThreadDfas() {
+    ThreadLocal<SoftReference<Dfa>> dfas = otherThreadDfas;
+    if (dfas == null) {
+      synchronized (dfaCacheLock) {
+        dfas = otherThreadDfas;
+        if (dfas == null) {
+          dfas = new ThreadLocal<>();
+          otherThreadDfas = dfas;
+        }
+      }
+    }
+    return dfas;
+  }
+
+  /** Returns the compiled program. Package-private for testing. */
+  Prog prog() {
+    return prog;
+  }
+
+  /** Returns the current thread's cached DFA without creating it. Package-private for testing. */
+  Dfa cachedDfa() {
+    SoftReference<Dfa> ref;
+    if (ownerThreadId == Thread.currentThread().threadId()) {
+      ref = ownerDfa;
+    } else {
+      ThreadLocal<SoftReference<Dfa>> dfas = otherThreadDfas;
+      ref = dfas != null ? dfas.get() : null;
+    }
+    return ref != null ? ref.get() : null;
   }
 
   /**
