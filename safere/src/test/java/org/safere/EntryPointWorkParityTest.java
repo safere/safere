@@ -61,6 +61,10 @@ class EntryPointWorkParityTest {
       List.of(
           new Scenario("hello", ""),
           new Scenario("hello", "hello"),
+          new Scenario("https://", ""),
+          new Scenario("https://", "https://"),
+          new Scenario(";", ""),
+          new Scenario(";", ";"),
           new Scenario("[0-9]", ""),
           new Scenario("[0-9]+", ""),
           new Scenario("(?i)\\b(?:foo|bar|baz)\\b", ""),

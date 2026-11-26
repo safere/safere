@@ -729,15 +729,24 @@ class SearchScalingRegressionTest {
     Pattern pattern = Pattern.compile("(delim)");
     String input = "item delim ".repeat(1_000);
 
+    long dfaSteps =
+        WorkCounter.countForwardDfaStepsForTesting(() -> {
+          String[] parts = pattern.split(input);
+          assertThat(parts).hasSize(1_001);
+        });
     long work =
         WorkCounter.countForTesting(() -> {
           String[] parts = pattern.split(input);
           assertThat(parts).hasSize(1_001);
         });
 
-    assertThat(work)
+    assertThat(dfaSteps)
         .as("Literal split on parenthesized pattern should execute on fast path without DFA work")
-        .isEqualTo(0);
+        .isZero();
+    assertThat(work)
+        .as("Literal split on parenthesized pattern should scan linearly via StringLiteralSearch")
+        .isPositive()
+        .isLessThanOrEqualTo(2L * input.length());
   }
 
   @Test
