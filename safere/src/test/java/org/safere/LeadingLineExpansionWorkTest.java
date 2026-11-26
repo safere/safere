@@ -209,6 +209,30 @@ class LeadingLineExpansionWorkTest {
   }
 
   /**
+   * With a literal on every line, a literal-set expansion skips nothing, and its per-literal scans
+   * would cost more than the forward search. After a few such searches the matcher stops calling it
+   * for a while, so the work stays close to the forward search alone.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void literalOnEveryLineStopsTheLiteralSetScans(boolean utf8) {
+    Pattern pattern = Pattern.compile(".*(?:error|fatal|panic):? \\w+");
+    String line =
+        "request handled in 23 ms path=/api/v1/items/12345" + " ".repeat(60) + "error: disk\n";
+    int lines = 2_000;
+    String input = line.repeat(lines);
+    long work =
+        WorkCounter.countWithForwardDfaStepsForTesting(() -> {
+          int matches =
+              utf8
+                  ? count(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))))
+                  : count(pattern.matcher(input));
+          assertThat(matches).isEqualTo(lines);
+        });
+    assertThat(work).isLessThan(3L * input.length() / 2);
+  }
+
+  /**
    * A literal set searches for each literal separately, but a later literal only searches up to the
    * best hit so far, so literals that never occur cost about as much as the one that does.
    */
