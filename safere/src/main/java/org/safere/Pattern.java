@@ -419,6 +419,9 @@ public final class Pattern implements Serializable {
                 && enginePathOptions.startAcceleration()
                 && this.utf8StartAccelerator != null
                 && !prog.anchorStart()
+                // A wide expansion leaves short inputs to the forward search without scanning,
+                // so it doesn't cover disjoint literals there.
+                && !FindPlan.isWideLeadingExpansion(this.multiAnchor.startPlan())
             ? RejectPrefilter.withoutDisjointLiterals(baseFindReject)
             : baseFindReject;
     this.findPlan =

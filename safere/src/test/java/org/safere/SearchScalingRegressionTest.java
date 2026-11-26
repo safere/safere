@@ -942,9 +942,13 @@ class SearchScalingRegressionTest {
     long work =
         WorkCounter.countForTesting(() -> assertThat(pattern.matcher(input).find()).isTrue());
 
+    // The leading expansion scans for each of the three literals once and, finding no line
+    // terminator before the hit, checks for each of the five that non-DOTALL `.` excludes, before
+    // the forward search starts at the search start. Its literal search stands in for the reject
+    // prefilter's.
     assertThat(work)
         .as("a positive disjoint-literal candidate should not repeat every full-input scan")
-        .isLessThan(input.length() * 5L);
+        .isLessThan(input.length() * 9L);
   }
 
   @Test

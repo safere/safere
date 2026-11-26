@@ -49,8 +49,10 @@ sealed interface StringStartAccelerator {
               ? null
               : CharClass.create(ml.fallbackClass());
       case MultiAnchorDescriptor.StartPlan.LeadingExpansion le -> {
-        StringStartAccelerator inner = create(le.innerPlan(), hasWordBoundary);
-        yield inner != null
+        InnerLiteralSet innerLiterals = LeadingExpansion.innerLiterals(le);
+        StringStartAccelerator inner =
+            innerLiterals != null ? null : create(le.innerPlan(), hasWordBoundary);
+        yield inner != null || innerLiterals != null
             ? new LeadingExpansion(
                 le.leadingClass(),
                 le.minRepetition(),
@@ -58,7 +60,8 @@ sealed interface StringStartAccelerator {
                 le.hasLeadingAssertions(),
                 MultiAnchorCompiler.isWideLeadingClass(le.leadingClass()),
                 LeadingExpansion.forwardScanChars(le),
-                inner)
+                inner,
+                innerLiterals)
             : null;
       }
       case MultiAnchorDescriptor.StartPlan.LineAnchor la ->
@@ -787,8 +790,21 @@ sealed interface StringStartAccelerator {
       boolean hasLeadingAssertions,
       boolean wideLeadingClass,
       char[] excludedChars,
-      StringStartAccelerator inner)
+      StringStartAccelerator inner,
+      InnerLiteralSet innerLiterals)
       implements StringStartAccelerator {
+
+    /**
+     * Returns the exact literal search for a wide expansion's multi-literal inner plan, or null
+     * when the inner plan has its own accelerator in {@link #inner}. Exactly one of the two is
+     * non-null.
+     */
+    static InnerLiteralSet innerLiterals(MultiAnchorDescriptor.StartPlan.LeadingExpansion le) {
+      return MultiAnchorCompiler.isWideLeadingClass(le.leadingClass())
+              && le.innerPlan() instanceof MultiAnchorDescriptor.StartPlan.MultiLiteral ml
+          ? InnerLiteralSet.create(ml.literals())
+          : null;
+    }
 
     /**
      * Returns the code units a wide leading class excludes, when a forward search for them can
@@ -831,7 +847,7 @@ sealed interface StringStartAccelerator {
           wideLeadingClass
               ? AcceleratorPolicy.WIDE_LEADING_EXPANSION
               : AcceleratorPolicy.LEADING_EXPANSION;
-      return policy.withStrategy(inner.policy().strategy());
+      return policy.withStrategy(inner != null ? inner.policy().strategy() : MatchStrategy.LITERAL);
     }
 
     /**
@@ -846,6 +862,9 @@ sealed interface StringStartAccelerator {
     }
 
     int findInnerCandidate(CharSequence text, int searchPos, boolean unixLines) {
+      if (innerLiterals != null) {
+        return innerLiterals.indexOf(text, searchPos);
+      }
       return StringStartAccelerator.findNextCandidate(inner, text, searchPos, unixLines);
     }
 

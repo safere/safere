@@ -1407,18 +1407,37 @@ final class MultiAnchorCompiler {
       return null;
     }
 
+    List<Regexp> elements = re.subs;
     int idx = 0;
-    while (idx < re.nsub() && isLeadingZeroWidth(re.subs.get(idx))) {
-      idx++;
+    boolean hasLeadingAssertions = false;
+    boolean splicedGroup = false;
+    Regexp first;
+    while (true) {
+      while (idx < elements.size() && isLeadingZeroWidth(elements.get(idx))) {
+        idx++;
+      }
+      if (idx >= elements.size() - 1) {
+        return null;
+      }
+      first = unwrapCaptures(elements.get(idx));
+      if (first == null) {
+        return null;
+      }
+      if (first.op != RegexpOp.CONCAT || first.nsub() == 0) {
+        break;
+      }
+      // A group holding the leading repeat together with what follows it, as in `(.*foo)bar`,
+      // matches the same strings as its elements spliced into the enclosing concatenation, so the
+      // walk back from the inner candidate finds the same starts. Groups only affect submatch
+      // bounds, which the exact engine resolves from the chosen start.
+      List<Regexp> spliced = new ArrayList<>(first.subs);
+      spliced.addAll(elements.subList(idx + 1, elements.size()));
+      hasLeadingAssertions |= idx > 0;
+      elements = spliced;
+      idx = 0;
+      splicedGroup = true;
     }
-    if (idx >= re.nsub() - 1) {
-      return null;
-    }
-
-    Regexp first = unwrapCaptures(re.subs.get(idx));
-    if (first == null) {
-      return null;
-    }
+    hasLeadingAssertions |= idx > 0;
 
     int minRepetition;
     int maxRepetition;
@@ -1486,11 +1505,32 @@ final class MultiAnchorCompiler {
     if (wideLeadingClass && Utils.MAX_RUNE + 1 - numRunes > MAX_LEADING_CLASS_COMPLEMENT) {
       return null;
     }
+    // Splicing a group is only measured for wide classes, where it adds the line-start walk.
+    // Narrow classes keep their existing start and reject plans.
+    if (splicedGroup && !wideLeadingClass) {
+      return null;
+    }
 
-    List<Regexp> tailSubs = re.subs.subList(idx + 1, re.nsub());
+    List<Regexp> tailSubs = elements.subList(idx + 1, elements.size());
     Regexp tail = tailSubs.size() == 1 ? tailSubs.getFirst() : Regexp.concat(tailSubs, 0);
 
     MultiAnchorDescriptor.StartPlan inner = extractStartPlan(tail, false);
+    if (wideLeadingClass
+        && !(inner instanceof MultiAnchorDescriptor.StartPlan.Literal
+            || inner instanceof MultiAnchorDescriptor.StartPlan.FixedOffset)) {
+      // A tail's start plan only reports its leading literal alternation when the alternation is
+      // the whole tail, as in `.*(?:apple|banana)`. With more after it, as in
+      // `.*(?:apple|banana)\b.*`, every match still starts with one of the literals.
+      String[] literals = extractLiteralAlternation(firstPrefixCandidate(tail));
+      if (literals != null && isWideInnerLiteralSet(literals)) {
+        inner =
+            new MultiAnchorDescriptor.StartPlan.MultiLiteral(
+                literals,
+                inner instanceof MultiAnchorDescriptor.StartPlan.CharClass cc
+                    ? cc.scanInfo()
+                    : null);
+      }
+    }
     if (inner == null
         || inner instanceof MultiAnchorDescriptor.StartPlan.None
         // Keep class offsets scoped to their exact ASCII prefix, without a backward-expansion
@@ -1501,10 +1541,13 @@ final class MultiAnchorCompiler {
     }
     // Before a wide class, only an exact literal search finds inner candidates sparse enough to
     // pay for walking back to the line start. Class and multi-literal scans may report every
-    // position, or decline and report the search start.
+    // position, or decline and report the search start. A few longer literals get their own exact
+    // search instead (see isWideInnerLiteralSet).
     if (wideLeadingClass
         && !(inner instanceof MultiAnchorDescriptor.StartPlan.Literal
-            || inner instanceof MultiAnchorDescriptor.StartPlan.FixedOffset)) {
+            || inner instanceof MultiAnchorDescriptor.StartPlan.FixedOffset
+            || (inner instanceof MultiAnchorDescriptor.StartPlan.MultiLiteral ml
+                && isWideInnerLiteralSet(ml.literals())))) {
       return null;
     }
     // An optional leading character in front of a class too common to scan for, such as `-?\d+`,
@@ -1518,7 +1561,30 @@ final class MultiAnchorCompiler {
     }
 
     return new MultiAnchorDescriptor.StartPlan.LeadingExpansion(
-        leadingClass, minRepetition, maxRepetition, idx > 0, inner);
+        leadingClass, minRepetition, maxRepetition, hasLeadingAssertions, inner);
+  }
+
+  /**
+   * Returns whether a wide leading expansion may search for {@code literals} as its inner plan.
+   *
+   * <p>The general multi-literal accelerators can report a candidate per first-byte hit, or decline
+   * and report the search start. {@link InnerLiteralSet} instead reports only exact literal starts,
+   * so a wide expansion treats it like a single literal. It searches for each literal separately,
+   * so the set is kept small, and every literal has at least {@link
+   * InnerLiteralSet#MIN_LITERAL_LENGTH} characters, which keeps a hit about as rare as one on a
+   * single literal of that length.
+   */
+  static boolean isWideInnerLiteralSet(String[] literals) {
+    if (literals.length < 2 || literals.length > InnerLiteralSet.MAX_LITERALS) {
+      return false;
+    }
+    for (String literal : literals) {
+      if (literal.length() < InnerLiteralSet.MIN_LITERAL_LENGTH
+          || literal.length() > InnerLiteralSet.MAX_LITERAL_LENGTH) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static PrefixResult extractPrefix(Regexp re) {
