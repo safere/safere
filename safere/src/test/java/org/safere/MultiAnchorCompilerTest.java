@@ -507,6 +507,55 @@ class MultiAnchorCompilerTest {
         .toList();
   }
 
+  @Test
+  void groupedWideLeadingRepeatsGetLeadingExpansion() {
+    for (String regex :
+        List.of("(.*error): (\\w+)", "(?:.*error): \\w+", "((.*)error)x", "(\\b.*error)y")) {
+      StartPlan plan = Pattern.compile(regex).startPlan();
+      assertThat(plan).as(regex).isInstanceOf(StartPlan.LeadingExpansion.class);
+      StartPlan.LeadingExpansion le = (StartPlan.LeadingExpansion) plan;
+      assertThat(MultiAnchorCompiler.isWideLeadingClass(le.leadingClass())).as(regex).isTrue();
+      assertThat(le.innerPlan()).as(regex).isEqualTo(new StartPlan.Literal("error", false));
+      assertThat(le.hasLeadingAssertions()).as(regex).isEqualTo(regex.contains("\\b"));
+    }
+  }
+
+  @Test
+  void groupedNarrowLeadingRepeatsKeepTheirPlans() {
+    // Splicing a group is limited to wide classes, so these keep the plan they had without it.
+    for (String regex : List.of("(\\d+error): (\\w+)", "(\\s*error)x", "([a-z]+error)x")) {
+      assertThat(Pattern.compile(regex).startPlan())
+          .as(regex)
+          .isNotInstanceOf(StartPlan.LeadingExpansion.class);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"(.*error): (\\w+)", "(?:.*error): \\w+", "(\\b.*error)y"})
+  void groupedLeadingExpansionsKeepTheRejectPlanOfNoStartPlan(String regex) {
+    // A wide expansion's inner literal stays in the reject plan, as for a leading `.*`.
+    int flags = Pattern.toParseFlags(0);
+    Regexp ast = Parser.parse(regex, flags);
+    MultiAnchorDescriptor descriptor = MultiAnchorCompiler.compile(ast, flags);
+    assertThat(descriptor.startPlan()).isInstanceOf(StartPlan.LeadingExpansion.class);
+    RejectPlan withoutStart =
+        MultiAnchorCompiler.extractRejectPlan(
+            MultiAnchorCompiler.factorAlternations(ast), flags, StartPlan.None.INSTANCE, false);
+    assertThat(rejectPlans(descriptor.rejectPlan()).map(MultiAnchorCompilerTest::describe))
+        .containsExactlyElementsOf(
+            rejectPlans(withoutStart).map(MultiAnchorCompilerTest::describe).toList());
+  }
+
+  private static String describe(RejectPlan plan) {
+    return switch (plan) {
+      case RejectPlan.DisjointLiterals disjoint ->
+          "Disjoint" + Arrays.toString(disjoint.literals());
+      case RejectPlan.RequiredCharClass required ->
+          "Class" + Arrays.toString(required.scanInfo().ranges());
+      default -> plan.toString();
+    };
+  }
+
   private static Stream<MultiAnchorDescriptor.RejectPlan> rejectPlans(
       MultiAnchorDescriptor.RejectPlan plan) {
     if (plan instanceof MultiAnchorDescriptor.RejectPlan.Composite composite) {

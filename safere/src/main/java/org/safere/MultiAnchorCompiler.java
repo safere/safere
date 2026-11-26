@@ -1407,18 +1407,37 @@ final class MultiAnchorCompiler {
       return null;
     }
 
+    List<Regexp> elements = re.subs;
     int idx = 0;
-    while (idx < re.nsub() && isLeadingZeroWidth(re.subs.get(idx))) {
-      idx++;
+    boolean hasLeadingAssertions = false;
+    boolean splicedGroup = false;
+    Regexp first;
+    while (true) {
+      while (idx < elements.size() && isLeadingZeroWidth(elements.get(idx))) {
+        idx++;
+      }
+      if (idx >= elements.size() - 1) {
+        return null;
+      }
+      first = unwrapCaptures(elements.get(idx));
+      if (first == null) {
+        return null;
+      }
+      if (first.op != RegexpOp.CONCAT || first.nsub() == 0) {
+        break;
+      }
+      // A group holding the leading repeat together with what follows it, as in `(.*foo)bar`,
+      // matches the same strings as its elements spliced into the enclosing concatenation, so the
+      // walk back from the inner candidate finds the same starts. Groups only affect submatch
+      // bounds, which the exact engine resolves from the chosen start.
+      List<Regexp> spliced = new ArrayList<>(first.subs);
+      spliced.addAll(elements.subList(idx + 1, elements.size()));
+      hasLeadingAssertions |= idx > 0;
+      elements = spliced;
+      idx = 0;
+      splicedGroup = true;
     }
-    if (idx >= re.nsub() - 1) {
-      return null;
-    }
-
-    Regexp first = unwrapCaptures(re.subs.get(idx));
-    if (first == null) {
-      return null;
-    }
+    hasLeadingAssertions |= idx > 0;
 
     int minRepetition;
     int maxRepetition;
@@ -1486,8 +1505,13 @@ final class MultiAnchorCompiler {
     if (wideLeadingClass && Utils.MAX_RUNE + 1 - numRunes > MAX_LEADING_CLASS_COMPLEMENT) {
       return null;
     }
+    // Splicing a group is only measured for wide classes, where it adds the line-start walk.
+    // Narrow classes keep their existing start and reject plans.
+    if (splicedGroup && !wideLeadingClass) {
+      return null;
+    }
 
-    List<Regexp> tailSubs = re.subs.subList(idx + 1, re.nsub());
+    List<Regexp> tailSubs = elements.subList(idx + 1, elements.size());
     Regexp tail = tailSubs.size() == 1 ? tailSubs.getFirst() : Regexp.concat(tailSubs, 0);
 
     MultiAnchorDescriptor.StartPlan inner = extractStartPlan(tail, false);
@@ -1518,7 +1542,7 @@ final class MultiAnchorCompiler {
     }
 
     return new MultiAnchorDescriptor.StartPlan.LeadingExpansion(
-        leadingClass, minRepetition, maxRepetition, idx > 0, inner);
+        leadingClass, minRepetition, maxRepetition, hasLeadingAssertions, inner);
   }
 
   static PrefixResult extractPrefix(Regexp re) {
