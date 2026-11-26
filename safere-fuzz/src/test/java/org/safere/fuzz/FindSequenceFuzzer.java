@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.code_intelligence.jazzer.api.FuzzedDataProvider;
 import com.code_intelligence.jazzer.junit.FuzzTest;
 import java.lang.reflect.Field;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -415,7 +416,7 @@ public final class FindSequenceFuzzer {
     boolean warmLineEndCache = false;
     String warmInput = null;
     boolean previousMatchGrammar = false;
-    switch (data.consumeInt(0, 23)) {
+    switch (data.consumeInt(0, 24)) {
       case 0 -> {
         regex = nestedCapturingGroups(data.consumeInt(0, 512)) + "*";
         flags = 0;
@@ -666,6 +667,10 @@ public final class FindSequenceFuzzer {
           regex = "(?U)" + regex;
         }
       }
+      case 24 -> {
+        assertResultsDetectMutation(data);
+        return;
+      }
       default -> throw new AssertionError();
     }
     FuzzSupport.CompiledPattern pattern = FuzzSupport.compileRequired(regex, flags);
@@ -741,6 +746,51 @@ public final class FindSequenceFuzzer {
         // Independent model sequences retain failures and assert the SafeRE boundary.
         matcher.reset();
       }
+    }
+  }
+
+  private static void assertResultsDetectMutation(FuzzedDataProvider data) {
+    String atom = data.pickValue(List.of("a", "ab", "é", "😀"));
+    String regex = "(" + atom + ")";
+    int advances = data.consumeInt(1, 8);
+    boolean useIterator = data.consumeBoolean();
+    boolean exhausted = data.consumeBoolean();
+    String input = atom.repeat(exhausted ? advances : advances + 2);
+    var matcher = org.safere.Pattern.compile(regex).matcher(input);
+    var results = matcher.results();
+    Runnable advance;
+    Runnable checkExhausted;
+    if (useIterator) {
+      var iterator = results.iterator();
+      advance = () -> assertThat(iterator.next().group(1)).isEqualTo(atom);
+      checkExhausted = () -> assertThat(iterator.hasNext()).isFalse();
+    } else {
+      var spliterator = results.spliterator();
+      advance =
+          () ->
+              assertThat(
+                      spliterator.tryAdvance(result -> assertThat(result.group(1)).isEqualTo(atom)))
+                  .isTrue();
+      checkExhausted = () -> assertThat(spliterator.tryAdvance(result -> {})).isFalse();
+    }
+
+    for (int i = 0; i < advances; i++) {
+      advance.run();
+    }
+    if (exhausted) {
+      checkExhausted.run();
+    }
+    switch (data.consumeInt(0, 3)) {
+      case 0 -> assertThat(matcher.find()).isEqualTo(!exhausted);
+      case 1 -> matcher.reset();
+      case 2 -> matcher.region(atom.length(), input.length());
+      case 3 -> matcher.usePattern(org.safere.Pattern.compile(regex));
+      default -> throw new AssertionError();
+    }
+    if (exhausted) {
+      checkExhausted.run();
+    } else {
+      assertThatThrownBy(advance::run).isInstanceOf(ConcurrentModificationException.class);
     }
   }
 

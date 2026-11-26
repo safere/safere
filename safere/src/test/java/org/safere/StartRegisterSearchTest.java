@@ -287,17 +287,81 @@ class StartRegisterSearchTest {
   }
 
   @Test
-  void growingWideRowsRespectsTheTransitionBudget() {
-    StringBuilder members = new StringBuilder();
-    for (int i = 0; i < 1450; i++) {
-      members.appendCodePoint(0x100 + i * 2);
-    }
+  void wideRowsCanGrowWithinTheCacheBudget() {
     String input = "z" + "a".repeat(1100);
-    Pattern pattern = Pattern.compile(input + "|q[" + members + "]");
+    Pattern pattern = Pattern.compile(input + "|q" + wideClass(1450));
     StartRegisterSearch search = StartRegisterSearch.create(pattern.flatDfaProg(), null, null);
 
     assertThat(search.searchForTesting(new StringInputScanner(input), 0)).isEqualTo(input.length());
-    assertThat(search.transitionCapacityForTesting()).isLessThanOrEqualTo(1 << 22);
+    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
+  }
+
+  @Test
+  void wideFrontiersConsumeTheBudgetAndAreReleasedOnReset() {
+    String regex = "a[ab]{1000}c|q" + wideClass(1950);
+    String wide = "a".repeat(1001) + "c";
+    String shortMatch = "q" + Character.toString(0x11000);
+    StartRegisterSearch search = search(regex);
+
+    assertThat(search.find(new StringInputScanner(wide), 0, AdaptiveBackoff.NEUTRAL))
+        .isEqualTo(StartRegisterSearch.FALLBACK);
+    long full = search.estimatedCacheBytes();
+    assertThat(full).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
+    assertThat(search.find(new StringInputScanner(shortMatch), 0, AdaptiveBackoff.NEUTRAL))
+        .isEqualTo(shortMatch.length());
+    assertThat(search.resetsForTesting()).isEqualTo(1);
+    assertThat(search.estimatedCacheBytes()).isLessThan(full);
+
+    assertAgrees(regex, 0, wide + " " + shortMatch);
+  }
+
+  @Test
+  void reservedRowsLeaveRoomForGrowingFrontiers() {
+    String regex = "a[ab]{830}c|q" + wideClass(1950);
+    String input = "a".repeat(831) + "c";
+    StartRegisterSearch search = search(regex);
+    assertThat(search.find(new StringInputScanner(input), 0, AdaptiveBackoff.NEUTRAL))
+        .isEqualTo(input.length());
+    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
+  }
+
+  @Test
+  void registerEventsCanExhaustTheBudgetWithoutAddingStates() {
+    // Prime enough states to leave only a small event budget with either reference width.
+    String primer = "z" + "a".repeat(1013);
+    Prog prog = Pattern.compile(primer + "|q(?s:.)|r" + wideClass(1950)).flatDfaProg();
+    StartRegisterSearch search = StartRegisterSearch.create(prog, null, null);
+    assertThat(search.find(new StringInputScanner(primer), 0, AdaptiveBackoff.NEUTRAL))
+        .isEqualTo(primer.length());
+    String first = "q" + Character.toString(0x11000);
+    assertThat(search.find(new StringInputScanner(first), 0, AdaptiveBackoff.NEUTRAL))
+        .isEqualTo(first.length());
+    int states = search.stateCount();
+
+    // These code points reach the same state but each transition records its own register event.
+    long result = 0;
+    for (int i = 1; i < 3900; i++) {
+      String input = "q" + Character.toString(0x11000 + i);
+      result = search.find(new StringInputScanner(input), 0, AdaptiveBackoff.NEUTRAL);
+      if (result == StartRegisterSearch.FALLBACK) {
+        break;
+      }
+      assertThat(result).isEqualTo(input.length());
+    }
+    assertThat(result).isEqualTo(StartRegisterSearch.FALLBACK);
+    assertThat(search.stateCount()).isEqualTo(states);
+    assertThat(search.estimatedCacheBytes()).isLessThanOrEqualTo(DfaCacheBudget.CACHE_BYTE_BUDGET);
+    assertThat(search.find(new StringInputScanner(first), 0, AdaptiveBackoff.NEUTRAL))
+        .isEqualTo(first.length());
+    assertThat(search.resetsForTesting()).isEqualTo(1);
+  }
+
+  private static String wideClass(int count) {
+    StringBuilder members = new StringBuilder("[");
+    for (int i = 0; i < count; i++) {
+      members.appendCodePoint(0x11000 + i * 2);
+    }
+    return members.append(']').toString();
   }
 
   @Test
@@ -313,7 +377,7 @@ class StartRegisterSearchTest {
     InputScanner text = new StringInputScanner(input.toString());
     assertThat(search.find(text, 0, AdaptiveBackoff.NEUTRAL))
         .isEqualTo(StartRegisterSearch.FALLBACK);
-    assertThat(search.stateCount()).isEqualTo(search.maxStatesForTesting());
+    assertThat(search.stateCount()).isEqualTo(StartRegisterSearch.MAX_STATES);
     for (int reset = 1; reset <= StartRegisterSearch.MAX_RESETS; reset++) {
       assertThat(search.find(text, 0, AdaptiveBackoff.NEUTRAL))
           .isEqualTo(StartRegisterSearch.FALLBACK);

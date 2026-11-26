@@ -1753,8 +1753,9 @@ public final class Matcher implements MatchResult {
    *
    * <p>Each match result is produced as if by {@link #toMatchResult()}.
    *
-   * <p>This method does not reset this matcher. Matching starts on a call to {@link
-   * Stream#findFirst()} or similar terminal operation, and continues from the current position.
+   * <p>Matching starts when the stream first advances and continues from this matcher's current
+   * position. The stream detects changes to this matcher during traversal on a best-effort basis
+   * and throws {@link ConcurrentModificationException} when it detects a change.
    *
    * @return a sequential stream of match results
    */
@@ -1762,14 +1763,30 @@ public final class Matcher implements MatchResult {
     Spliterator<MatchResult> spliterator =
         new Spliterators.AbstractSpliterator<>(
             Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL) {
+          private boolean started;
+          private boolean exhausted;
+          private int expectedModCount;
+
           @Override
           public boolean tryAdvance(Consumer<? super MatchResult> action) {
-            if (!find()) {
+            Objects.requireNonNull(action);
+            if (exhausted) {
               return false;
             }
-            int expectedModCount = modCount;
+            if (started) {
+              checkConcurrentModification(expectedModCount);
+            }
+            boolean found = find();
+            int modCountAfterFind = modCount;
+            expectedModCount = modCountAfterFind;
+            started = true;
+            if (!found) {
+              exhausted = true;
+              return false;
+            }
             action.accept(toMatchResult());
-            checkConcurrentModification(expectedModCount);
+            // The callback can advance this spliterator and change its expected count.
+            checkConcurrentModification(modCountAfterFind);
             return true;
           }
         };

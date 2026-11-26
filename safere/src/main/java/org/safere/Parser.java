@@ -36,17 +36,30 @@ final class Parser {
   private static final int LEFT_PAREN = -1;
   private static final int VERTICAL_BAR = -2;
 
+  // Both concatenation and alternation combine these operand properties with bitwise OR.
+  private static final int NOT_ZERO_WIDTH = 1;
+  private static final int HAS_CAPTURE = 2;
+
   // Stack entry: wraps a Regexp with linked-list pointer and extra metadata for parens.
   private static final class StackEntry {
     Regexp re;
     StackEntry down;
+    int operandProperties;
     // For LEFT_PAREN entries:
     int cap; // capture index, or -1 for non-capturing
     String name; // capture name, or null
-    int savedFlags; // flags at time of paren open
 
-    StackEntry(Regexp re) {
+    StackEntry(Regexp re, int operandProperties) {
       this.re = re;
+      this.operandProperties = operandProperties;
+    }
+
+    boolean isZeroWidth() {
+      return (operandProperties & NOT_ZERO_WIDTH) == 0;
+    }
+
+    boolean hasCapture() {
+      return (operandProperties & HAS_CAPTURE) != 0;
     }
   }
 
@@ -276,7 +289,7 @@ final class Parser {
               throw lexer.error("invalid nested repetition operator", token.start);
             }
             if (possessive && op == RegexpOp.STAR && canObservePossessiveZeroWidthIteration()) {
-              pushPossessiveZeroWidthRepeatOp(op);
+              pushPossessiveZeroWidthStar();
             } else {
               pushRepeatOp(op, token.start, reluctant);
             }
@@ -310,13 +323,10 @@ final class Parser {
   private StackEntry newMarker(int markerTag) {
     Regexp re = Regexp.noMatch(flags);
     re.matchId = markerTag;
-    StackEntry e = new StackEntry(re);
-    if (markerTag == LEFT_PAREN) {
-      e.savedFlags = flags;
-    }
-    return e;
+    return new StackEntry(re, NOT_ZERO_WIDTH);
   }
 
+  // Token operands contain no captures, including the alternation built for \R.
   private void pushRegexp(Regexp re) {
     // Special case: a character class of one character is just a literal.
     if (re.op == RegexpOp.CHAR_CLASS && re.charClass != null) {
@@ -327,7 +337,25 @@ final class Parser {
       }
     }
 
-    StackEntry e = new StackEntry(re);
+    int operandProperties =
+        switch (re.op) {
+          case EMPTY_MATCH,
+              BEGIN_LINE,
+              END_LINE,
+              WORD_BOUNDARY,
+              NO_WORD_BOUNDARY,
+              GRAPHEME_CLUSTER_BOUNDARY,
+              BEGIN_TEXT,
+              PREVIOUS_MATCH_END,
+              END_TEXT ->
+              0;
+          default -> NOT_ZERO_WIDTH;
+        };
+    pushRegexp(re, operandProperties);
+  }
+
+  private void pushRegexp(Regexp re, int operandProperties) {
+    StackEntry e = new StackEntry(re, operandProperties);
     e.down = stacktop;
     stacktop = e;
   }
@@ -481,6 +509,7 @@ final class Parser {
       fl ^= ParseFlags.NON_GREEDY;
     }
 
+    // Unary quantifiers and their squashed forms preserve both operand properties.
     // Squash **, ++ and ??.
     if (op == stacktop.re.op && fl == stacktop.re.flags) {
       return;
@@ -508,18 +537,9 @@ final class Parser {
     stacktop.re = re;
   }
 
-  private void pushPossessiveZeroWidthRepeatOp(RegexpOp op) {
-    switch (op) {
-      case STAR -> {
-        Regexp sub = stacktop.re;
-        stacktop.re = Regexp.rawQuantifier(RegexpOp.QUEST, Regexp.plus(sub, flags), flags);
-      }
-      case PLUS -> pushRepeatOp(RegexpOp.PLUS, tokenStart, false);
-      case QUEST -> {
-        // Best-effort zero-width possessive normalization: prefer the one-iteration capture path.
-      }
-      default -> throw new IllegalStateException("unexpected repeat op: " + op);
-    }
+  private void pushPossessiveZeroWidthStar() {
+    Regexp sub = stacktop.re;
+    stacktop.re = Regexp.rawQuantifier(RegexpOp.QUEST, Regexp.plus(sub, flags), flags);
   }
 
   private void pushPossessiveZeroWidthRepeatRange(int max) {
@@ -534,73 +554,18 @@ final class Parser {
         && stacktop != null
         && stacktop.re.op == RegexpOp.PLUS
         && !stacktop.re.nonGreedy()
-        && isQuantifiedZeroWidth(stacktop.re);
+        && stacktop.isZeroWidth();
   }
 
   private boolean canIgnorePossessiveModifierOnZeroWidthOperand() {
-    return stacktop != null && !isMarker(stacktop) && isZeroWidth(stacktop.re);
+    return stacktop != null && !isMarker(stacktop) && stacktop.isZeroWidth();
   }
 
   private boolean canObservePossessiveZeroWidthIteration() {
     return stacktop != null
         && !isMarker(stacktop)
-        && hasCapture(stacktop.re)
-        && isZeroWidth(stacktop.re);
-  }
-
-  private static boolean hasCapture(Regexp re) {
-    ArrayDeque<Regexp> pending = new ArrayDeque<>();
-    pending.add(re);
-    while (!pending.isEmpty()) {
-      Regexp current = pending.removeLast();
-      if (current.op == RegexpOp.CAPTURE && current.cap > 0) {
-        return true;
-      }
-      if (current.subs != null) {
-        pending.addAll(current.subs);
-      }
-    }
-    return false;
-  }
-
-  private static boolean isQuantifiedZeroWidth(Regexp re) {
-    return switch (re.op) {
-      case STAR, PLUS, QUEST, REPEAT -> isZeroWidth(re.subs.getFirst());
-      default -> false;
-    };
-  }
-
-  private static boolean isZeroWidth(Regexp re) {
-    ArrayDeque<Regexp> pending = new ArrayDeque<>();
-    pending.add(re);
-    while (!pending.isEmpty()) {
-      Regexp current = pending.removeLast();
-      switch (current.op) {
-        case EMPTY_MATCH,
-            BEGIN_LINE,
-            END_LINE,
-            WORD_BOUNDARY,
-            NO_WORD_BOUNDARY,
-            GRAPHEME_CLUSTER_BOUNDARY,
-            BEGIN_TEXT,
-            PREVIOUS_MATCH_END,
-            END_TEXT -> {
-          // Zero-width by definition.
-        }
-        case CAPTURE, NON_CAPTURE, STAR, PLUS, QUEST -> pending.add(current.subs.getFirst());
-        case REPEAT -> {
-          // A zero-count repetition never executes its child, regardless of the child's width.
-          if (current.max != 0) {
-            pending.add(current.subs.getFirst());
-          }
-        }
-        case CONCAT, ALTERNATE -> pending.addAll(current.subs);
-        default -> {
-          return false;
-        }
-      }
-    }
-    return true;
+        && stacktop.hasCapture()
+        && stacktop.isZeroWidth();
   }
 
   private void pushRepetition(int min, int max, int opStart, boolean nongreedy) {
@@ -617,6 +582,10 @@ final class Parser {
     Regexp sub = stacktop.re;
     Regexp re = Regexp.repeat(sub, fl, min, max);
     stacktop.re = re;
+    if (max == 0) {
+      // Zero iterations consume nothing. Captures still count as part of the operand's syntax.
+      stacktop.operandProperties &= ~NOT_ZERO_WIDTH;
+    }
 
     // Check for too-deep nesting of repeats.
     if (min >= 2 || max >= 2) {
@@ -684,7 +653,6 @@ final class Parser {
     StackEntry e = newMarker(LEFT_PAREN);
     e.cap = ++ncap;
     e.name = name;
-    e.savedFlags = flags;
     e.down = stacktop;
     stacktop = e;
   }
@@ -692,7 +660,6 @@ final class Parser {
   private void doLeftParenNoCapture() {
     StackEntry e = newMarker(LEFT_PAREN);
     e.cap = -1;
-    e.savedFlags = flags;
     e.down = stacktop;
     stacktop = e;
   }
@@ -735,14 +702,14 @@ final class Parser {
     stacktop = r2.down;
 
     // Restore flags from when paren opened.
-    flags = r2.savedFlags;
+    flags = r2.re.flags;
 
     // Rewrite LeftParen as capture if needed.
     if (r2.cap > 0) {
       Regexp re = Regexp.capture(r1.re, flags, r2.cap, r2.name);
-      pushRegexp(re);
+      pushRegexp(re, r1.operandProperties | HAS_CAPTURE);
     } else {
-      pushRegexp(Regexp.nonCapture(r1.re, flags));
+      pushRegexp(Regexp.nonCapture(r1.re, flags), r1.operandProperties);
     }
   }
 
@@ -778,22 +745,25 @@ final class Parser {
   }
 
   private void doCollapse(RegexpOp op) {
-    // Scan backward to marker, counting children of composite.
-    int n = 0;
-    for (StackEntry e = stacktop; e != null && !isMarker(e); e = e.down) {
-      if (e.re.op == op && e.re.subs != null) {
-        n += e.re.subs.size();
-      } else {
-        n++;
-      }
-    }
-
     // If there's just one child, leave it alone.
     if (stacktop != null && !isMarker(stacktop)) {
       StackEntry first = stacktop;
       StackEntry belowFirst = first.down;
       if (belowFirst == null || isMarker(belowFirst)) {
         return; // just one
+      }
+    }
+
+    // Combine the facts of each entry before flattening like operators or joining literals.
+    int n = 0;
+    int operandProperties = 0;
+    for (StackEntry e = stacktop; e != null && !isMarker(e); e = e.down) {
+      if (WorkCounterConfig.ENABLED) WorkCounter.record();
+      operandProperties |= e.operandProperties;
+      if (e.re.op == op && e.re.subs != null) {
+        n += e.re.subs.size();
+      } else {
+        n++;
       }
     }
 
@@ -826,9 +796,7 @@ final class Parser {
     } else {
       re = op == RegexpOp.CONCAT ? Regexp.concat(subs, flags) : Regexp.alternate(subs, flags);
     }
-    StackEntry entry = new StackEntry(re);
-    entry.down = stacktop;
-    stacktop = entry;
+    pushRegexp(re, operandProperties);
   }
 
   // ---- Literal string coalescing ----

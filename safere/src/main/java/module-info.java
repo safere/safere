@@ -5,5 +5,7 @@
 
 /** SafeRE: a linear-time regular expression matching library for Java. */
 module org.safere {
+  requires static jdk.management;
+
   exports org.safere;
 }

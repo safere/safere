@@ -5,6 +5,10 @@
 
 package org.safere;
 
+import static org.safere.DfaCacheBudget.CACHE_BYTE_BUDGET;
+import static org.safere.DfaCacheBudget.REFERENCE_BYTES;
+import static org.safere.DfaCacheBudget.STATE_OVERHEAD_BYTES;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -98,6 +102,8 @@ final class Dfa {
   /** Maximum number of DFA states before bailing out to NFA. */
   private static final int DEFAULT_MAX_STATES = 10_000;
 
+  private static final int INITIAL_TRANSITION_CELLS = 1024;
+
   /**
    * Input positions of progress per cached state that this DFA must have covered before the state
    * cache may be discarded again.
@@ -178,10 +184,6 @@ final class Dfa {
       this.flags = flags;
     }
 
-    StateKey copy() {
-      return new StateKey(insts, flags);
-    }
-
     @Override
     public int hashCode() {
       return Arrays.hashCode(insts) * 31 + flags;
@@ -227,6 +229,8 @@ final class Dfa {
    * Total transition classes, including any Unicode word split and a separate end-of-text class.
    */
   private final int numClasses;
+
+  private final long stateIdMultiplier;
 
   /** Whether each interval is split by Unicode word-character membership. */
   private final boolean splitUnicodeWordClasses;
@@ -366,9 +370,12 @@ final class Dfa {
 
   private static final int MAX_RESET_BACKOFF_SHIFT = 20;
 
+  private final long flatRowBytes;
+  private final long stateRowBytes;
+  private long cachedStateBytes;
   private int[] transitions;
-  private State[] offsetToState;
-  private boolean[] isAcceleratedStateOffset;
+  private State[] statesById;
+  private boolean[] isAcceleratedState;
   private boolean hasStateAccelerators;
 
   /** Whether this cache generation contains any universal-prefix proof. */
@@ -500,6 +507,7 @@ final class Dfa {
     this.crLfCacheBit = hasCrLfContext ? anchoredCacheBit << 1 : 0;
     this.boundaries = setup.boundaries;
     this.numClasses = setup.numClasses;
+    this.stateIdMultiplier = Math.ceilDiv(1L << Integer.SIZE, numClasses);
     this.splitUnicodeWordClasses = setup.splitUnicodeWordClasses;
     this.asciiClassMap = setup.asciiClassMap;
     Arrays.fill(this.cacheCps, -1);
@@ -507,47 +515,63 @@ final class Dfa {
     this.expandStack = new int[prog.size()];
     this.expandFrontier = new int[prog.size()];
     this.computeBuf = new int[prog.size()];
-    this.deadState = new State(0, EMPTY_INSTS, 0, null, numClasses, false, null);
+    // Flat capacity survives a reset. Successor rows and frontier data are charged only for
+    // live states. The failure-transition queue can hold at most one index per flat entry.
+    // Scratch buffers sized to the program are outside this cache budget.
+    this.flatRowBytes =
+        (Integer.BYTES + (innerLiteralSearch == null ? 0 : Integer.BYTES)) * (long) numClasses
+            + REFERENCE_BYTES
+            + Byte.BYTES;
+    this.stateRowBytes = REFERENCE_BYTES * (long) numClasses + STATE_OVERHEAD_BYTES;
+    int maxRows = cacheRowLimit(0);
+    int rows =
+        maxRows < 2 ? 0 : Math.min(maxRows, Math.max(2, INITIAL_TRANSITION_CELLS / numClasses));
+    this.deadState = new State(0, EMPTY_INSTS, 0, null, rows == 0 ? 0 : numClasses, false, null);
     this.nextStateId = 1;
-    this.transitions = new int[1024];
-    this.offsetToState = new State[1024];
-    this.isAcceleratedStateOffset = new boolean[1024];
-    addStateToFlatArrays(deadState);
+    this.transitions = new int[rows * numClasses];
+    this.statesById = new State[rows];
+    this.isAcceleratedState = new boolean[rows];
+    if (rows != 0) {
+      statesById[0] = deadState;
+      cachedStateBytes = stateRowBytes;
+    }
+  }
+
+  private int cacheRowLimit(long frontierBytes) {
+    // Row zero is the dead state. A byte-limited row count also bounds every signed transition
+    // offset and array length before either is computed with int arithmetic.
+    return (int)
+        Math.min(
+            maxStates + 1L, (CACHE_BYTE_BUDGET - frontierBytes) / (flatRowBytes + stateRowBytes));
+  }
+
+  private void growCache(int maxRows) {
+    int rows = (int) Math.min(maxRows, statesById.length * 2L);
+    transitions = Arrays.copyOf(transitions, rows * numClasses);
+    statesById = Arrays.copyOf(statesById, rows);
+    isAcceleratedState = Arrays.copyOf(isAcceleratedState, rows);
   }
 
   private void addStateToFlatArrays(State s) {
-    int minTransLen = (s.id + 1) * numClasses;
-    if (minTransLen > transitions.length) {
-      int newLen = Math.max(transitions.length * 2, minTransLen);
-      transitions = Arrays.copyOf(transitions, newLen);
-      offsetToState = Arrays.copyOf(offsetToState, newLen);
-      isAcceleratedStateOffset = Arrays.copyOf(isAcceleratedStateOffset, newLen);
-    }
-    offsetToState[s.id * numClasses] = s;
-    isAcceleratedStateOffset[s.id * numClasses] = s.isStartState || s.accelerator != null;
+    statesById[s.id] = s;
+    isAcceleratedState[s.id] = s.isStartState || s.accelerator != null;
     if (s.accelerator != null) {
       hasStateAccelerators = true;
     }
   }
 
-  private void setTransition(int fromId, int cls, int toId) {
-    int fromBase = fromId * numClasses;
-    State toState = offsetToState[toId * numClasses];
-    // Negative entries already leave the hot loop for match handling. On DFAs with inner
-    // narrowing, also flag failure frontiers so observing failure adds no per-character test.
-    boolean needsAttention =
-        toState.isMatch() || (innerLiteralSearch != null && toState.isStartState);
-    int storedId = toId * numClasses;
-    if (needsAttention) {
-      storedId = -storedId;
-    }
-    transitions[fromBase + cls] = storedId;
+  private int stateId(int offset) {
+    // All nonnegative row offsets are exact multiples of numClasses. Rounding the scaled
+    // reciprocal up adds less than one to offset / numClasses, so the shift gives the exact ID.
+    return (int) ((offset * stateIdMultiplier) >>> Integer.SIZE);
   }
 
   private void pauseFailureTransition(int index, int offset) {
     if (pausedFailureTransitionCount == pausedFailureTransitions.length) {
       pausedFailureTransitions =
-          Arrays.copyOf(pausedFailureTransitions, Math.max(8, pausedFailureTransitionCount * 2));
+          Arrays.copyOf(
+              pausedFailureTransitions,
+              Math.min(transitions.length, Math.max(8, pausedFailureTransitionCount * 2)));
     }
     pausedFailureTransitions[pausedFailureTransitionCount++] = index;
     // This positive entry cannot be queued again before it is restored.
@@ -570,7 +594,11 @@ final class Dfa {
 
   private void addTransition(State from, int cls, State to) {
     from.next[cls] = to;
-    setTransition(from.id, cls, to.id);
+    // Negative entries already leave the hot loop for match handling. On DFAs with inner
+    // narrowing, also flag failure frontiers so observing failure adds no per-character test.
+    boolean needsAttention = to.isMatch() || (innerLiteralSearch != null && to.isStartState);
+    int offset = to.id * numClasses;
+    transitions[from.id * numClasses + cls] = needsAttention ? -offset : offset;
   }
 
   /**
@@ -952,12 +980,25 @@ final class Dfa {
     }
     lookupKey.reset(insts, flags);
     State s = cache.get(lookupKey);
+    lookupKey.reset(EMPTY_INSTS, 0);
     if (s != null) {
       return s;
     }
-    if (cache.size() >= maxStates) {
+    int matchIdCount = wordBoundaryMatchIds == null ? 0 : wordBoundaryMatchIds.length;
+    long stateBytes =
+        cachedStateBytes + stateRowBytes + Integer.BYTES * ((long) insts.length + matchIdCount);
+    int requiredRows = nextStateId + 1;
+    if (nextStateId > maxStates
+        || stateBytes + flatRowBytes * Math.max(requiredRows, statesById.length)
+            > CACHE_BYTE_BUDGET) {
       return null;
     }
+    if (nextStateId == statesById.length) {
+      // Limit geometric growth as if the new slots were all in use. The check above guarantees
+      // that this leaves room for at least the new state and its transition row.
+      growCache(cacheRowLimit(stateBytes - stateRowBytes * requiredRows));
+    }
+    StateKey key = new StateKey(insts, flags);
     boolean isHighestPriorityMatch =
         (anyMatch && (flags & FLAG_MATCH) != 0)
             || (insts.length > 0 && prog.inst(insts[0]).opCode == InstOp.OP_MATCH);
@@ -976,7 +1017,8 @@ final class Dfa {
             isHighestPriorityMatch,
             accelerator);
     addStateToFlatArrays(s);
-    cache.put(lookupKey.copy(), s);
+    cache.put(key, s);
+    cachedStateBytes = stateBytes;
     return s;
   }
 
@@ -1052,7 +1094,7 @@ final class Dfa {
       int matchStart,
       boolean ambiguous) {
     int[] transitions = this.transitions;
-    State[] offsetToState = this.offsetToState;
+    State[] statesById = this.statesById;
     int[] asciiClassMap = this.asciiClassMap;
     boolean needEndMatch = prog.anchorEnd();
     // No states can be created inside this cached loop. A cache with no proofs needs no
@@ -1073,7 +1115,7 @@ final class Dfa {
       }
       if (next < 0) {
         next = -next;
-        State state = offsetToState[next];
+        State state = statesById[stateId(next)];
         if (state.isMatch()) {
           int flags = state.flags;
           // A self-transition cannot acquire a proof that was false when this state was entered.
@@ -1118,11 +1160,14 @@ final class Dfa {
     if (s != null) {
       return s;
     }
+    if (statesById.length == 0) {
+      return budgetExhausted();
+    }
     if (!resetCache(pos)) {
       return null;
     }
     s = startState(text, pos, anchored, reverse);
-    return s == null ? budgetExhaustedAfterReset() : s;
+    return s == null ? budgetExhausted() : s;
   }
 
   /**
@@ -1134,9 +1179,8 @@ final class Dfa {
    * elapsed. The caller must then abandon the DFA for the active search and let the NFA finish it.
    *
    * <p>A reset invalidates every {@link State} the caller holds. State ids restart from zero and
-   * the flat arrays indexed by {@code state.id * numClasses} are rebuilt from scratch, so any
-   * {@code State} reference, state offset, or local copy of the flat arrays held across the call is
-   * stale.
+   * the transition rows and state metadata are rebuilt from scratch, so any {@code State}
+   * reference, state offset, or local copy of the flat arrays held across the call is stale.
    */
   private boolean resetCache(int pos) {
     long delta = Math.abs((long) pos - progressAnchor);
@@ -1164,12 +1208,11 @@ final class Dfa {
     backoffProgress = 0;
     lastSearchBailed = false;
     currentGenerationPenalized = false;
-    int used = Math.min(nextStateId * numClasses, transitions.length);
-    Arrays.fill(transitions, 0, used, 0);
+    Arrays.fill(transitions, 0, nextStateId * numClasses, 0);
     pausedFailureTransitionCount = 0;
     pendingFailureTransitionIndex = -1;
-    Arrays.fill(offsetToState, 0, used, null);
-    Arrays.fill(isAcceleratedStateOffset, 0, used, false);
+    Arrays.fill(statesById, 0, nextStateId, null);
+    Arrays.fill(isAcceleratedState, 0, nextStateId, false);
     // The dead state outlives the reset, so clear the transitions recorded on it by hand.
     Arrays.fill(deadState.next, null);
     // A surviving start-cache entry would hand back a state the flat arrays no longer describe.
@@ -1178,6 +1221,7 @@ final class Dfa {
       Arrays.fill(fastStartStates, null);
     }
     cache.clear();
+    cachedStateBytes = stateRowBytes;
     hasUniversalPrefixStates = false;
     hasStateAccelerators = false;
     nextStateId = 1;
@@ -1185,12 +1229,8 @@ final class Dfa {
     return true;
   }
 
-  /**
-   * Records that a freshly reset cache still could not hold the states the search needs, and
-   * returns null so the caller abandons the DFA. This only happens with budgets of a few states; it
-   * is still budget exhaustion, so it must set {@link #lastSearchBailed} like a refused reset.
-   */
-  private State budgetExhaustedAfterReset() {
+  /** Returns null and signals fallback when the cache cannot hold the states the search needs. */
+  private State budgetExhausted() {
     lastSearchBailed = true;
     return null;
   }
@@ -1217,7 +1257,7 @@ final class Dfa {
     State recreated = getOrCreate(s.insts, s.flags, s.wordBoundaryMatchIds);
     if (recreated != null && s.isStartState) {
       recreated.isStartState = true;
-      isAcceleratedStateOffset[recreated.id * numClasses] = true;
+      isAcceleratedState[recreated.id] = true;
     }
     return recreated;
   }
@@ -1241,7 +1281,7 @@ final class Dfa {
     }
     State recreated = recreateAfterReset(s);
     State next = recreated == null ? null : computeNext(recreated, cp, text, nextPos);
-    return next == null ? budgetExhaustedAfterReset() : next;
+    return next == null ? budgetExhausted() : next;
   }
 
   /**
@@ -1258,11 +1298,11 @@ final class Dfa {
       }
       s = recreateAfterReset(s);
       if (s == null) {
-        return budgetExhaustedAfterReset();
+        return budgetExhausted();
       }
       ns = computeNext(s, cp, text, nextPos);
       if (ns == null) {
-        return budgetExhaustedAfterReset();
+        return budgetExhausted();
       }
     }
     addTransition(s, cls, ns);
@@ -1464,6 +1504,9 @@ final class Dfa {
    *     the right of where a reverse scan begins), rather than the character BEFORE pos
    */
   State startState(InputScanner text, int pos, boolean anchored, boolean reverseContext) {
+    if (statesById.length == 0) {
+      return null;
+    }
     if (fastStartStates == null) {
       return computeStartState(text, pos, anchored, reverseContext);
     }
@@ -1569,7 +1612,7 @@ final class Dfa {
       // idle would allow start acceleration to skip characters belonging to that match.
       if (!anchored && !reverseContext) {
         s.isStartState = true;
-        isAcceleratedStateOffset[s.id * numClasses] = true;
+        isAcceleratedState[s.id] = true;
       }
       startStateContextKeys[cacheIndex] = cacheKey;
       startStateByContext[cacheIndex] = s;
@@ -2235,8 +2278,8 @@ final class Dfa {
     }
 
     int[] transitions = this.transitions;
-    State[] offsetToState = this.offsetToState;
-    boolean[] isAcceleratedStateOffset = this.isAcceleratedStateOffset;
+    State[] statesById = this.statesById;
+    boolean[] isAcceleratedState = this.isAcceleratedState;
     int[] asciiClassMap = this.asciiClassMap;
     // Fast path: loop through ASCII characters (characters < 128)
     while (pos < textLen) {
@@ -2275,8 +2318,8 @@ final class Dfa {
           // Creating a start state, or resetting the cache, can grow or replace the contents of
           // the flat arrays, just like computeNext below.
           transitions = this.transitions;
-          offsetToState = this.offsetToState;
-          isAcceleratedStateOffset = this.isAcceleratedStateOffset;
+          statesById = this.statesById;
+          isAcceleratedState = this.isAcceleratedState;
           if (s.isMatch()) {
             if (isRequiredEndMatch(pos, needEndMatch, textLen, trailingTermStart)) {
               matched = true;
@@ -2332,7 +2375,7 @@ final class Dfa {
           }
           if (nsId < 0) {
             nsId = -nsId;
-            State ns = offsetToState[nsId];
+            State ns = statesById[stateId(nsId)];
             if (ns.isMatch() && !needEndMatch) {
               boolean useBefore =
                   (ns.flags & (FLAG_MATCH_BEFORE | FLAG_MATCH_AFTER_DEFERRED)) == FLAG_MATCH_BEFORE;
@@ -2354,7 +2397,7 @@ final class Dfa {
               break;
             }
           }
-          if (nsId == sId && isAcceleratedStateOffset[sId]) {
+          if (nsId == sId && isAcceleratedState[stateId(sId)]) {
             sId = nsId;
             pos++;
             hitAcceleratedState = true;
@@ -2379,7 +2422,7 @@ final class Dfa {
           }
           if (nsId < 0) {
             nsId = -nsId;
-            State ns = offsetToState[nsId];
+            State ns = statesById[stateId(nsId)];
             if (ns.isMatch() && !needEndMatch) {
               boolean useBefore =
                   (ns.flags & (FLAG_MATCH_BEFORE | FLAG_MATCH_AFTER_DEFERRED)) == FLAG_MATCH_BEFORE;
@@ -2395,7 +2438,7 @@ final class Dfa {
           pos++;
         }
       }
-      s = offsetToState[sId];
+      s = statesById[stateId(sId)];
       if (pendingFailureTransitionIndex >= 0) {
         // Keep all transition-table writes outside the cached scalar loop.
         pauseFailureTransition(pendingFailureTransitionIndex, sId);
@@ -2427,8 +2470,8 @@ final class Dfa {
         // computeNext can grow the flat arrays and a cache reset replaces their contents. Either
         // way s is no longer usable, but the loop reloads sId from ns on the next iteration.
         transitions = this.transitions;
-        offsetToState = this.offsetToState;
-        isAcceleratedStateOffset = this.isAcceleratedStateOffset;
+        statesById = this.statesById;
+        isAcceleratedState = this.isAcceleratedState;
       }
       s = ns;
       if (s == deadState) {
@@ -2703,7 +2746,7 @@ final class Dfa {
       return completeSearch(new SearchResult(matched, matchStart), pos);
     }
 
-    State[] offsetToState = this.offsetToState;
+    State[] statesById = this.statesById;
     int[] asciiClassMap = this.asciiClassMap;
     // Fast path: scan backward through ASCII characters
     while (pos > scanLimit) {
@@ -2728,13 +2771,13 @@ final class Dfa {
           if (cursor.prefixProved()) {
             return completeSearch(new SearchResult(true, matchStart, ambiguous), pos);
           }
-          s = offsetToState[cursor.stateOffset()];
+          s = statesById[stateId(cursor.stateOffset())];
         } else {
           long cursor =
               scanCachedReverseAscii(
                   text, pos, scanLimit, s.id * numClasses, posDepThreshold, maxInputUnits);
           pos = (int) (cursor >>> 32);
-          s = offsetToState[(int) cursor];
+          s = statesById[stateId((int) cursor)];
         }
       }
 
@@ -2760,7 +2803,7 @@ final class Dfa {
         if (ns == null) {
           return completeSearch(null, pos); // budget exceeded
         }
-        offsetToState = this.offsetToState;
+        statesById = this.statesById;
       }
       s = ns;
       if (s == deadState) {
@@ -2986,7 +3029,7 @@ final class Dfa {
 
     if (s != deadState) {
       int[] transitions = this.transitions;
-      State[] offsetToState = this.offsetToState;
+      State[] statesById = this.statesById;
       int[] asciiClassMap = this.asciiClassMap;
       // Fast path: scan forward through ASCII characters
       int sId = s.id * numClasses;
@@ -3001,7 +3044,7 @@ final class Dfa {
         int cls = asciiClassMap[ch];
         int nsId = transitions[sId + cls];
         if (nsId == 0) {
-          s = offsetToState[sId];
+          s = statesById[stateId(sId)];
           int effectiveNextPos = pos + 1;
           State ns = computeNext(s, ch, text, effectiveNextPos);
           if (ns == null) {
@@ -3012,19 +3055,19 @@ final class Dfa {
             }
             s = recreateAfterReset(s);
             if (s == null) {
-              budgetExhaustedAfterReset();
+              budgetExhausted();
               return completeSearch(null, pos); // budget exceeded
             }
             sId = s.id * numClasses;
             ns = computeNext(s, ch, text, effectiveNextPos);
             if (ns == null) {
-              budgetExhaustedAfterReset();
+              budgetExhausted();
               return completeSearch(null, pos); // budget exceeded
             }
           }
           addTransition(s, cls, ns);
           transitions = this.transitions;
-          offsetToState = this.offsetToState;
+          statesById = this.statesById;
           nsId = transitions[sId + cls];
         }
         if (nsId == 0) { // deadState
@@ -3033,7 +3076,7 @@ final class Dfa {
         int realNsId;
         if (nsId < 0) {
           realNsId = -nsId;
-          State ns = offsetToState[realNsId];
+          State ns = statesById[stateId(realNsId)];
           int flags = ns.flags;
           int endPos =
               ((flags & (FLAG_MATCH_BEFORE | FLAG_MATCH_AFTER_DEFERRED)) == FLAG_MATCH_BEFORE)
@@ -3058,7 +3101,7 @@ final class Dfa {
         sId = realNsId;
         pos++;
       }
-      s = offsetToState[sId];
+      s = statesById[stateId(sId)];
 
       // General loop
       while (pos <= textLen) {
