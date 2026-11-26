@@ -22085,6 +22085,199 @@
       }
     },
     {
+      "id": "LeadingWildcardFormBenchmark.find.{form}.{shape}",
+      "operation": "find",
+      "patterns": [
+        "{form}"
+      ],
+      "inputs": [
+        "leadingWildcard.log.{shape}"
+      ],
+      "axes": {
+        "form": [
+          {
+            "id": "capture",
+            "value": "(.*error): (\\w+)"
+          }
+        ],
+        "shape": [
+          "end",
+          "early",
+          "failing"
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LeadingWildcardFormBenchmark.find.{form}.none",
+      "operation": "find",
+      "patterns": [
+        "{form}"
+      ],
+      "inputs": [
+        "leadingWildcard.log.none"
+      ],
+      "axes": {
+        "form": [
+          {
+            "id": "capture",
+            "value": "(.*error): (\\w+)"
+          }
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LeadingWildcardFormBenchmark.find.{form}.short",
+      "operation": "find",
+      "patterns": [
+        "{form}"
+      ],
+      "inputs": [
+        "leadingWildcard.log.short"
+      ],
+      "axes": {
+        "form": [
+          {
+            "id": "capture",
+            "value": "(.*error): (\\w+)"
+          }
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LeadingWildcardFormBenchmark.findAllCount.{form}.every",
+      "operation": "findAllCount",
+      "patterns": [
+        "{form}"
+      ],
+      "inputs": [
+        "leadingWildcard.log.every"
+      ],
+      "axes": {
+        "form": [
+          {
+            "id": "capture",
+            "value": "(.*error): (\\w+)"
+          }
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 8192
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LeadingWildcardFormBenchmark.findAllCount.{form}.every100",
+      "operation": "findAllCount",
+      "patterns": [
+        "{form}"
+      ],
+      "inputs": [
+        "leadingWildcard.log.every100"
+      ],
+      "axes": {
+        "form": [
+          {
+            "id": "capture",
+            "value": "(.*error): (\\w+)"
+          }
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 82
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LeadingWildcardFormBenchmark.longLine.{form}.{layout}.{size}",
+      "operation": "find",
+      "patterns": [
+        "{form}"
+      ],
+      "inputs": [
+        "leadingWildcard.{layout}.{size}"
+      ],
+      "axes": {
+        "form": [
+          {
+            "id": "capture",
+            "value": "(.*error): (\\w+)"
+          }
+        ],
+        "layout": [
+          "singleLine",
+          "shortLines"
+        ],
+        "size": [
+          384,
+          768
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
       "id": "CaptureRecoveryBenchmark.stack.text",
       "operation": "findGroup",
       "patterns": [
