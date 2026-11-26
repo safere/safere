@@ -1186,6 +1186,95 @@ class MatcherTest {
       assertThatThrownBy(() -> m.end((String) null)).isInstanceOf(NullPointerException.class);
     }
 
+    // java.util.regex.Matcher checks for a current match before resolving the group name, so a
+    // missing match wins over an unknown name. Null names are still rejected first.
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "never attempted",
+          "failed find",
+          "failed matches",
+          "failed lookingAt",
+          "reset",
+          "reset input",
+          "region"
+        })
+    @DisplayName("named group methods without a match throw IllegalStateException for any name")
+    void namedGroupMethodsWithoutMatchCheckMatchBeforeName(String state) {
+      for (String name : List.of("word", "missing")) {
+        Matcher m = matcherWithoutMatch(state);
+        assertThatThrownBy(() -> m.group(name))
+            .as("group(%s)", name)
+            .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> m.start(name))
+            .as("start(%s)", name)
+            .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> m.end(name))
+            .as("end(%s)", name)
+            .isInstanceOf(IllegalStateException.class);
+      }
+
+      Matcher m = matcherWithoutMatch(state);
+      assertThatThrownBy(() -> m.group((String) null)).isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> m.start((String) null)).isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> m.end((String) null)).isInstanceOf(NullPointerException.class);
+    }
+
+    // The MatchResult default methods used by java.util.regex snapshots resolve the name first,
+    // so an unknown name wins over a missing match there.
+    @Test
+    @DisplayName("toMatchResult() without a match checks the name before the match")
+    void namedGroupSnapshotWithoutMatchChecksNameBeforeMatch() {
+      Matcher m = matcherWithoutMatch("failed find");
+      MatchResult result = m.toMatchResult();
+
+      assertThatThrownBy(() -> result.group("missing"))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> result.start("missing"))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> result.end("missing")).isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> result.group("word")).isInstanceOf(IllegalStateException.class);
+      assertThatThrownBy(() -> result.start("word")).isInstanceOf(IllegalStateException.class);
+      assertThatThrownBy(() -> result.end("word")).isInstanceOf(IllegalStateException.class);
+    }
+
+    private static Matcher matcherWithoutMatch(String state) {
+      Pattern p = Pattern.compile("(?<word>a)");
+      Matcher m;
+      switch (state) {
+        case "never attempted" -> m = p.matcher("b");
+        case "failed find" -> {
+          m = p.matcher("b");
+          assertThat(m.find()).isFalse();
+        }
+        case "failed matches" -> {
+          m = p.matcher("ab");
+          assertThat(m.matches()).isFalse();
+        }
+        case "failed lookingAt" -> {
+          m = p.matcher("ba");
+          assertThat(m.lookingAt()).isFalse();
+        }
+        case "reset" -> {
+          m = p.matcher("a");
+          assertThat(m.find()).isTrue();
+          m.reset();
+        }
+        case "reset input" -> {
+          m = p.matcher("a");
+          assertThat(m.find()).isTrue();
+          m.reset("a");
+        }
+        case "region" -> {
+          m = p.matcher("a");
+          assertThat(m.find()).isTrue();
+          m.region(0, 1);
+        }
+        default -> throw new IllegalArgumentException(state);
+      }
+      return m;
+    }
+
     @Test
     @DisplayName("groupCount() returns number of capturing groups (excluding group 0)")
     void groupCount() {

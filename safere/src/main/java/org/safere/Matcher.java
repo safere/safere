@@ -3283,12 +3283,7 @@ public final class Matcher implements MatchResult {
    */
   @Override
   public String group(String name) {
-    Objects.requireNonNull(name, "Group name");
-    Integer idx = parentPattern.namedGroups().get(name);
-    if (idx == null) {
-      throw new IllegalArgumentException("No group with name <" + name + ">");
-    }
-    return group(idx);
+    return group(matchedGroupIndex(name));
   }
 
   /**
@@ -3371,12 +3366,7 @@ public final class Matcher implements MatchResult {
    */
   @Override
   public int start(String name) {
-    Objects.requireNonNull(name, "Group name");
-    Integer idx = parentPattern.namedGroups().get(name);
-    if (idx == null) {
-      throw new IllegalArgumentException("No group with name <" + name + ">");
-    }
-    return start(idx);
+    return start(matchedGroupIndex(name));
   }
 
   /**
@@ -3402,12 +3392,7 @@ public final class Matcher implements MatchResult {
    */
   @Override
   public int end(String name) {
-    Objects.requireNonNull(name, "Group name");
-    Integer idx = parentPattern.namedGroups().get(name);
-    if (idx == null) {
-      throw new IllegalArgumentException("No group with name <" + name + ">");
-    }
-    return end(idx);
+    return end(matchedGroupIndex(name));
   }
 
   // ---------------------------------------------------------------------------
@@ -4909,6 +4894,20 @@ public final class Matcher implements MatchResult {
     if (resultStatus != ResultStatus.MATCHED) {
       throw new IllegalStateException("No match found");
     }
+  }
+
+  /**
+   * Resolves a group name for the named-group accessors. As in the JDK, a missing match is reported
+   * before an unknown name.
+   */
+  private int matchedGroupIndex(String name) {
+    Objects.requireNonNull(name, "Group name");
+    checkMatch();
+    Integer idx = parentPattern.namedGroups().get(name);
+    if (idx == null) {
+      throw new IllegalArgumentException("No group with name <" + name + ">");
+    }
+    return idx;
   }
 
   private void checkGroup(int group) {
