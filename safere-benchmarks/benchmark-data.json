@@ -22098,6 +22098,10 @@
           {
             "id": "capture",
             "value": "(.*error): (\\w+)"
+          },
+          {
+            "id": "alternation",
+            "value": ".*(?:error|fatal|panic):? \\w+"
           }
         ],
         "shape": [
@@ -22133,6 +22137,10 @@
           {
             "id": "capture",
             "value": "(.*error): (\\w+)"
+          },
+          {
+            "id": "alternation",
+            "value": ".*(?:error|fatal|panic):? \\w+"
           }
         ]
       },
@@ -22163,6 +22171,10 @@
           {
             "id": "capture",
             "value": "(.*error): (\\w+)"
+          },
+          {
+            "id": "alternation",
+            "value": ".*(?:error|fatal|panic):? \\w+"
           }
         ]
       },
@@ -22193,6 +22205,10 @@
           {
             "id": "capture",
             "value": "(.*error): (\\w+)"
+          },
+          {
+            "id": "alternation",
+            "value": ".*(?:error|fatal|panic):? \\w+"
           }
         ]
       },
@@ -22223,6 +22239,10 @@
           {
             "id": "capture",
             "value": "(.*error): (\\w+)"
+          },
+          {
+            "id": "alternation",
+            "value": ".*(?:error|fatal|panic):? \\w+"
           }
         ]
       },
@@ -22253,6 +22273,10 @@
           {
             "id": "capture",
             "value": "(.*error): (\\w+)"
+          },
+          {
+            "id": "alternation",
+            "value": ".*(?:error|fatal|panic):? \\w+"
           }
         ],
         "layout": [

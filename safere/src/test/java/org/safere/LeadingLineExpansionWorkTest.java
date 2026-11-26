@@ -59,7 +59,8 @@ class LeadingLineExpansionWorkTest {
         ".*?error: \\w+",
         "[^;]*error: \\w+",
         "(.*)error: \\w+",
-        "(.*error): \\w+"
+        "(.*error): \\w+",
+        ".*(?:error|fatal|panic):? \\w+"
       })
   void utf8ExistenceDoesNotTraverseTheLeadingRunInTheDfa(String regex) {
     Pattern pattern = Pattern.compile(regex);
@@ -90,7 +91,8 @@ class LeadingLineExpansionWorkTest {
         ".*?error: \\w+",
         "[^;]*error: \\w+",
         "(.*)error: \\w+",
-        "(.*error): \\w+"
+        "(.*error): \\w+",
+        ".*(?:error|fatal|panic):? \\w+"
       })
   void stringPredicateDoesNotTraverseTheLeadingRunInTheDfa(String regex) {
     Pattern pattern = Pattern.compile(regex);
@@ -200,8 +202,56 @@ class LeadingLineExpansionWorkTest {
         Arguments.of(".+error", "\r", true),
         Arguments.of("\\S+error", " ", false),
         Arguments.of("\\S+error", " ", true),
+        Arguments.of(".+(?:error|fatal)", "\r", false),
+        Arguments.of(".+(?:error|fatal)", "\r", true),
         Arguments.of("(\\S+error)", " ", false),
         Arguments.of("(\\S+error)", " ", true));
+  }
+
+  /**
+   * With a literal on every line, a literal-set expansion skips nothing, and its per-literal scans
+   * would cost more than the forward search. After a few such searches the matcher stops calling it
+   * for a while, so the work stays close to the forward search alone.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void literalOnEveryLineStopsTheLiteralSetScans(boolean utf8) {
+    Pattern pattern = Pattern.compile(".*(?:error|fatal|panic):? \\w+");
+    String line =
+        "request handled in 23 ms path=/api/v1/items/12345" + " ".repeat(60) + "error: disk\n";
+    int lines = 2_000;
+    String input = line.repeat(lines);
+    long work =
+        WorkCounter.countWithForwardDfaStepsForTesting(() -> {
+          int matches =
+              utf8
+                  ? count(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))))
+                  : count(pattern.matcher(input));
+          assertThat(matches).isEqualTo(lines);
+        });
+    assertThat(work).isLessThan(3L * input.length() / 2);
+  }
+
+  /**
+   * A literal set searches for each literal separately, but a later literal only searches up to the
+   * best hit so far, so literals that never occur cost about as much as the one that does.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void absentLiteralsInASetDoNotRescanTheInput(boolean utf8) {
+    Pattern pattern = Pattern.compile(".*(?:apple|banana|cherry|damson):? \\w+");
+    String line = "x".repeat(90) + " apple: pie\n";
+    int lines = 2_000;
+    String input = "p".repeat(300) + "\n" + line.repeat(lines);
+    long work =
+        WorkCounter.countWithForwardDfaStepsForTesting(() -> {
+          int matches =
+              utf8
+                  ? count(pattern.matcher(Utf8Input.trusted(input.getBytes(UTF_8))))
+                  : count(pattern.matcher(input));
+          assertThat(matches).isEqualTo(lines);
+        });
+    assertThat(work).isLessThan(10L * input.length());
   }
 
   private static int count(Matcher matcher) {

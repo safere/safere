@@ -344,6 +344,39 @@ public final class Matcher implements MatchResult {
         : rejectWithDiagnostics(rejectPrefilter, text, scanner, fromIndex, options);
   }
 
+  /** Consecutive no-skip literal-set searches that start a quarantine. */
+  private static final int LITERAL_SET_DENSE_MISSES = 4;
+
+  private static final int LITERAL_SET_INITIAL_WINDOW = 4096;
+  private static final int LITERAL_SET_MAX_WINDOW = 1 << 16;
+
+  private void resetLiteralSetFallback() {
+    literalSetMisses = 0;
+    literalSetResume = 0;
+    literalSetWindow = LITERAL_SET_INITIAL_WINDOW;
+  }
+
+  /**
+   * Returns whether a search from {@code pos} with a literal-set leading expansion skips the
+   * expansion and starts at {@code pos}, because recent searches found their literal too close to
+   * skip anything.
+   */
+  private boolean literalSetExpansionSkipped(int pos) {
+    return pos < literalSetResume;
+  }
+
+  /** Records a literal-set expansion candidate for {@link #literalSetExpansionSkipped}. */
+  private void noteLiteralSetCandidate(int pos, int candidate) {
+    if (candidate != pos) {
+      literalSetMisses = 0;
+      literalSetWindow = LITERAL_SET_INITIAL_WINDOW;
+    } else if (++literalSetMisses >= LITERAL_SET_DENSE_MISSES) {
+      literalSetMisses = 0;
+      literalSetResume = (int) Math.min(Integer.MAX_VALUE, (long) pos + literalSetWindow);
+      literalSetWindow = Math.min(2 * literalSetWindow, LITERAL_SET_MAX_WINDOW);
+    }
+  }
+
   /**
    * Charges a matcher-level start-accelerator call from {@code pos} to {@link #startBackoff} when
    * its policy {@linkplain AcceleratorPolicy#chargesSkips charges skips}.
@@ -486,6 +519,21 @@ public final class Matcher implements MatchResult {
    */
   private long startBackoff;
 
+  /**
+   * Dense-hit fallback for a wide leading expansion with a literal-set inner plan (see {@link
+   * #literalSetExpansionSkipped}). When a few searches in a row find a literal so close that they
+   * skip nothing, as on input with a hit on every line, the per-literal scans cost more than the
+   * forward search they precede, so searches before {@link #literalSetResume} start at their search
+   * start without them. Each quarantine doubles {@link #literalSetWindow}, and a search that skips
+   * ahead resets it. Like {@link #startBackoff}, this only decides whether to call the accelerator
+   * and is cleared with it, so it can cost time but never changes a result. It is kept apart from
+   * {@link #startBackoff}, whose quarantine also stops the forward DFA's start-state fast-forward.
+   */
+  private int literalSetMisses;
+
+  private int literalSetResume;
+  private int literalSetWindow = LITERAL_SET_INITIAL_WINDOW;
+
   private InputScanner graphemeContextInput;
   private int graphemeContextStart;
   private int graphemeContextEnd;
@@ -615,6 +663,7 @@ public final class Matcher implements MatchResult {
     previousMatchEnd = 0;
     operationPreviousMatchEnd = 0;
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    resetLiteralSetFallback();
   }
 
   private void resetSearchStateForRegionStart() {
@@ -623,6 +672,7 @@ public final class Matcher implements MatchResult {
     previousMatchEnd = regionStart;
     operationPreviousMatchEnd = regionStart;
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    resetLiteralSetFallback();
   }
 
   private void rememberPreviousMatchEnd() {
@@ -680,6 +730,7 @@ public final class Matcher implements MatchResult {
     cachedStartRegister = null;
     startRegisterLookedUp = false;
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    resetLiteralSetFallback();
     if (bitStateBorrowed && cachedBitState != null) {
       bitStateBorrowed = false;
       cachedBitState = null;
@@ -2443,6 +2494,12 @@ public final class Matcher implements MatchResult {
       }
       return le.expandBackward(scanner, innerMatch, fromIndex);
     }
+    boolean literalSet =
+        accelerator instanceof Utf8StartAccelerator.LeadingExpansion le
+            && le.innerLiterals() != null;
+    if (literalSet && literalSetExpansionSkipped(fromIndex)) {
+      return fromIndex;
+    }
     int candidate = Utf8StartAccelerator.findNextCandidate(accelerator, scanner, fromIndex);
     if (candidate < 0) {
       if (strategy != null) {
@@ -2450,6 +2507,9 @@ public final class Matcher implements MatchResult {
       }
     } else {
       chargeStartAcceleration(fromIndex, candidate, scanner.length(), policy);
+      if (literalSet) {
+        noteLiteralSetCandidate(fromIndex, candidate);
+      }
     }
     return candidate;
   }
@@ -2494,6 +2554,12 @@ public final class Matcher implements MatchResult {
       // captures. A DFA budget bailout also resumes from the conservatively expanded start.
       return le.expandBackward(startText, innerMatch, fromIndex);
     }
+    boolean literalSet =
+        accelerator instanceof StringStartAccelerator.LeadingExpansion le
+            && le.innerLiterals() != null;
+    if (literalSet && literalSetExpansionSkipped(fromIndex)) {
+      return fromIndex;
+    }
     int candidate =
         StringStartAccelerator.findNextCandidate(
             accelerator, startText, fromIndex, prog.lineStartUnixLines());
@@ -2513,6 +2579,9 @@ public final class Matcher implements MatchResult {
       }
     } else {
       chargeStartAcceleration(fromIndex, candidate, scanner.length(), policy);
+      if (literalSet) {
+        noteLiteralSetCandidate(fromIndex, candidate);
+      }
     }
     return candidate;
   }
@@ -5222,6 +5291,7 @@ public final class Matcher implements MatchResult {
     int textLen = text.length();
     // This loop has its own search position, so it starts and leaves the backoff state neutral.
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    resetLiteralSetFallback();
 
     while (searchFrom <= textLen) {
       long packed = findNextMatchPacked(searchFrom, firstEndAnchoredStart);
@@ -5246,6 +5316,7 @@ public final class Matcher implements MatchResult {
       searchFrom = nextSplitSearchPosition(start, end);
     }
     startBackoff = AdaptiveBackoff.NEUTRAL;
+    resetLiteralSetFallback();
     return buffer.size / 2;
   }
 
