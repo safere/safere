@@ -27,10 +27,11 @@ field in the state schema. Include:
    Retrieve dates through body-free metadata; do not infer them from a commit’s author date.
    Link directly to the standalone copy/paste review and the full review/evidence. The checkpoint
    helper inserts these links. Do not embed the long author review or repeat benchmark tables.
-5. `## Your PRs With Review Feedback`: a compact table of current actionable feedback and newly
-   useful approvals. Summarize the verified update for each affected authored PR. Explain
-   disagreements, draft holds, blocked updates, and unpublished repairs. Group routine approvals
-   when clearer. Preserve reviewer-owned Done cells and link the complete per-request record.
+5. `## Your PRs With Review Feedback`: a compact table with one row for each PR in the authored
+   queue, including drafts. Include PRs with no feedback to address, even when the branch needed
+   no update. State the feedback outcome clearly, such as “Approved. No changes requested” or
+   “No external feedback.” Summarize any branch update separately in the same row. Preserve
+   reviewer-owned Done cells and link each PR’s supporting assessment.
 6. `## Issue Activity`: only new or meaningfully changed issues, changed decisions and uncovered
    requirements that matter now. Group related issues around the same PR or decision. Omit
    inactive backlog, mechanical metadata-only changes with no implication, historical PR lists,
@@ -51,8 +52,8 @@ not apply. Exact revisions, source/worktree paths, command logs, benchmark table
 worktree choice and historical feedback belong here.
 
 - `reports/<runId>/pr-N.md`: complete contributor assessment and fenced author review.
-- `reports/<runId>/authored-feedback.md`: complete per-request decisions and repairs, including
-  routine approvals omitted or grouped in the main brief.
+- `reports/<runId>/authored-feedback.md`: each authored PR’s feedback outcome, per-request
+  decisions, branch updates, and verification.
 - `reports/<runId>/issue-activity.md`: assessments and coverage for active issues only, with the
   existing issue helper’s summary rows/anchors. No unchanged open-issue inventory.
 - `artifacts/<runId>/pr-N/copy-paste-review.md`: the standalone author comment inside one fenced
@@ -70,6 +71,7 @@ an earlier sweep for still-valid reasoning.
 
 The helper audit checks the contributor queue, freshness, main anchors, linked detail identities,
 author-copy links/content, and optional worktrees. The issue helper audits active-issue supporting
-records rather than requiring a backlog section in the brief. Read the main report independently:
-can the maintainer understand each change and its next action without asking for a summary?
-Then read each standalone author review independently using the contributor review’s semantic rules.
+records. Compare the authored table with the `authored` list from `discover`. Verify that every
+PR has a row and that the row states when there was no feedback to address. Read the main report
+independently and check that each change and next action is clear. Then read each standalone
+author review using the contributor review’s semantic rules.
