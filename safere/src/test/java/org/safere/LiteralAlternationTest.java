@@ -60,7 +60,7 @@ class LiteralAlternationTest {
   }
 
   @Test
-  void longAlternativesRetainTheExistingRunner() {
+  void longAlternativesSelectTheOrderedLiteralSearch() {
     for (int length : new int[] {13, 16, 17, 65, 4_097}) {
       String literal = "a".repeat(length - 1) + "z";
       for (String regex :
@@ -69,15 +69,29 @@ class LiteralAlternationTest {
               literal + "|banana|cherry",
               "banana|" + literal + "|cherry")) {
         Pattern pattern = Pattern.compile(regex);
-        Pattern fallback =
-            Pattern.compile(regex, 0, EnginePathOptions.builder().literalFastPaths(false).build());
-        assertThat(pattern.preparedMatchRunner(false).getClass())
+        assertThat(pattern.preparedMatchRunner(false))
             .as(regex)
-            .isEqualTo(fallback.preparedMatchRunner(false).getClass());
+            .isInstanceOf(Matcher.LiteralAlternationPreparedRunner.class);
         for (String suffix : List.of("", "banana", "z")) {
           String text = "a".repeat(8_192) + suffix;
           compareFinds(pattern.matcher(text), java.util.regex.Pattern.compile(regex).matcher(text));
         }
+      }
+    }
+  }
+
+  @Test
+  void longAlternativesPreserveRegionBoundsAndPriorityAfterDenseSuffixHits() {
+    String literal = "z" + "ab".repeat(800);
+    for (String regex : List.of(literal + "|middle|zab", "zab|middle|" + literal)) {
+      Pattern pattern = Pattern.compile(regex);
+      var oracle = java.util.regex.Pattern.compile(regex);
+      for (String suffix : List.of("", literal, "middle", literal.substring(0, 1_600))) {
+        String region = "ab".repeat(2_400) + suffix;
+        String text = "middle" + region + literal;
+        compareFinds(
+            pattern.matcher(text).region(6, 6 + region.length()),
+            oracle.matcher(text).region(6, 6 + region.length()));
       }
     }
   }

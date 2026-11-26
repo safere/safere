@@ -46,6 +46,29 @@ class LiteralAlternationWorkTest {
   }
 
   @Test
+  void earlyShortMatchSkipsUnrelatedLongAlternatives() {
+    String text = "hit" + "x".repeat(65_536);
+    for (int length : new int[] {64, 1_024, 8_192}) {
+      Pattern pattern = Pattern.compile("a".repeat(length) + "|be|cat|dog|egg|hit");
+      assertThat(work(pattern, text)).isPositive().isLessThan(32);
+      assertThat(utf8Work(pattern, text, true)).isPositive().isLessThan(32);
+    }
+  }
+
+  @Test
+  void longLiteralVerificationStaysBoundedAsNeedlesAndInputGrow() {
+    for (int length : new int[] {64, 512, 2_048}) {
+      String literal = "a".repeat(length - 2) + "ba";
+      Pattern pattern = Pattern.compile(literal + "|middle|end");
+      String text = "a".repeat(16 * length);
+      long stringWork =
+          WorkCounter.countForTesting(() -> assertThat(pattern.matcher(text).find()).isFalse());
+      assertThat(stringWork).isPositive().isLessThan(16L * text.length());
+      assertThat(utf8Work(pattern, text, false)).isPositive().isLessThan(16L * text.length());
+    }
+  }
+
+  @Test
   void repeatedSparseMatchesDoNotRescanTheRemainingTail() {
     Pattern pattern = Pattern.compile("apple|banana|cherry");
     for (int gap : new int[] {1, 1_024, 4_096}) {

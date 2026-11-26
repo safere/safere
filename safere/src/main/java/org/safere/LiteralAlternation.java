@@ -12,14 +12,18 @@ import java.util.Arrays;
 /**
  * Complete, ordered literal alternatives for a bounded String and UTF-8 search fast path.
  *
- * <p>String searches with up to three distinct initial characters use per-literal windows. With
- * more initials, whole-String searches hop between candidates after the first window and return to
- * windowed search for dense candidates. String regions use the first-character scan to skip
- * candidate-free stretches and verify matches in short per-literal windows.
+ * <p>For long literals, both representations verify a bounded number of candidate starts. After
+ * that they search disjoint windows of starts once per alternative, in priority order. Each search
+ * bounds verification work and can switch to KMP.
  *
- * <p>UTF-8 searches use an exact first-byte accelerator when one is available. The default provider
- * can also scan a compact enclosing range on longer inputs. Dense range candidates near the start
- * fall back to the DFA. The vector provider can use Vector Teddy.
+ * <p>Short-literal String searches with up to three distinct initial characters use per-literal
+ * windows. With more initials, whole-String searches hop between candidates after the first window
+ * and return to windowed search for dense candidates. String regions use the first-character scan
+ * to skip candidate-free stretches and verify matches in short per-literal windows.
+ *
+ * <p>Short-literal UTF-8 searches use an exact first-byte accelerator when one is available. The
+ * default provider can also scan a compact enclosing range on longer inputs. Dense range candidates
+ * near the start fall back to the DFA. The vector provider can use Vector Teddy.
  */
 final class LiteralAlternation {
   static final long NO_MATCH = -1;
@@ -27,13 +31,16 @@ final class LiteralAlternation {
   private static final int PROBE_LENGTH = 1_024;
   private static final int MAX_ALTERNATIVES = 8;
   private static final int WINDOW_LENGTH = 256;
-  private static final int MAX_LITERAL_LENGTH = 12;
+  private static final int SHORT_LITERAL_LENGTH = 12;
   private static final int REGION_PROBE_DELAY = 2 * WINDOW_LENGTH;
   // Searches verify first-byte candidates one at a time until they see this many within
   // DENSE_CANDIDATE_SPAN bytes, then switch to one bounded scan per literal.
   private static final int DENSE_CANDIDATES = 8;
   private static final int DENSE_CANDIDATE_SPAN = 256;
 
+  // A window can read past its last candidate start to finish a literal. Make nonfinal windows
+  // at least as wide as the longest literal, so their total lookahead is bounded by input size.
+  private final int longLiteralWindow;
   private final String[] literals;
   private final boolean wholeInputRejection;
   private final char[] firstChars;
@@ -41,7 +48,7 @@ final class LiteralAlternation {
   private final int firstHigh;
   // The literals are ASCII, so their UTF-8 encodings are their chars as bytes.
   private final byte[][] utf8Literals;
-  private final int[][] utf8Failures;
+  private final int[][] failures;
   // Reuse the ordinary first-byte scan when present. Otherwise default-provider searches use a
   // compact enclosing range or bounded per-literal scans; vector searches retain their own plan.
   private final Utf8StartAccelerator.CharClass utf8FirstByteScan;
@@ -54,9 +61,11 @@ final class LiteralAlternation {
     this.wholeInputRejection = wholeInputRejection;
     char[] initials = new char[literals.length];
     int count = 0;
+    int longest = 0;
     int low = 127;
     int high = 0;
     for (String literal : literals) {
+      longest = Math.max(longest, literal.length());
       char first = literal.charAt(0);
       boolean seen = false;
       for (int i = 0; i < count; i++) {
@@ -68,14 +77,15 @@ final class LiteralAlternation {
       low = Math.min(low, first);
       high = Math.max(high, first);
     }
+    this.longLiteralWindow = longest > SHORT_LITERAL_LENGTH ? Math.max(longest, PROBE_LENGTH) : 0;
     this.firstChars = Arrays.copyOf(initials, count);
     this.firstLow = low;
     this.firstHigh = high;
     this.utf8Literals = new byte[literals.length][];
-    this.utf8Failures = new int[literals.length][];
+    this.failures = new int[literals.length][];
     for (int i = 0; i < literals.length; i++) {
       utf8Literals[i] = literals[i].getBytes(US_ASCII);
-      utf8Failures[i] = Pattern.literalFailure(utf8Literals[i]);
+      failures[i] = Pattern.literalFailure(utf8Literals[i]);
     }
     this.utf8FirstByteScan = utf8FirstByteScan;
   }
@@ -100,15 +110,6 @@ final class LiteralAlternation {
       if (literals[i] == null) {
         return null;
       }
-      // indexOf can repeatedly compare long near-matching prefixes. Even a whole-tail rejection
-      // filter may stop after its first successful alternative, whereas exact bounds require us
-      // to inspect later alternatives too. MAX_LITERAL_LENGTH * MAX_ALTERNATIVES bounds the
-      // comparison work per input position, keeping indexOf's O(n * m) worst case linear in n.
-      // WorkCounter charges distance, not character comparisons, so it relies on these caps.
-      // Keep the existing engine for longer needles.
-      if (literals[i].length() > MAX_LITERAL_LENGTH) {
-        return null;
-      }
     }
     return new LiteralAlternation(literals, wholeInputRejection, utf8FirstByteScan);
   }
@@ -122,10 +123,13 @@ final class LiteralAlternation {
       return FALLBACK;
     }
     int end = text.length();
+    if (longLiteralWindow != 0) {
+      return searchCandidates(text, 0, end);
+    }
     if (firstChars.length > 3) {
       int limit = Math.min(WINDOW_LENGTH, end);
       long match = search(text, 0, limit, end);
-      return match >= 0 || limit == end ? match : searchCandidates(text, limit);
+      return match >= 0 || limit == end ? match : searchCandidates(text, limit, end);
     }
     if (!wholeInputRejection) {
       return searchFixedWindows(text, 0, end);
@@ -144,10 +148,15 @@ final class LiteralAlternation {
     }
     int start = region.offset();
     int end = start + region.length();
-    long match =
-        firstChars.length > 3
-            ? searchRegionWithSkips(region.text(), start, end)
-            : searchFixedWindows(region.text(), start, end);
+    long match;
+    if (longLiteralWindow != 0) {
+      match = searchCandidates(region.text(), start, end);
+    } else {
+      match =
+          firstChars.length > 3
+              ? searchRegionWithSkips(region.text(), start, end)
+              : searchFixedWindows(region.text(), start, end);
+    }
     if (match < 0) {
       return match;
     }
@@ -206,16 +215,18 @@ final class LiteralAlternation {
   }
 
   /** Candidate starts advance monotonically, including on a switch to windowed search. */
-  private long searchCandidates(String text, int start) {
-    int end = text.length();
+  private long searchCandidates(String text, int start, int end) {
     int spanStart = start;
     int candidates = 0;
     for (int position = start; ; ) {
-      int candidate = StringInputScanner.indexOfSmallSet(text, firstChars, position);
+      int candidate = StringInputScanner.indexOfSmallSet(text, firstChars, position, end);
       if (candidate < 0) {
         return NO_MATCH;
       }
       for (String literal : literals) {
+        if (literal.length() > end - candidate || literal.charAt(0) != text.charAt(candidate)) {
+          continue;
+        }
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.record(literal.length());
         }
@@ -225,6 +236,10 @@ final class LiteralAlternation {
       }
       position = candidate + 1;
       if (++candidates == DENSE_CANDIDATES) {
+        // Limit full-length verifications even when false candidates are far apart.
+        if (longLiteralWindow != 0) {
+          return searchGrowingWindows(text, position, end, longLiteralWindow);
+        }
         if (candidate - spanStart < DENSE_CANDIDATE_SPAN) {
           return searchGrowingWindows(text, position, end, PROBE_LENGTH);
         }
@@ -254,6 +269,7 @@ final class LiteralAlternation {
     byte[] bytes = text.bytes();
     int offset = text.offset();
     if (scanRange
+        && longLiteralWindow == 0
         && (VectorScanProviders.vectorProviderAvailable()
             || length < WINDOW_LENGTH
             || firstHigh - firstLow > 31)) {
@@ -274,6 +290,9 @@ final class LiteralAlternation {
       }
       int position = candidate + 1;
       if (++candidates == DENSE_CANDIDATES) {
+        if (longLiteralWindow != 0) {
+          return searchGrowingWindows(text, position, longLiteralWindow);
+        }
         if (candidate - spanStart < DENSE_CANDIDATE_SPAN) {
           // For a dense range near the start, retry with the DFA. The retried prefix is
           // bounded by the admission window plus one density span.
@@ -306,11 +325,13 @@ final class LiteralAlternation {
   /** Returns the bounds of the highest-priority literal starting at {@code position}, or -1. */
   private long matchAt(byte[] bytes, int offset, int length, int position) {
     for (byte[] literal : utf8Literals) {
+      if (literal.length > length - position || literal[0] != bytes[offset + position]) {
+        continue;
+      }
       if (WorkCounterConfig.ENABLED) {
         WorkCounter.record(literal.length);
       }
-      if (literal.length <= length - position
-          && ByteSwarScan.matchesAt(bytes, offset, literal, position)) {
+      if (ByteSwarScan.matchesAt(bytes, offset, literal, position)) {
         return ((long) position << 32) | (position + literal.length);
       }
     }
@@ -350,7 +371,7 @@ final class LiteralAlternation {
     for (int i = 0; i < utf8Literals.length; i++) {
       byte[] literal = utf8Literals[i];
       // indexOfWithin charges WorkCounter for the bytes it scans.
-      int idx = text.indexOfWithin(literal, utf8Failures[i], from, bestStart - 1);
+      int idx = text.indexOfWithin(literal, failures[i], from, bestStart - 1);
       if (idx >= 0) {
         bestStart = idx;
         bestEnd = idx + literal.length;
@@ -385,15 +406,20 @@ final class LiteralAlternation {
   private long search(String text, int from, int limit, int end) {
     int bestStart = limit;
     int bestEnd = -1;
-    int length = text.length();
-    for (String literal : literals) {
+    for (int i = 0; i < literals.length; i++) {
+      String literal = literals[i];
       int searchEnd = bestStart + Math.min(literal.length() - 1, end - bestStart);
-      int idx =
-          searchEnd == length
-              ? text.indexOf(literal, from)
-              : text.indexOf(literal, from, searchEnd);
-      if (WorkCounterConfig.ENABLED) {
-        WorkCounter.record(idx >= 0 ? idx - from + literal.length() : searchEnd - from);
+      int idx;
+      if (literal.length() > SHORT_LITERAL_LENGTH) {
+        idx = indexOfLongLiteral(text, literal, failures[i], from, searchEnd);
+      } else {
+        idx =
+            searchEnd == text.length()
+                ? text.indexOf(literal, from)
+                : text.indexOf(literal, from, searchEnd);
+        if (WorkCounterConfig.ENABLED) {
+          WorkCounter.record(idx >= 0 ? idx - from + literal.length() : searchEnd - from);
+        }
       }
       if (idx >= 0 && idx < bestStart) {
         bestStart = idx;
@@ -405,5 +431,58 @@ final class LiteralAlternation {
       }
     }
     return bestEnd < 0 ? NO_MATCH : ((long) bestStart << 32) | bestEnd;
+  }
+
+  /** Locate possible literal ends, then verify their starts. Dense false hits switch to KMP. */
+  private static int indexOfLongLiteral(
+      String text, String literal, int[] failure, int from, int end) {
+    int length = literal.length();
+    if (length > end - from) {
+      return -1;
+    }
+    int last = length - 1;
+    char anchor = literal.charAt(last);
+    long budget = WorkLimit.forRemaining(end - from);
+    int pos = from;
+    while (pos <= end - length) {
+      int hit = text.indexOf(anchor, pos + last, end);
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record(hit < 0 ? end - (pos + last) : hit - (pos + last) + 1);
+      }
+      if (hit < 0) {
+        return -1;
+      }
+      int candidate = hit - last;
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record(length);
+      }
+      if (text.startsWith(literal, candidate)) {
+        return candidate;
+      }
+      pos = candidate + 1;
+      budget -= length;
+      if (budget <= 0) {
+        return indexOfKmp(text, literal, failure, pos, end);
+      }
+    }
+    return -1;
+  }
+
+  private static int indexOfKmp(String text, String literal, int[] failure, int pos, int end) {
+    // All starts before pos were ruled out. ASCII gives both encodings the same failure table.
+    int matched = 0;
+    for (; pos < end; pos++) {
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record();
+      }
+      char c = text.charAt(pos);
+      while (matched > 0 && c != literal.charAt(matched)) {
+        matched = failure[matched - 1];
+      }
+      if (c == literal.charAt(matched) && ++matched == literal.length()) {
+        return pos - literal.length() + 1;
+      }
+    }
+    return -1;
   }
 }
