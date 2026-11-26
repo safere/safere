@@ -648,10 +648,28 @@ sealed interface StringStartAccelerator {
     }
 
     int findCandidate(String text, int fromIndex, boolean unixLines) {
+      if (StringVectorLoads.ENABLED) {
+        return findVectorCandidate(text, fromIndex);
+      }
       // Three members cost three intrinsic passes over a gap, which has not been measured against
       // the table scan below, so only one- and two-member sets take the per-member search.
       if (scanInfo instanceof CharClassScanInfo.SmallSet smallSet && smallSet.chars().length <= 2) {
         return StringInputScanner.indexOfSmallSet(text, smallSet.chars(), fromIndex);
+      }
+      return indexOfCharClass(text, asciiTable, scanInfo.ranges(), scanInfo.isAscii(), fromIndex);
+    }
+
+    /**
+     * Like {@link #findCandidate}, but tries a String vector scan first. It is a separate method so
+     * that, when vector loads are off, {@code findCandidate} keeps the shape of the scalar scan.
+     */
+    private int findVectorCandidate(String text, int fromIndex) {
+      if (scanInfo instanceof CharClassScanInfo.SmallSet smallSet && smallSet.chars().length <= 2) {
+        return StringInputScanner.indexOfSmallSet(text, smallSet.chars(), fromIndex);
+      }
+      int found = StringVectorLoads.indexOfCharClass(text, scanInfo.ranges(), fromIndex);
+      if (found != VectorScanProvider.UNSUPPORTED) {
+        return found;
       }
       return indexOfCharClass(text, asciiTable, scanInfo.ranges(), scanInfo.isAscii(), fromIndex);
     }

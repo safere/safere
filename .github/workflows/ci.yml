@@ -277,6 +277,7 @@ jobs:
       - name: Run full SafeRE tests with Vector enabled
         run: >
           mvn jacoco:prepare-agent surefire:test
+          surefire:test@string-vector-reflective
           surefire:test@vector-width-64
           surefire:test@vector-width-128
           -pl safere

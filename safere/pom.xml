@@ -328,6 +328,32 @@ final class WorkCounterConfig {
             </configuration>
             <executions>
               <execution>
+                <!-- The main run above has no add-opens, like a normal user JVM. This one opens
+                     java.lang and selects the reflective String vector loads, for the tests that
+                     cover them. -->
+                <id>string-vector-reflective</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${workCounter.enabled}</skipTests>
+                  <argLine>
+                    @{argLine} --add-modules=jdk.incubator.vector
+                    --add-opens=java.base/java.lang=ALL-UNNAMED
+                    -Dorg.safere.experimental.vectorScanProvider=vector
+                    -Dorg.safere.experimental.stringVectorLoads=reflective
+                  </argLine>
+                  <includes>
+                    <include>org/safere/StringVectorScanTest.java</include>
+                    <include>org/safere/StringCharClassFindTest.java</include>
+                  </includes>
+                  <reportsDirectory>
+                    ${project.build.directory}/surefire-reports-string-vector-reflective
+                  </reportsDirectory>
+                </configuration>
+              </execution>
+              <execution>
                 <!-- Test narrow SIMD widths with HotSpot -XX:MaxVectorSize instead of taking a
                      non-constant VectorSpecies parameter inside hot scan loops. -->
                 <id>vector-width-64</id>
