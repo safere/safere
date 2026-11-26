@@ -146,6 +146,19 @@ class LiteralAlternationWorkTest {
   }
 
   @Test
+  void nearbyHitAfterAFalseInitialOnlyScansTheFirstShortTailWindow() {
+    Pattern pattern = Pattern.compile("red|green|blue|yellow|orange|purple");
+    String prefix = "x".repeat(256) + "p";
+    String hit = "purple";
+    // Both tails following the false initial cover the first 64-position window and its overlap.
+    String shorter = prefix + hit + "x".repeat(96 - hit.length());
+    String longer = prefix + hit + "x".repeat(128 - hit.length());
+    long shortWork = work(pattern, shorter);
+    assertThat(shortWork).isPositive();
+    assertThat(work(pattern, longer)).isEqualTo(shortWork);
+  }
+
+  @Test
   void regionSearchWorkIsIndependentOfTheBackingStringTail() {
     Pattern pattern = Pattern.compile("north|south|east|west|upper|lower|front|back");
     for (String filler : new String[] {"x", "n"}) {
