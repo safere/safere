@@ -13,7 +13,8 @@ final class DfaCacheBudget {
    */
   static final long CACHE_BYTE_BUDGET = 16L * 1024 * 1024;
 
-  // Charge each reference as an uncompressed 64-bit reference.
+  // Charge 8 bytes per reference to avoid querying the VM. On HotSpot with compressed references,
+  // this charges twice the actual size of each reference array element.
   static final int REFERENCE_BYTES = Long.BYTES;
   // Allow for VM-dependent headers, a map entry, and the optional state accelerator.
   static final int STATE_OVERHEAD_BYTES = 256;
