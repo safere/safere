@@ -54,6 +54,11 @@ retargeted if a different path takes over. Plain `\w+` would not do: UTF-8 count
 with a character-class scan that skips both DFAs. Compilation and UTF-8 encoding are
 outside timing.
 
+`ReverseDfaFindBenchmark.wordProseCapture.32768` is the same workload with the word
+in a capture group, `\b(\w+)\b`. The loop doesn't read the group, so each `find()`
+is still one forward pass of the start-register search, and the same harness test
+checks it.
+
 `ReverseDfaFindBenchmark.proseLines.32768` keeps a capture-free workload on the
 reverse DFA. It counts `(?m)^.+$` matches in the same prose with a line break
 after each sentence (768 lines). The start-register search doesn't handle line

@@ -5,7 +5,10 @@
 
 package org.safere;
 
-import java.util.ArrayList;
+import static org.safere.DfaCacheBudget.CACHE_BYTE_BUDGET;
+import static org.safere.DfaCacheBudget.REFERENCE_BYTES;
+import static org.safere.DfaCacheBudget.STATE_OVERHEAD_BYTES;
+
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -24,7 +27,7 @@ import java.util.HashMap;
  *
  * <p>A search answers {@link #FALLBACK} whenever it can't vouch for the match start: the match
  * belongs to an attempt without a register, the match is empty, the start position is not a code
- * point boundary, or the state budget ran out. The caller then runs the ordinary forward and
+ * point boundary, or the cache budget ran out. The caller then runs the ordinary forward and
  * reverse DFA search. Fallbacks waste a forward scan, so {@link #find} also tracks them and stops
  * using the automaton for a while when they are too frequent (see {@link #FALLBACK_COST}).
  *
@@ -81,11 +84,13 @@ final class StartRegisterSearch {
    */
   static final int MAX_STATES = 4096;
 
-  /** Most cached transitions (ints) before the cache is cleared: 16 MiB. */
-  private static final int MAX_TRANSITIONS = 1 << 22;
-
   /** Rows allocated up front; the table doubles as states are added. */
   private static final int INITIAL_STATE_CAPACITY = 4;
+
+  private static final int INITIAL_EVENT_CAPACITY = 64;
+  private static final int EVENT_BYTES = 4 * Integer.BYTES;
+  // Start-state references, array headers and the initial hash table allocation.
+  private static final int FIXED_CACHE_BYTES = 1024;
 
   // Cache budget. A search that runs out of states falls back and clears the cache before the next
   // find. More than MAX_RESETS clears, net of one forgiven per RESET_DECAY answered searches, free
@@ -158,29 +163,30 @@ final class StartRegisterSearch {
 
   private final int eotColumn;
 
-  /** State budget: {@link #MAX_STATES}, or fewer for wide rows. */
-  private final int maxStates;
-
-  private final ArrayList<St> states = new ArrayList<>();
-  private final HashMap<St, St> interned = new HashMap<>();
+  private final long cacheRowBytes;
+  private long cachedStateBytes;
+  // State IDs start at 1. All per-state arrays have the same capacity as the transition rows.
+  private int nextStateId = 1;
+  private St[] states = new St[INITIAL_STATE_CAPACITY];
+  private HashMap<St, St> interned = new HashMap<>();
   private final St[] startStates = new St[16];
-  private int[] matchRankOf = new int[64];
-  private boolean[] stopOf = new boolean[64];
-  private StateAccelerator[] accelOf = new StateAccelerator[64];
-  private boolean[] accelChecked = new boolean[64];
-  private boolean[] accelSkipsNonAscii = new boolean[64];
+  private int[] matchRankOf = new int[INITIAL_STATE_CAPACITY];
+  private boolean[] stopOf = new boolean[INITIAL_STATE_CAPACITY];
+  private StateAccelerator[] accelOf = new StateAccelerator[INITIAL_STATE_CAPACITY];
+  private boolean[] accelChecked = new boolean[INITIAL_STATE_CAPACITY];
+  private boolean[] accelSkipsNonAscii = new boolean[INITIAL_STATE_CAPACITY];
 
   /** States without live attempts except the fresh one, where a new search could start. */
-  private boolean[] startLikeOf = new boolean[64];
+  private boolean[] startLikeOf = new boolean[INITIAL_STATE_CAPACITY];
 
   /** Cached transitions: 0 unknown, positive plain next state id (with match flags), else event. */
   private int[] transitions;
 
   // Events: transitions that change the registers or report a match the scalar loop doesn't.
-  private int[] infoNext = new int[64];
-  private int[] infoSrc0 = new int[64];
-  private int[] infoSrc1 = new int[64];
-  private int[] infoDeferredRank = new int[64];
+  private int[] infoNext = new int[INITIAL_EVENT_CAPACITY];
+  private int[] infoSrc0 = new int[INITIAL_EVENT_CAPACITY];
+  private int[] infoSrc1 = new int[INITIAL_EVENT_CAPACITY];
+  private int[] infoDeferredRank = new int[INITIAL_EVENT_CAPACITY];
   private int infoCount;
 
   private boolean overflowed;
@@ -220,11 +226,11 @@ final class StartRegisterSearch {
       this.eotColumn = 128;
     }
     this.row = eotColumn + 1;
-    // State IDs begin at 1, so the backing table includes one unused row.
-    this.maxStates = Math.min(MAX_STATES, MAX_TRANSITIONS / row - 1);
-    // Start small, like Dfa: the searches this targets need a handful of states.
+    // Per-row metadata includes one int, four flags, two references, and hash table buckets.
+    this.cacheRowBytes = (row + 1L) * Integer.BYTES + 4L * Byte.BYTES + 5L * REFERENCE_BYTES;
+    // Four rows fit easily even at the maximum width allowed above. Program-sized search
+    // scratch and the non-ASCII boundaries are independent of the cache.
     this.transitions = new int[row * INITIAL_STATE_CAPACITY];
-    states.add(null); // ids start at 1
   }
 
   /**
@@ -280,13 +286,13 @@ final class StartRegisterSearch {
       return SKIPPED;
     }
     if (overflowed) {
-      clearCache();
       if (++resets > MAX_RESETS) {
         releaseCache();
         resets = 0;
         pause = RESET_PAUSE;
         return SKIPPED;
       }
+      clearCache();
     }
     long result = text.isCodePointBoundary(startPos) ? search(text, startPos) : FALLBACK;
     if (result == FALLBACK) {
@@ -333,17 +339,15 @@ final class StartRegisterSearch {
 
   /** Number of states built since the last cache reset, for tests and measurements. */
   int stateCount() {
-    return states.size() - 1;
+    return nextStateId - 1;
   }
 
-  /** Number of transition slots currently allocated, for tests. */
-  int transitionCapacityForTesting() {
-    return transitions.length;
-  }
-
-  /** The state budget, for tests. */
-  int maxStatesForTesting() {
-    return maxStates;
+  /** Estimated retained cache bytes, including unused slots in allocated arrays. */
+  long estimatedCacheBytes() {
+    return FIXED_CACHE_BYTES
+        + cachedStateBytes
+        + cacheRowBytes * states.length
+        + EVENT_BYTES * (long) infoNext.length;
   }
 
   /** Number of cache resets, for tests. */
@@ -472,7 +476,7 @@ final class StartRegisterSearch {
         continue;
       }
       if (t == 0) {
-        t = computeTransition(states.get(sid), cp, column);
+        t = computeTransition(states[sid], cp, column);
         if (t == 0) {
           return FALLBACK;
         }
@@ -637,11 +641,12 @@ final class StartRegisterSearch {
     return 128 + index;
   }
 
-  /** Clears every cached state and transition after the state budget ran out. */
+  /** Clears every cached state and transition after the cache budget ran out. */
   private void clearCache() {
     overflowed = false;
-    states.clear();
-    states.add(null);
+    Arrays.fill(states, 1, nextStateId, null);
+    nextStateId = 1;
+    cachedStateBytes = 0;
     interned.clear();
     Arrays.fill(startStates, null);
     Arrays.fill(transitions, 0);
@@ -654,17 +659,57 @@ final class StartRegisterSearch {
   /** Clears the cache and shrinks its arrays back to their initial size. */
   private void releaseCache() {
     clearCache();
-    transitions = new int[row * INITIAL_STATE_CAPACITY];
-    matchRankOf = new int[64];
-    stopOf = new boolean[64];
-    accelOf = new StateAccelerator[64];
-    accelChecked = new boolean[64];
-    accelSkipsNonAscii = new boolean[64];
-    startLikeOf = new boolean[64];
-    infoNext = new int[64];
-    infoSrc0 = new int[64];
-    infoSrc1 = new int[64];
-    infoDeferredRank = new int[64];
+    interned = new HashMap<>();
+    resizeStateArrays(INITIAL_STATE_CAPACITY);
+    resizeEventArrays(INITIAL_EVENT_CAPACITY);
+  }
+
+  private void resizeStateArrays(int capacity) {
+    transitions = Arrays.copyOf(transitions, capacity * row);
+    states = Arrays.copyOf(states, capacity);
+    matchRankOf = Arrays.copyOf(matchRankOf, capacity);
+    stopOf = Arrays.copyOf(stopOf, capacity);
+    accelOf = Arrays.copyOf(accelOf, capacity);
+    accelChecked = Arrays.copyOf(accelChecked, capacity);
+    accelSkipsNonAscii = Arrays.copyOf(accelSkipsNonAscii, capacity);
+    startLikeOf = Arrays.copyOf(startLikeOf, capacity);
+  }
+
+  private void resizeEventArrays(int capacity) {
+    infoNext = Arrays.copyOf(infoNext, capacity);
+    infoSrc0 = Arrays.copyOf(infoSrc0, capacity);
+    infoSrc1 = Arrays.copyOf(infoSrc1, capacity);
+    infoDeferredRank = Arrays.copyOf(infoDeferredRank, capacity);
+  }
+
+  private boolean reserveState(long stateBytes) {
+    int requiredRows = nextStateId + 1;
+    int capacity = states.length;
+    long spareBytes =
+        CACHE_BYTE_BUDGET
+            - estimatedCacheBytes()
+            - stateBytes
+            - cacheRowBytes * Math.max(0, requiredRows - capacity);
+    if (nextStateId > MAX_STATES || spareBytes < 0) {
+      return false;
+    }
+    if (requiredRows > capacity) {
+      // Budget spare rows using observed frontiers so unused branches do not force tiny
+      // resizes. For frontiers that grow by one instruction per state, doubling the table
+      // can raise the newest frontier to four times the current mean.
+      long frontierBytes = stateBytes - STATE_OVERHEAD_BYTES;
+      long liveFrontierBytes =
+          cachedStateBytes + stateBytes - STATE_OVERHEAD_BYTES * (long) nextStateId;
+      long averageFrontierBytes = Math.ceilDiv(liveFrontierBytes, nextStateId);
+      long plannedFrontierBytes =
+          Math.min(
+              2L * Integer.BYTES * prog.size(), Math.max(frontierBytes, 4 * averageFrontierBytes));
+      long extraRows = spareBytes / (cacheRowBytes + STATE_OVERHEAD_BYTES + plannedFrontierBytes);
+      int grownCapacity =
+          (int) Math.min(2L * capacity, Math.min(MAX_STATES + 1L, requiredRows + extraRows));
+      resizeStateArrays(grownCapacity);
+    }
+    return true;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -805,28 +850,22 @@ final class StartRegisterSearch {
     if (existing != null) {
       return existing;
     }
-    if (states.size() > maxStates) {
+    long stateBytes =
+        STATE_OVERHEAD_BYTES + Integer.BYTES * ((long) s.pcs.length + s.groups.length);
+    if (!reserveState(stateBytes)) {
       overflowed = true;
       return null;
     }
-    s.id = states.size();
-    states.add(s);
+    s.id = nextStateId++;
+    states[s.id] = s;
     interned.put(s, s);
+    cachedStateBytes += stateBytes;
     for (int i = 0; i < s.pcs.length; i++) {
       if (prog.inst(s.pcs[i]).opCode == InstOp.OP_MATCH) {
         s.matchRank = s.groups[i] < REGISTERS ? s.groups[i] : UNKNOWN;
         s.highestPriorityMatch = i == 0;
         break;
       }
-    }
-    if (matchRankOf.length <= s.id) {
-      int size = matchRankOf.length * 2;
-      matchRankOf = Arrays.copyOf(matchRankOf, size);
-      stopOf = Arrays.copyOf(stopOf, size);
-      accelOf = Arrays.copyOf(accelOf, size);
-      accelChecked = Arrays.copyOf(accelChecked, size);
-      accelSkipsNonAscii = Arrays.copyOf(accelSkipsNonAscii, size);
-      startLikeOf = Arrays.copyOf(startLikeOf, size);
     }
     boolean startLike = s.matchRank == NONE && s.pcs.length != 0;
     for (int g : s.groups) {
@@ -835,16 +874,10 @@ final class StartRegisterSearch {
     startLikeOf[s.id] = startLike;
     matchRankOf[s.id] = s.matchRank;
     stopOf[s.id] = s.highestPriorityMatch || s.pcs.length == 0;
-    int requiredTransitions = (s.id + 1) * row;
-    if (transitions.length < requiredTransitions) {
-      int capacity =
-          Math.min((maxStates + 1) * row, Math.max(transitions.length * 2, requiredTransitions));
-      transitions = Arrays.copyOf(transitions, capacity);
-    }
     return s;
   }
 
-  /** Computes and caches a transition; returns 0 when the state budget ran out. */
+  /** Computes and caches a transition; returns 0 when the cache budget ran out. */
   private int computeTransition(St s, int cp, int column) {
     if (!accelChecked[s.id]) {
       accelChecked[s.id] = true;
@@ -960,11 +993,12 @@ final class StartRegisterSearch {
           };
     } else {
       if (infoCount == infoNext.length) {
-        int size = infoCount * 2;
-        infoNext = Arrays.copyOf(infoNext, size);
-        infoSrc0 = Arrays.copyOf(infoSrc0, size);
-        infoSrc1 = Arrays.copyOf(infoSrc1, size);
-        infoDeferredRank = Arrays.copyOf(infoDeferredRank, size);
+        long availableEvents = (CACHE_BYTE_BUDGET - estimatedCacheBytes()) / EVENT_BYTES;
+        if (availableEvents == 0) {
+          overflowed = true;
+          return 0;
+        }
+        resizeEventArrays(infoCount + (int) Math.min(infoCount, availableEvents));
       }
       infoNext[infoCount] = ns.id;
       infoSrc0[infoCount] = src[0];

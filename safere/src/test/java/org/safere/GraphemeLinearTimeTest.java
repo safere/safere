@@ -25,6 +25,76 @@ import org.junit.jupiter.params.provider.ValueSource;
 @Tag("work-counter")
 class GraphemeLinearTimeTest {
   @ParameterizedTest
+  @ValueSource(strings = {"\\Xa", "\\X\\Xz"})
+  void anchoredFailureWorkIsIndependentOfTheUnreadSuffix(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    String small = "zz" + "a".repeat(128);
+    String large = "zz" + "a".repeat(8_192);
+    for (boolean utf8 : new boolean[] {false, true}) {
+      for (boolean fullMatch : new boolean[] {false, true}) {
+        long smallWork = anchoredFailureWork(pattern, small, utf8, fullMatch);
+        long largeWork = anchoredFailureWork(pattern, large, utf8, fullMatch);
+        assertThat(smallWork).isPositive();
+        assertThat(largeWork)
+            .as("UTF-8=%s, full match=%s, small input work=%d", utf8, fullMatch, smallWork)
+            .isLessThanOrEqualTo(smallWork * 2);
+      }
+    }
+  }
+
+  private static long anchoredFailureWork(
+      Pattern pattern, String text, boolean utf8, boolean fullMatch) {
+    BooleanSupplier match;
+    if (utf8) {
+      Utf8Matcher matcher = pattern.matcher(Utf8Input.validated(text.getBytes(UTF_8)));
+      match = fullMatch ? matcher::matches : matcher::lookingAt;
+    } else {
+      Matcher matcher = pattern.matcher(text);
+      match = fullMatch ? matcher::matches : matcher::lookingAt;
+    }
+    return WorkCounter.countForTesting(() -> assertThat(match.getAsBoolean()).isFalse());
+  }
+
+  @Test
+  void boundedSearchStopsAfterTheLastAllowedStartFails() {
+    Prog prog = Pattern.compile("\\Xa").prog();
+    assertThat(boundedSearch(prog, "zza")).containsExactly(1, 3);
+
+    String small = "zzz" + "a".repeat(128);
+    String large = "zzz" + "a".repeat(8_192);
+    long smallWork =
+        WorkCounter.countForTesting(() -> assertThat(boundedSearch(prog, small)).isNull());
+    long largeWork =
+        WorkCounter.countForTesting(() -> assertThat(boundedSearch(prog, large)).isNull());
+    assertThat(smallWork).isPositive();
+    assertThat(largeWork).isLessThanOrEqualTo(smallWork * 2);
+  }
+
+  private static int[] boundedSearch(Prog prog, String text) {
+    return Nfa.search(prog, text, 0, 1, Nfa.Anchor.UNANCHORED, Nfa.MatchKind.FIRST_MATCH, 1);
+  }
+
+  @Test
+  void anchoredMatchWaitsForADelayedGraphemeThread() {
+    Pattern pattern = Pattern.compile("(\\X|.)a");
+    String cluster = "👩\u200D👩";
+    int clusterBytes = cluster.getBytes(UTF_8).length;
+    for (boolean fullMatch : new boolean[] {false, true}) {
+      String text = cluster + "a" + (fullMatch ? "" : "tail");
+      Matcher matcher = pattern.matcher(text);
+      assertThat(fullMatch ? matcher.matches() : matcher.lookingAt()).isTrue();
+      assertThat(matcher.group(1)).isEqualTo(cluster);
+      assertThat(matcher.end()).isEqualTo(cluster.length() + 1);
+
+      Utf8Matcher utf8 = pattern.matcher(Utf8Input.validated(text.getBytes(UTF_8)));
+      assertThat(fullMatch ? utf8.matches() : utf8.lookingAt()).isTrue();
+      assertThat(utf8.start(1)).isZero();
+      assertThat(utf8.end(1)).isEqualTo(clusterBytes);
+      assertThat(utf8.end()).isEqualTo(clusterBytes + 1);
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"🇦🇧", "👩\u0300\u200D👩", "\u0915\u094D\u0915"})
   void firstContextualClusterWorkIsIndependentOfTheUnreadSuffix(String cluster) {
     Pattern pattern = Pattern.compile("\\X");

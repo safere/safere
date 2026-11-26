@@ -1679,12 +1679,16 @@ class CrossEngineBenchmarkPlanTest {
     }
   }
 
-  @Test
-  void reverseDfaProseWorkloadRecoversEveryMatchStartInTheForwardPass() {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "ReverseDfaFindBenchmark.wordProse.32768",
+        "ReverseDfaFindBenchmark.wordProseCapture.32768"
+      })
+  void reverseDfaProseWorkloadRecoversEveryMatchStartInTheForwardPass(String workloadId) {
     // The workload measures repeated match-start recovery, which the start-register search does in
     // the forward DFA pass instead of a reverse DFA pass. If another path takes over, this fails so
     // the workload can be retargeted instead of silently measuring that path.
-    String workloadId = "ReverseDfaFindBenchmark.wordProse.32768";
     CrossEngineBenchmarkPlan plan = CrossEngineBenchmarkPlan.load();
     BenchmarkData data = BenchmarkData.get();
     List<OperationDiagnostics> events = new ArrayList<>();

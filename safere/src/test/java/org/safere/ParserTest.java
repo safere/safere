@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests for {@link Parser}. */
@@ -802,6 +803,48 @@ class ParserTest {
       Regexp re = parse(nestedNonCapturingGroups(5000, "a{0}") + "++");
 
       assertThat(re.op).isEqualTo(RegexpOp.PLUS);
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = ';',
+        value = {"(\\b); ++", "\\b; *+", "(\\b); {0,1}+"})
+    @Tag("work-counter")
+    void nestedZeroWidthPossessiveRepeatsParseWithLinearScaling(String atom, String quantifier) {
+      String suffix = "\\b|\\A)" + quantifier;
+      String smaller = "(?:".repeat(128) + atom + suffix.repeat(128);
+      String larger = "(?:".repeat(512) + atom + suffix.repeat(512);
+
+      long smallerWork = parseWork(smaller);
+      long largerWork = parseWork(larger);
+
+      assertThat(smallerWork).isPositive();
+      assertThat(largerWork)
+          .as("4x nesting depth, smallerWork=%d largerWork=%d", smallerWork, largerWork)
+          .isLessThan(smallerWork * 5);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"(?:a{0}|b)*+", "(?:a{0}b)?+", "(?:a{0,1})++", "(?:\\R){0}+"})
+    void possessiveRepeatOnConsumingOperandReportsQuantifierOffset(String regex) {
+      assertThatThrownBy(() -> parse(regex))
+          .isInstanceOfSatisfying(
+              PatternSyntaxException.class,
+              error -> {
+                assertThat(error.getDescription())
+                    .isEqualTo("possessive quantifiers are not supported");
+                assertThat(error.getIndex()).isEqualTo(regex.lastIndexOf(')') + 1);
+              });
+    }
+
+    @Test
+    void zeroWidthPossessiveStarUsesCapturePathForCapturesUnderZeroCount() {
+      Regexp withCapture = parse("(?:(a){0}|\\b)*+");
+      Regexp withoutCapture = parse("(?:a{0}|\\b)*+");
+
+      assertThat(withCapture.op).isEqualTo(RegexpOp.QUEST);
+      assertThat(withCapture.sub().op).isEqualTo(RegexpOp.PLUS);
+      assertThat(withoutCapture.op).isEqualTo(RegexpOp.STAR);
     }
 
     @Test

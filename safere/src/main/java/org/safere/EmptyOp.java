@@ -45,6 +45,9 @@ final class EmptyOp {
   /** {@code \B} — Unicode not a word boundary (when UNICODE_CHARACTER_CLASS is set). */
   public static final int UNICODE_NON_WORD_BOUNDARY = 1 << 8;
 
+  static final int WORD_BOUNDARIES =
+      WORD_BOUNDARY | NON_WORD_BOUNDARY | UNICODE_WORD_BOUNDARY | UNICODE_NON_WORD_BOUNDARY;
+
   /** {@code $} or {@code \Z} with UNIX_LINES: end of text or before a final LF. */
   public static final int UNIX_DOLLAR_END = 1 << 9;
 
