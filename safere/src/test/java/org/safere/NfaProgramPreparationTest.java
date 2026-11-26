@@ -55,21 +55,51 @@ class NfaProgramPreparationTest {
             List.of(new StringInputScanner(input), new Utf8InputScanner(input.getBytes(UTF_8)));
         for (InputScanner scanner : scanners) {
           int end = scanner.length();
-          for (Nfa.MatchKind kind : List.of(Nfa.MatchKind.FIRST_MATCH, Nfa.MatchKind.FULL_MATCH)) {
-            int[] expected =
-                Nfa.search(
-                    graph, scanner, 0, end, end, 0, Nfa.Anchor.UNANCHORED, kind, groups, null);
-            int[] actual =
-                Nfa.search(
-                    flat, scanner, 0, end, end, 0, Nfa.Anchor.UNANCHORED, kind, groups, null);
-            assertThat(actual)
-                .as(
-                    "/%s/ on %s via %s (%s)",
-                    regex, input, scanner.getClass().getSimpleName(), kind)
-                .isEqualTo(expected);
+          for (Nfa.MatchKind kind : Nfa.MatchKind.values()) {
+            for (int requested : new int[] {0, 1, groups}) {
+              int[] expected =
+                  Nfa.search(
+                      graph, scanner, 0, end, end, 0, Nfa.Anchor.UNANCHORED, kind, requested, null);
+              int[] actual =
+                  Nfa.search(
+                      flat, scanner, 0, end, end, 0, Nfa.Anchor.UNANCHORED, kind, requested, null);
+              assertThat(actual)
+                  .as(
+                      "/%s/ on %s via %s (%s)",
+                      regex, input, scanner.getClass().getSimpleName(), kind)
+                  .isEqualTo(expected);
+            }
           }
         }
       }
+    }
+  }
+
+  @Test
+  void cachedFlatQueuesCanSwitchBetweenExistenceAndBounds() {
+    Pattern pattern = Pattern.compile("(ab|a)+");
+    Prog flat = pattern.flatProg();
+    assertThat(flat.didFlatten()).isTrue();
+    InputScanner input = new StringInputScanner("xxaba");
+    int end = input.length();
+    EngineContext context =
+        EngineContext.create(flat, input, 0, end, end, 0, 0, end, end, 0, end, null);
+    Nfa engine = null;
+    for (int groups : new int[] {0, 1, 0, 2, 1, 0}) {
+      engine = Nfa.getOrCreate(engine, flat, context, 2 * Math.max(1, groups), false, false);
+      assertThat(engine.runSearch(false, Nfa.MatchKind.FIRST_MATCH, groups, end))
+          .isEqualTo(
+              Nfa.search(
+                  pattern.prog(),
+                  input,
+                  0,
+                  end,
+                  end,
+                  0,
+                  Nfa.Anchor.UNANCHORED,
+                  Nfa.MatchKind.FIRST_MATCH,
+                  groups,
+                  null));
     }
   }
 

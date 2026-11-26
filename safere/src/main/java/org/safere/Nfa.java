@@ -60,8 +60,18 @@ final class Nfa {
     }
   }
 
+  private enum QueueLayout {
+    THREADS,
+    INSTRUCTIONS,
+    INSTRUCTIONS_AND_STARTS
+  }
+
   private static final class QueueState {
     final NfaThread[] threads;
+    // Flattened scalar programs need only an instruction and, for bounds, the candidate start.
+    // The end is the input position at which MATCH wins.
+    final int[] flatIds;
+    int[] flatStarts;
     int size = 0;
 
     final int[] visitedInst;
@@ -69,8 +79,13 @@ final class Nfa {
     final Set<Long> visitedGrapheme;
     final boolean hasGraphemeSemantics;
 
-    QueueState(int progSize, boolean hasGraphemeSemantics) {
-      this.threads = new NfaThread[progSize + 1];
+    QueueState(int progSize, boolean hasGraphemeSemantics, QueueLayout layout) {
+      this.threads = layout == QueueLayout.THREADS ? new NfaThread[progSize + 1] : null;
+      this.flatIds = layout != QueueLayout.THREADS ? new int[progSize + 1] : null;
+      this.flatStarts =
+          layout == QueueLayout.INSTRUCTIONS_AND_STARTS
+              ? new int[Math.min(16, progSize + 1)]
+              : null;
       this.visitedInst = new int[progSize + 1];
       this.visitedGrapheme = hasGraphemeSemantics ? new HashSet<>() : null;
       this.hasGraphemeSemantics = hasGraphemeSemantics;
@@ -161,6 +176,7 @@ final class Nfa {
     return queueDecoded;
   }
 
+  private QueueLayout queueLayout = QueueLayout.THREADS;
   private boolean matched;
   private int[] bestMatch;
   private final AddToThreadqStack addToThreadqStack = new AddToThreadqStack();
@@ -190,7 +206,7 @@ final class Nfa {
     if (!queueStatePool.isEmpty()) {
       return queueStatePool.remove(queueStatePool.size() - 1);
     }
-    return new QueueState(prog.size(), prog.hasGraphemeSemantics());
+    return new QueueState(prog.size(), prog.hasGraphemeSemantics(), queueLayout);
   }
 
   private void freeQueueState(QueueState q) {
@@ -258,6 +274,17 @@ final class Nfa {
   }
 
   int[] runSearch(boolean anchored, MatchKind kind, int nsubmatch, int endPos, int[] reuseGroups) {
+    QueueLayout layout = QueueLayout.THREADS;
+    if (prog.didFlatten() && ncapture == 2 && prog.supportsFlatNfa()) {
+      layout =
+          nsubmatch > 0 || longest || reuseGroups != null
+              ? QueueLayout.INSTRUCTIONS_AND_STARTS
+              : QueueLayout.INSTRUCTIONS;
+    }
+    if (queueLayout != layout) {
+      queueStatePool.clear();
+      queueLayout = layout;
+    }
     if (prog.hasGraphemeClusterInstruction()) {
       doSearchEveryCharPosition(anchored);
     } else {
@@ -604,7 +631,7 @@ final class Nfa {
 
       boolean done =
           flatProgram
-              ? stepFlatCodePoint(runq, nextq, text, pos, nextPos)
+              ? stepFlatCodePoint(runq, nextq, text, pos, nextPos, initialCap)
               : stepCodePoint(runq, nextq, text, pos, nextPos);
 
       QueueState tmp = runq;
@@ -1148,24 +1175,40 @@ final class Nfa {
         }
         case InstOp.OP_CHAR_RANGE -> {
           if (cp >= 0 && ip.matchesChar(cp)) {
-            addThread(q, instructionId, captures, -1);
+            addFlatThread(q, instructionId, captures);
           }
           id = next;
         }
         case InstOp.OP_CHAR_CLASS -> {
           if (cp >= 0 && ip.matchesCharClass(cp)) {
-            addThread(q, instructionId, captures, -1);
+            addFlatThread(q, instructionId, captures);
           }
           id = next;
         }
         case InstOp.OP_MATCH -> {
-          addThread(q, instructionId, captures, -1);
+          addFlatThread(q, instructionId, captures);
           id = next;
         }
         case InstOp.OP_FAIL -> id = next;
         default -> throw new IllegalStateException("Unsupported flattened NFA opcode: " + ip.op);
       }
     }
+  }
+
+  private void addFlatThread(QueueState q, int id, int[] captures) {
+    if (q.flatIds == null) {
+      addThread(q, id, captures, -1);
+      return;
+    }
+    q.flatIds[q.size] = id;
+    if (q.flatStarts != null) {
+      if (q.size == q.flatStarts.length) {
+        int growth = Math.min(q.size, q.flatIds.length - q.size);
+        q.flatStarts = Arrays.copyOf(q.flatStarts, q.size + growth);
+      }
+      q.flatStarts[q.size] = captures[0];
+    }
+    q.size++;
   }
 
   private boolean isExpansionComplete(QueueState q, int instructionId, InputScanner text, int pos) {
@@ -1349,14 +1392,25 @@ final class Nfa {
 
   /** Steps a scalar list program; its queue contains only admitted consumers and MATCH. */
   private boolean stepFlatCodePoint(
-      QueueState rq, QueueState nq, InputScanner text, int matchPos, int nextPos) {
+      QueueState rq, QueueState nq, InputScanner text, int matchPos, int nextPos, int[] scratch) {
     nq.clear();
     for (int threadIndex = 0; threadIndex < rq.size; threadIndex++) {
       if (WorkCounterConfig.ENABLED) {
         WorkCounter.record();
       }
-      NfaThread t = rq.threads[threadIndex];
-      int[] capture = t.capture;
+      int id;
+      int[] capture;
+      if (rq.flatIds != null) {
+        id = rq.flatIds[threadIndex];
+        capture = scratch;
+        if (rq.flatStarts != null) {
+          capture[0] = rq.flatStarts[threadIndex];
+        }
+      } else {
+        NfaThread t = rq.threads[threadIndex];
+        id = t.id;
+        capture = t.capture;
+      }
       if (longest
           && matched
           && bestMatch[0] != -1
@@ -1364,7 +1418,7 @@ final class Nfa {
           && bestMatch[0] < capture[0]) {
         continue;
       }
-      Inst ip = prog.inst(t.id);
+      Inst ip = prog.inst(id);
       if (ip.opCode == InstOp.OP_MATCH) {
         if (acceptMatch(capture, matchPos) && !longest) {
           rq.clear();
