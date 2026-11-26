@@ -28,7 +28,8 @@ final class LiteralAlternation {
   private static final int PROBE_LENGTH = 1_024;
   private static final int MAX_ALTERNATIVES = 8;
   private static final int WINDOW_LENGTH = 256;
-  private static final int SHORT_TAIL_WINDOW = 32;
+  private static final int SHORT_TAIL_LIMIT = 128;
+  private static final int SHORT_TAIL_WINDOW = 64;
   private static final int MAX_LITERAL_LENGTH = 12;
   private static final int REGION_PROBE_DELAY = 2 * WINDOW_LENGTH;
   // Searches verify first-byte candidates one at a time until they see this many within
@@ -228,9 +229,9 @@ final class LiteralAlternation {
         }
       }
       position = candidate + 1;
-      // A short suffix cannot amortize repeated candidate hops. Start its literal scans close
-      // to the false initial so a nearby lower-priority hit need not wait for a whole-tail scan.
-      if (end - position <= PROBE_LENGTH) {
+      // Bound the extra scanning a sparse tail pays after one false initial. The first window
+      // also limits how far we scan before checking a nearby lower-priority literal.
+      if (end - position <= SHORT_TAIL_LIMIT) {
         return searchGrowingWindows(text, position, end, SHORT_TAIL_WINDOW, false);
       }
       if (++candidates == DENSE_CANDIDATES) {

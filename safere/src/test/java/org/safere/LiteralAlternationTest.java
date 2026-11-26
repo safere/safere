@@ -211,6 +211,26 @@ class LiteralAlternationTest {
   }
 
   @Test
+  void shortTailWindowBoundariesPreserveCrossingMatchesAndSourceOrder() {
+    for (String regex :
+        List.of("backtrack|north|south|east|west|back", "back|north|south|east|west|backtrack")) {
+      Pattern pattern = Pattern.compile(regex);
+      java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex);
+      // The first possible start after the first window is the false initial 'n'.
+      String prefix = "x".repeat(256) + "n";
+      for (String filler : List.of("x", "日")) {
+        for (int length : new int[] {127, 128, 129}) {
+          for (int offset : new int[] {63, 64, 65}) {
+            String tail = filler.repeat(offset) + "backtrackwest";
+            String text = prefix + tail + filler.repeat(length - tail.length());
+            compareFinds(pattern.matcher(text), jdk.matcher(text));
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   void denseInitialsPreserveCrossingMatchesAndSourceOrder() {
     for (String regex : List.of("nnnnook|west|south|east|nnnn", "nnnnook|west|south|east|nnno")) {
       Pattern pattern = Pattern.compile(regex);
