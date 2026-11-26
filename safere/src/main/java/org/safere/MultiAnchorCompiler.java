@@ -1515,6 +1515,22 @@ final class MultiAnchorCompiler {
     Regexp tail = tailSubs.size() == 1 ? tailSubs.getFirst() : Regexp.concat(tailSubs, 0);
 
     MultiAnchorDescriptor.StartPlan inner = extractStartPlan(tail, false);
+    if (wideLeadingClass
+        && !(inner instanceof MultiAnchorDescriptor.StartPlan.Literal
+            || inner instanceof MultiAnchorDescriptor.StartPlan.FixedOffset)) {
+      // A tail's start plan only reports its leading literal alternation when the alternation is
+      // the whole tail, as in `.*(?:apple|banana)`. With more after it, as in
+      // `.*(?:apple|banana)\b.*`, every match still starts with one of the literals.
+      String[] literals = extractLiteralAlternation(firstPrefixCandidate(tail));
+      if (literals != null && isWideInnerLiteralSet(literals)) {
+        inner =
+            new MultiAnchorDescriptor.StartPlan.MultiLiteral(
+                literals,
+                inner instanceof MultiAnchorDescriptor.StartPlan.CharClass cc
+                    ? cc.scanInfo()
+                    : null);
+      }
+    }
     if (inner == null
         || inner instanceof MultiAnchorDescriptor.StartPlan.None
         // Keep class offsets scoped to their exact ASCII prefix, without a backward-expansion
@@ -1525,10 +1541,13 @@ final class MultiAnchorCompiler {
     }
     // Before a wide class, only an exact literal search finds inner candidates sparse enough to
     // pay for walking back to the line start. Class and multi-literal scans may report every
-    // position, or decline and report the search start.
+    // position, or decline and report the search start. A few longer literals get their own exact
+    // search instead (see isWideInnerLiteralSet).
     if (wideLeadingClass
         && !(inner instanceof MultiAnchorDescriptor.StartPlan.Literal
-            || inner instanceof MultiAnchorDescriptor.StartPlan.FixedOffset)) {
+            || inner instanceof MultiAnchorDescriptor.StartPlan.FixedOffset
+            || (inner instanceof MultiAnchorDescriptor.StartPlan.MultiLiteral ml
+                && isWideInnerLiteralSet(ml.literals())))) {
       return null;
     }
     // An optional leading character in front of a class too common to scan for, such as `-?\d+`,
@@ -1543,6 +1562,29 @@ final class MultiAnchorCompiler {
 
     return new MultiAnchorDescriptor.StartPlan.LeadingExpansion(
         leadingClass, minRepetition, maxRepetition, hasLeadingAssertions, inner);
+  }
+
+  /**
+   * Returns whether a wide leading expansion may search for {@code literals} as its inner plan.
+   *
+   * <p>The general multi-literal accelerators can report a candidate per first-byte hit, or decline
+   * and report the search start. {@link InnerLiteralSet} instead reports only exact literal starts,
+   * so a wide expansion treats it like a single literal. It searches for each literal separately,
+   * so the set is kept small, and every literal has at least {@link
+   * InnerLiteralSet#MIN_LITERAL_LENGTH} characters, which keeps a hit about as rare as one on a
+   * single literal of that length.
+   */
+  static boolean isWideInnerLiteralSet(String[] literals) {
+    if (literals.length < 2 || literals.length > InnerLiteralSet.MAX_LITERALS) {
+      return false;
+    }
+    for (String literal : literals) {
+      if (literal.length() < InnerLiteralSet.MIN_LITERAL_LENGTH
+          || literal.length() > InnerLiteralSet.MAX_LITERAL_LENGTH) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static PrefixResult extractPrefix(Regexp re) {

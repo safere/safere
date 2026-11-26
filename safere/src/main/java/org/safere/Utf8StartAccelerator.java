@@ -72,7 +72,9 @@ sealed interface Utf8StartAccelerator {
         yield null;
       }
       case MultiAnchorDescriptor.StartPlan.LeadingExpansion le -> {
-        Utf8StartAccelerator inner = create(le.innerPlan(), hasWordBoundary);
+        InnerLiteralSet innerLiterals = StringStartAccelerator.LeadingExpansion.innerLiterals(le);
+        Utf8StartAccelerator inner =
+            innerLiterals != null ? null : create(le.innerPlan(), hasWordBoundary);
         // This wrapper does not retain the folded filter's per-search scan cursor, and an optional
         // single-character leading class before a non-ASCII inner class is faster in the UTF-8
         // byte DFA than running an un-memoized scalar UTF-8 code-point scan plus inner DFA check.
@@ -82,7 +84,7 @@ sealed interface Utf8StartAccelerator {
                 && !cc.scanInfo().isAscii())) {
           yield null;
         }
-        yield inner != null
+        yield inner != null || innerLiterals != null
             ? new LeadingExpansion(
                 le.leadingClass(),
                 le.minRepetition(),
@@ -90,7 +92,8 @@ sealed interface Utf8StartAccelerator {
                 le.hasLeadingAssertions(),
                 MultiAnchorCompiler.isWideLeadingClass(le.leadingClass()),
                 LeadingExpansion.ExcludedSet.of(le),
-                inner)
+                inner,
+                innerLiterals)
             : null;
       }
       case MultiAnchorDescriptor.StartPlan.LineAnchor unusedLa -> null;
@@ -876,7 +879,8 @@ sealed interface Utf8StartAccelerator {
       boolean hasLeadingAssertions,
       boolean wideLeadingClass,
       ExcludedSet excludedSet,
-      Utf8StartAccelerator inner)
+      Utf8StartAccelerator inner,
+      InnerLiteralSet innerLiterals)
       implements Utf8StartAccelerator {
 
     /**
@@ -952,7 +956,7 @@ sealed interface Utf8StartAccelerator {
           wideLeadingClass
               ? AcceleratorPolicy.WIDE_LEADING_EXPANSION
               : AcceleratorPolicy.LEADING_EXPANSION;
-      return policy.withStrategy(inner.policy().strategy());
+      return policy.withStrategy(inner != null ? inner.policy().strategy() : MatchStrategy.LITERAL);
     }
 
     /**
@@ -967,6 +971,9 @@ sealed interface Utf8StartAccelerator {
     }
 
     int findInnerCandidate(Utf8InputScanner scanner, int searchPos) {
+      if (innerLiterals != null) {
+        return innerLiterals.indexOf(scanner, searchPos);
+      }
       if (wideLeadingClass && inner instanceof Literal lit && lit.prefixUtf8() != null) {
         // Search the way the UTF-8 reject prefilter does, since find() skips that prefilter when
         // this search subsumes it (see Pattern.startSubsumesFindReject).

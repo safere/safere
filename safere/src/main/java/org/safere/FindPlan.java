@@ -18,6 +18,8 @@ package org.safere;
  *     prefilter, then reject only the tail after the first candidate (see {@link #rejectMode})
  * @param startSubsumesReject whether a failed start search already proves rejection, so the reject
  *     prefilter would only repeat its scan
+ * @param startSubsumesLongReject like {@code startSubsumesReject}, but only for searches over at
+ *     least {@link MultiAnchorCompiler#MIN_WIDE_LEADING_SKIP} units
  * @param wideLeadingExpansion whether the start plan is a leading expansion over a wide class such
  *     as non-DOTALL {@code .}, which can walk back over a whole line: the DFA loop doesn't use it,
  *     and existence searches keep its minimum skip. Its accelerators also use {@link
@@ -31,6 +33,7 @@ record FindPlan(
     RejectPrefilter utf8Reject,
     boolean startPrecedesReject,
     boolean startSubsumesReject,
+    boolean startSubsumesLongReject,
     boolean wideLeadingExpansion,
     boolean existenceStartsAtInner) {
 
@@ -73,7 +76,10 @@ record FindPlan(
     if (startPrecedesReject && startSearchRuns && remaining < MAX_LITERAL_START_FIRST_LENGTH) {
       return REJECT_TAIL;
     }
-    return startSubsumesReject ? REJECT_NONE : REJECT_FIRST;
+    return startSubsumesReject
+            || (startSubsumesLongReject && remaining >= MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP)
+        ? REJECT_NONE
+        : REJECT_FIRST;
   }
 
   /** Returns whether a {@link #REJECT_TAIL} search rejects the tail after its start candidate. */
@@ -119,6 +125,7 @@ record FindPlan(
         utf8Reject,
         startSearchAvailable && stringReject != null && multiAnchor.startPrecedesFindReject(),
         startSearchAvailable && multiAnchor.startSubsumesFindReject(),
+        startSearchAvailable && multiAnchor.startSubsumesLongFindReject(),
         isWideLeadingExpansion(startPlan),
         existenceStartsAtInner(startPlan));
   }
@@ -133,8 +140,8 @@ record FindPlan(
    * expansion. With a zero minimum and no assertions before the leading class, any match [s, e) has
    * a suffix [q, e) starting at an inner candidate at or after the first one, and that suffix is
    * itself a match with zero leading repetitions. Searching from the full scanner keeps the
-   * assertion context at q. A wide class also needs an exact literal inner plan, the only inner
-   * plan it is measured with.
+   * assertion context at q. A wide class also needs an exact inner search: a case-sensitive
+   * literal, or the literals of an {@link InnerLiteralSet}.
    */
   static boolean existenceStartsAtInner(MultiAnchorDescriptor.StartPlan startPlan) {
     if (!(startPlan instanceof MultiAnchorDescriptor.StartPlan.LeadingExpansion le)
@@ -144,6 +151,7 @@ record FindPlan(
     }
     return !MultiAnchorCompiler.isWideLeadingClass(le.leadingClass())
         || (le.innerPlan() instanceof MultiAnchorDescriptor.StartPlan.Literal lit
-            && !lit.foldCase());
+            && !lit.foldCase())
+        || le.innerPlan() instanceof MultiAnchorDescriptor.StartPlan.MultiLiteral;
   }
 }

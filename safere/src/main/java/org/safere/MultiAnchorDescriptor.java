@@ -5,6 +5,7 @@
 
 package org.safere;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -130,9 +131,40 @@ final class MultiAnchorDescriptor {
     };
   }
 
+  /**
+   * Returns whether a failed start search over at least {@link
+   * MultiAnchorCompiler#MIN_WIDE_LEADING_SKIP} units already rejects the input. Holds for a leading
+   * expansion over a wide class whose inner plan is an {@link InnerLiteralSet} whose every literal
+   * implies the reject plan, as in {@code .*(?:apple|banana|cherry).*}, where the reject plan
+   * requires one of the same literals. Shorter inputs aren't covered: the expansion leaves them to
+   * the forward search without scanning.
+   */
+  boolean startSubsumesLongFindReject() {
+    if (startAnchored
+        || !(startPlan instanceof StartPlan.LeadingExpansion le)
+        || !MultiAnchorCompiler.isWideLeadingClass(le.leadingClass())
+        || !(le.innerPlan() instanceof StartPlan.MultiLiteral ml)) {
+      return false;
+    }
+    for (String literal : ml.literals()) {
+      boolean implied =
+          switch (rejectPlan) {
+            case RejectPlan.Composite composite ->
+                Arrays.stream(composite.plans()).allMatch(plan -> impliedByLiteral(plan, literal));
+            default -> impliedByLiteral(rejectPlan, literal);
+          };
+      if (!implied) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private static boolean impliedByLiteral(RejectPlan plan, String literal) {
     return switch (plan) {
       case RejectPlan.RequiredLiteral rl -> literal.contains(rl.literal());
+      case RejectPlan.DisjointLiterals dl ->
+          Arrays.stream(dl.literals()).anyMatch(literal::contains);
       case RejectPlan.RequiredCharClass rc ->
           literal.codePoints().anyMatch(rc.scanInfo()::contains);
       default -> false;
