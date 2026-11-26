@@ -91,7 +91,24 @@ class StartRegisterWorkTest {
             assertThat(search.searchForTesting(scanner, 0))
                 .isLessThanOrEqualTo(StartRegisterSearch.HANDOFF));
 
-    assertThat(steps).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF_DISTANCE + 2L);
+    assertThat(steps).isLessThanOrEqualTo(StartRegisterSearch.START_LOOP_HANDOFF_DISTANCE + 2L);
+  }
+
+  @Test
+  void searchThatLeavesTheStartStateKeepsGoingToTheFullDistance() {
+    // Every space leaves the start state, so the search doesn't hand over at the shorter distance
+    // for searches that stay in it; it walks HANDOFF_DISTANCE before it does.
+    Pattern pattern = Pattern.compile(" [0-9]{4,}");
+    StartRegisterSearch search = StartRegisterSearch.create(pattern.flatDfaProg(), null, null);
+    InputScanner scanner = new StringInputScanner("1111x 1x_".repeat(1024));
+
+    long steps =
+        WorkCounter.countForwardDfaStepsForTesting(() ->
+            assertThat(search.searchForTesting(scanner, 0))
+                .isLessThanOrEqualTo(StartRegisterSearch.HANDOFF));
+
+    assertThat(steps).isGreaterThan(StartRegisterSearch.HANDOFF_DISTANCE);
+    assertThat(steps).isLessThanOrEqualTo(StartRegisterSearch.HANDOFF_DISTANCE + 16L);
   }
 
   @Test
