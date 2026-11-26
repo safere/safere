@@ -19,16 +19,19 @@ Repeated searches charge scans up to the selected match and bounded lookahead to
 advancement. When scans overlap beyond that allowance, the matcher uses the exact NFA and records
 failures at bounded intervals. Scalar scan units and accelerated scan units carry different
 positive charges. Activation compares the excess over the advancing matches' allowance with
-the cost of covering the outstanding tail. After short searches that use no cached failure,
-the start-register engine can retry within a fixed window. Only a completed search can supply
-a result. Exhausting the window restarts the exact search with the existing memo. A continuation after the final match cannot accept on the same
-input and bounds. Scalar programs with independent instructions record each failure by instruction
-and position. Dense sets use bitmaps. The scalar program width can increase the checkpoint
-spacing by a factor fixed for that program. A later search stops when all its live instructions have failed there. Both searches
-check only positions past the previous-match boundary, where any future `\G` assertion fails.
+the cost of covering the outstanding tail. After short searches that use no cached failure, the
+matcher can discard the memo and resume ordinary search once per sequence. If expensive overlap
+returns, the matcher can build a new memo. The single retry bounds the additional overlap by a
+constant multiple of the remaining region.
+
+A continuation after the final match cannot accept on the same input and bounds. Scalar programs
+with independent instructions record each failure by instruction and position. Dense sets use
+bitmaps. The scalar program width can increase the checkpoint spacing by a factor fixed for that
+program. A later search stops when all its live instructions have failed there. Both searches check
+only positions past the previous-match boundary, where any future `\G` assertion fails.
 For programs that need extra state, the key preserves the whole frontier, including thread order,
 progress state, and pending grapheme work. The matcher discards old checkpoints as the cursor
-advances and returns to the prepared path once it passes the scanned range. The fixed program
+advances and resumes ordinary search when it passes the scanned range. The fixed program
 bounds the number and size of keys per checkpoint.
 
 Use explicit stacks and worklists for user-controlled nesting. Engine state,

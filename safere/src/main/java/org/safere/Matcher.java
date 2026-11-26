@@ -1815,11 +1815,17 @@ public final class Matcher implements MatchResult {
   private long findBitStateWork;
   private int findNativeScanUnits;
   private int shortMemoSearches;
+  private boolean findTailRetryUsed;
   private FindTailMemo findTailMemo;
   private int findTailEnd;
   private long findTailDebt;
 
   private void clearFindTail() {
+    findTailRetryUsed = false;
+    discardFindTailMemo();
+  }
+
+  private void discardFindTailMemo() {
     findTailMemo = null;
     findTailEnd = 0;
     findTailDebt = 0;
@@ -1912,7 +1918,14 @@ public final class Matcher implements MatchResult {
       return false;
     }
     if (start + findInputOffset(scanner) >= findTailEnd) {
-      clearFindTail();
+      discardFindTailMemo();
+      return false;
+    }
+    if (!findTailRetryUsed && shortMemoSearches >= 2) {
+      // Let the usual engines resume. This can restart a long scan, so spend at most
+      // one retry across the entire sequence, even if a later tail activates the memo.
+      findTailRetryUsed = true;
+      discardFindTailMemo();
       return false;
     }
     return true;
@@ -3315,28 +3328,6 @@ public final class Matcher implements MatchResult {
 
   private int[] findWithTailMemo(InputScanner scanner, int start, int end, int nsubmatch) {
     findTailMemo.beginSearch(regionStart - findInputOffset(scanner), start);
-    if (shortMemoSearches >= 2
-        && regionStart == 0
-        && regionEnd == getTextLength()
-        && parentPattern.prog().numCaptures() == 1) {
-      StartRegisterSearch search = preparedStartRegister();
-      if (search != null) {
-        long match = search.probe(scanner, start, FIND_LOOKAHEAD_LIMIT);
-        if (diagnosticOperation != null && match != StartRegisterSearch.SKIPPED) {
-          diagnosticOperation.accumulator().incrementForwardDfaSearchCount();
-        }
-        if (match >= 0) {
-          if (groups == null || groups.length < 2) {
-            groups = new int[2];
-          }
-          groups[0] = (int) (match >>> 32);
-          groups[1] = (int) match;
-          diagnosticExact(MatchStrategy.DFA, false);
-          return groups;
-        }
-        shortMemoSearches = 0;
-      }
-    }
     int[] result =
         searchNfa(
             parentPattern.prog(),
