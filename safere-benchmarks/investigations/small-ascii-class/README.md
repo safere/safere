@@ -13,6 +13,10 @@ long and short multibyte runs, frequent escapes, and alternating ASCII and
 multibyte characters. The gap sweep places 6 to 192 `é` characters before
 each of 4096 `:1` escapes. [Issue #1264](https://github.com/safere/safere/issues/1264)
 
+The `dfaTripleUnmasked` controls use three targets that differ in more than
+one bit per pair. They exercise the full three-way comparison on the long run
+and 12-character gap.
+
 Use the shared runner with the default provider, for example:
 
 ```bash

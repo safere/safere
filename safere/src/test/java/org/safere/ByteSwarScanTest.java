@@ -148,6 +148,27 @@ class ByteSwarScanTest {
     }
   }
 
+  @Test
+  void firstAsciiSearchHonorsTheStartAndLimit() {
+    for (int offset = 0; offset < Long.BYTES; offset++) {
+      for (int length : new int[] {128, 129, 159, 160, 161, 255, 1024}) {
+        int start = 5;
+        int limit = start + length;
+        byte[] storage = new byte[offset + limit + Long.BYTES];
+        Arrays.fill(storage, (byte) 'X');
+        Arrays.fill(storage, offset + start, offset + limit, (byte) 0xC3);
+        assertThat(ByteSwarScan.firstAsciiAfterNonAsciiPrefix(storage, offset, limit, start))
+            .isEqualTo(limit);
+        for (int hit = start; hit < limit; hit++) {
+          storage[offset + hit] = 'X';
+          assertThat(ByteSwarScan.firstAsciiAfterNonAsciiPrefix(storage, offset, limit, start))
+              .isEqualTo(hit);
+          storage[offset + hit] = (byte) 0xC3;
+        }
+      }
+    }
+  }
+
   private static int scan(byte[] storage, int offset, int length, byte[] triple, int start) {
     if ((triple[0] | triple[1] | triple[2]) >= 0) {
       return new Utf8InputScanner(storage, offset, length)

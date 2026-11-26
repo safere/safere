@@ -93,6 +93,17 @@
       "shared": true
     },
     {
+      "id": "classScan.dfa.unmaskedGap12",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9@1",
+        "suffix": ";",
+        "length": 57345
+      },
+      "shared": true
+    },
+    {
       "id": "classScan.asciiMiss.{size}",
       "axes": {
         "size": [
@@ -869,6 +880,42 @@
               "gap192"
             ]
           },
+          "reason": "The JDK matcher exceeds its stack on the repeated alternation at these input sizes."
+        }
+      ]
+    },
+    {
+      "id": "AsciiClassScan.dfaTripleUnmasked.{shape}",
+      "operation": "matches",
+      "patterns": [
+        "(?:[^@;!]|@[0-9])*[;!]"
+      ],
+      "inputs": [
+        "classScan.dfa.{shape}"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "shape": [
+          "long",
+          "unmaskedGap12"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string"
+          ],
           "reason": "The JDK matcher exceeds its stack on the repeated alternation at these input sizes."
         }
       ]

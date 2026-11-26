@@ -213,7 +213,7 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
     }
     ScanAudit.record(ScanKind.TRIPLE, ScanDirection.FORWARD, window, ScanPath.SWAR);
     if (window >= NON_ASCII_SKIP_MIN_LENGTH && (b0 | b1 | b2) >= 0 && bytes[offset + start] < 0) {
-      start = ByteSwarScan.skipNonAsciiBlocks(bytes, offset, scanLen, start);
+      start = ByteSwarScan.firstAsciiAfterNonAsciiPrefix(bytes, offset, scanLen, start);
     }
     if (start < scanLen) {
       byte value = bytes[offset + start];

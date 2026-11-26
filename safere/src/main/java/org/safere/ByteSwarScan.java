@@ -858,4 +858,45 @@ abstract class ByteSwarScan {
     }
     return position;
   }
+
+  /**
+   * Finds the first ASCII byte, or returns {@code length} if the range contains none. The caller
+   * must leave at least {@link #NON_ASCII_SKIP_MIN_LENGTH} bytes in the range.
+   */
+  static int firstAsciiAfterNonAsciiPrefix(byte[] bytes, int offset, int length, int start) {
+    int position = start;
+    int blockSize = 4 * Long.BYTES;
+    // Probe one word at a time until there is a full block of non-ASCII bytes.
+    // An escape in this prefix can then be handled without loading the rest of the block.
+    int prefixEnd = start + blockSize;
+    while (position < prefixEnd) {
+      long word = (long) LONG_VIEW.get(bytes, offset + position);
+      long ascii = ~word & BYTE_HIGH_BITS;
+      if (ascii != 0) {
+        return position + firstAsciiByteInWord(ascii);
+      }
+      position += Long.BYTES;
+    }
+    if (length - position >= NON_ASCII_SKIP_MIN_LENGTH) {
+      position = skipNonAsciiBlocks(bytes, offset, length, position);
+    }
+    int wordEnd = lastLoadStart(length, 0, Long.BYTES);
+    while (position <= wordEnd) {
+      long word = (long) LONG_VIEW.get(bytes, offset + position);
+      long ascii = ~word & BYTE_HIGH_BITS;
+      if (ascii != 0) {
+        return position + firstAsciiByteInWord(ascii);
+      }
+      position += Long.BYTES;
+    }
+    while (position < length && bytes[offset + position] < 0) {
+      position++;
+    }
+    return position;
+  }
+
+  private static int firstAsciiByteInWord(long ascii) {
+    return (LITTLE_ENDIAN ? Long.numberOfTrailingZeros(ascii) : Long.numberOfLeadingZeros(ascii))
+        >>> 3;
+  }
 }
