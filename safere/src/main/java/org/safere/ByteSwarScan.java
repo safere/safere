@@ -30,6 +30,8 @@ abstract class ByteSwarScan {
 
   static final int FILTER_LENGTH_FACTOR = 40;
 
+  static final int NON_ASCII_SKIP_MIN_LENGTH = 128;
+
   private static final VarHandle LONG_VIEW = byteArrayViewVarHandle(long[].class, nativeOrder());
 
   private static final boolean LITTLE_ENDIAN = nativeOrder() == ByteOrder.LITTLE_ENDIAN;
