@@ -869,6 +869,9 @@ sealed interface StringStartAccelerator {
         count++;
         start = cpStart;
       }
+      if (WorkCounterConfig.ENABLED) {
+        WorkCounter.record(innerMatch - start + 1);
+      }
       return start;
     }
 
@@ -917,6 +920,9 @@ sealed interface StringStartAccelerator {
           }
           count++;
           start = cpStart;
+        }
+        if (WorkCounterConfig.ENABLED) {
+          WorkCounter.record(innerMatch - start + 1);
         }
         if (count >= minRepetition) {
           return start;
