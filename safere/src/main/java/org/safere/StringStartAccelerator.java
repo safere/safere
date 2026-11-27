@@ -5,6 +5,7 @@
 
 package org.safere;
 
+import java.util.Arrays;
 import org.safere.Pattern.FixedOffsetLiteral;
 import org.safere.Pattern.StartAcceleration;
 
@@ -633,13 +634,25 @@ sealed interface StringStartAccelerator {
     }
   }
 
+  /**
+   * Scans for a character class member.
+   *
+   * <p>{@code lowTable} answers membership for every code unit below {@link #LOW_TABLE_LIMIT}.
+   * Those code units are never surrogates, so each is a whole code point and the scan can stay in
+   * one tight loop over Latin, Greek, Cyrillic, Hebrew, Arabic and other scripts in that range, not
+   * just ASCII. Higher code points, including supplementary ones, take the decoding path. One- and
+   * two-member small sets are searched per member and have no table.
+   */
   // The lookup table is immutable pattern metadata; array identity and value semantics are unused.
   @SuppressWarnings("ArrayRecordComponent")
-  record CharClass(CharClassScanInfo scanInfo, boolean[] asciiTable)
+  record CharClass(CharClassScanInfo scanInfo, boolean[] lowTable)
       implements StringStartAccelerator {
 
+    /** Code units below this limit are looked up in {@code lowTable}; all are non-surrogates. */
+    static final int LOW_TABLE_LIMIT = 0x800;
+
     static CharClass create(CharClassScanInfo scanInfo) {
-      return new CharClass(scanInfo, buildAsciiTable(scanInfo));
+      return new CharClass(scanInfo, buildLowTable(scanInfo));
     }
 
     @Override
@@ -653,19 +666,19 @@ sealed interface StringStartAccelerator {
       if (scanInfo instanceof CharClassScanInfo.SmallSet smallSet && smallSet.chars().length <= 2) {
         return StringInputScanner.indexOfSmallSet(text, smallSet.chars(), fromIndex);
       }
-      return indexOfCharClass(text, asciiTable, scanInfo.ranges(), scanInfo.isAscii(), fromIndex);
+      return indexOfCharClass(text, lowTable, scanInfo.ranges(), scanInfo.isAscii(), fromIndex);
     }
 
     private static int indexOfCharClass(
-        String text, boolean[] asciiTable, int[] ranges, boolean isAscii, int fromIndex) {
+        String text, boolean[] lowTable, int[] ranges, boolean isAscii, int fromIndex) {
       int length = text.length();
       int index = fromIndex;
       while (index < length) {
-        int asciiResult = scanAsciiRun(text, asciiTable, index);
-        if (asciiResult >= 0) {
-          return asciiResult;
+        int tableResult = scanTableRun(text, lowTable, index);
+        if (tableResult >= 0) {
+          return tableResult;
         }
-        index = ~asciiResult;
+        index = ~tableResult;
         if (index >= length) {
           return -1;
         }
@@ -683,32 +696,40 @@ sealed interface StringStartAccelerator {
     }
 
     /**
-     * Scans one contiguous ASCII run. A nonnegative result is a matching position; a negative
-     * result is the complement of either the first non-ASCII position or the text length. Keeping
-     * Unicode decoding and range lookup outside this loop allows HotSpot to optimize the common
-     * ASCII path independently.
+     * Scans one contiguous run of code units that {@code lowTable} covers. A nonnegative result is
+     * a matching position; a negative result is the complement of either the first code unit at or
+     * above the table limit or the text length. Keeping decoding and range lookup outside this loop
+     * allows HotSpot to optimize the table path independently.
      */
-    private static int scanAsciiRun(String text, boolean[] asciiTable, int fromIndex) {
+    private static int scanTableRun(String text, boolean[] lowTable, int fromIndex) {
       int length = text.length();
       for (int i = fromIndex; i < length; i++) {
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.record();
         }
         char ch = text.charAt(i);
-        if (ch >= 128) {
+        if (ch >= lowTable.length) {
           return ~i;
         }
-        if (asciiTable[ch]) {
+        if (lowTable[ch]) {
           return i;
         }
       }
       return ~length;
     }
 
-    private static boolean[] buildAsciiTable(CharClassScanInfo scanInfo) {
-      boolean[] table = new boolean[128];
-      for (int i = 0; i < 128; i++) {
-        table[i] = scanInfo.contains(i);
+    /**
+     * Returns the membership table, or {@code null} for one- and two-member small sets, which
+     * {@link #findCandidate} searches without it.
+     */
+    private static boolean[] buildLowTable(CharClassScanInfo scanInfo) {
+      if (scanInfo instanceof CharClassScanInfo.SmallSet smallSet && smallSet.chars().length <= 2) {
+        return null;
+      }
+      boolean[] table = new boolean[LOW_TABLE_LIMIT];
+      int[] ranges = scanInfo.ranges();
+      for (int i = 0; i < ranges.length && ranges[i] < LOW_TABLE_LIMIT; i += 2) {
+        Arrays.fill(table, ranges[i], Math.min(ranges[i + 1], LOW_TABLE_LIMIT - 1) + 1, true);
       }
       return table;
     }

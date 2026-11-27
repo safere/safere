@@ -9,6 +9,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import java.util.List;
+import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.safere.Pattern.FixedOffsetLiteral;
 
@@ -467,6 +469,176 @@ class StartAcceleratorTest {
       from = candidate + 1;
     }
     assertThat(accelerator.findCandidate(text, from, false)).isEqualTo(-1);
+  }
+
+  /** Code points around the table limit, case-fold partners and surrogates, for scan tests. */
+  private static final String[] LOW_TABLE_ALPHABET = {
+    "a",
+    "q",
+    "k",
+    "K",
+    "s",
+    "S",
+    ",",
+    " ",
+    "\u007f",
+    "\u0080",
+    "\u00ff",
+    "\u017f",
+    "\u212a",
+    "\u03a3",
+    "\u03c3",
+    "\u03c2",
+    "\u0416",
+    "\u0436",
+    "\u0428",
+    "\u0448",
+    "\u07fe",
+    "\u07ff",
+    "\u0800",
+    "\u0801",
+    "\ud7ff",
+    "\ue000",
+    "\uffff",
+    "\ud83d",
+    "\ude00",
+    "\ud83d\ude00",
+    "\udc00",
+    "\ud800\udc00",
+    "\u4e2d",
+    "\u00df",
+    "\u1e9e",
+    "\u00e5",
+    "\u00c5",
+    "\u212b"
+  };
+
+  private static List<CharClassScanInfo> lowTableClasses() {
+    return List.of(
+        // Members on both sides of the table limit.
+        scanInfo(new CharClassBuilder().addRune(0x7FF).addRune(0x800).addRune('q')),
+        scanInfo(new CharClassBuilder().addRange(0x7FE, 0x801)),
+        scanInfo(new CharClassBuilder().addRune(0x7F).addRune(0x80).addRune(0x7FF)),
+        // Non-ASCII literal alternation initials.
+        scanInfo(
+            new CharClassBuilder().addRune(0x41C).addRune(0x41A).addRune(0x421).addRune(0x422)),
+        // Case-fold partners, one of them (KELVIN SIGN) above the table limit.
+        scanInfo(
+            new CharClassBuilder()
+                .addRune('k')
+                .addRune(0x212A)
+                .addRune(0x17F)
+                .addRune(0x3A3)
+                .addRune(0x3C3)
+                .addRune(0x3C2)),
+        // Sharp s and A with ring, whose case partners (U+1E9E, ANGSTROM SIGN) are above the limit.
+        scanInfo(
+            new CharClassBuilder()
+                .addRune(0xDF)
+                .addRune(0x1E9E)
+                .addRune(0xE5)
+                .addRune(0xC5)
+                .addRune(0x212B)),
+        // Supplementary and lone-surrogate members.
+        scanInfo(new CharClassBuilder().addRune(0x416).addRune(0x1F600).addRune(0x3C8)),
+        scanInfo(new CharClassBuilder().addRune(0xDC00).addRune('a').addRune(0x400)),
+        scanInfo(new CharClassBuilder().addRange(0xD800, 0xDBFF).addRune(0x436).addRune('s')),
+        // Members only above the table limit, and an ASCII-only class.
+        scanInfo(new CharClassBuilder().addRune(0x4E2D).addRune(0x1F600).addRune(0xE000)),
+        scanInfo(new CharClassBuilder().addRune(',').addRune(';').addRune('.')));
+  }
+
+  private static CharClassScanInfo scanInfo(CharClassBuilder builder) {
+    return CharClassScanInfo.fromCharClass(builder.build());
+  }
+
+  /** The candidate the scan must return: the first whole code point at or after {@code from}. */
+  private static int referenceCandidate(CharClassScanInfo scanInfo, String text, int from) {
+    int index = from;
+    while (index < text.length()) {
+      int cp = text.codePointAt(index);
+      if (scanInfo.contains(cp)) {
+        return index;
+      }
+      index += Character.charCount(cp);
+    }
+    return -1;
+  }
+
+  @Test
+  void charClassLowTableMatchesClassMembership() {
+    for (CharClassScanInfo scanInfo : lowTableClasses()) {
+      StringStartAccelerator.CharClass accelerator =
+          StringStartAccelerator.CharClass.create(scanInfo);
+      boolean[] table = accelerator.lowTable();
+      assertThat(table).hasSize(StringStartAccelerator.CharClass.LOW_TABLE_LIMIT);
+      for (int c = 0; c < table.length; c++) {
+        assertThat(table[c]).as("U+%04X in %s", c, scanInfo).isEqualTo(scanInfo.contains(c));
+      }
+    }
+  }
+
+  @Test
+  void charClassSmallSetsHaveNoLowTable() {
+    assertThat(
+            StringStartAccelerator.CharClass.create(
+                    scanInfo(new CharClassBuilder().addRune('[').addRune(0xFF3B)))
+                .lowTable())
+        .isNull();
+    assertThat(
+            StringStartAccelerator.CharClass.create(
+                    scanInfo(new CharClassBuilder().addRune('a').addRune('b')))
+                .lowTable())
+        .isNull();
+  }
+
+  @Test
+  void charClassCandidateAtTableLimit() {
+    StringStartAccelerator.CharClass below =
+        StringStartAccelerator.CharClass.create(
+            scanInfo(new CharClassBuilder().addRune(0x7FF).addRune('q').addRune('z')));
+    StringStartAccelerator.CharClass above =
+        StringStartAccelerator.CharClass.create(
+            scanInfo(new CharClassBuilder().addRune(0x800).addRune('q').addRune('z')));
+
+    assertThat(below.findCandidate("\u07fe\u0800\u07ff", 0, false)).isEqualTo(2);
+    assertThat(below.findCandidate("\u07fe\u0800\u0801", 0, false)).isEqualTo(-1);
+    assertThat(above.findCandidate("\u07fe\u07ff\u0800", 0, false)).isEqualTo(2);
+    assertThat(above.findCandidate("\u07fe\u07ff\u0801", 0, false)).isEqualTo(-1);
+    // Scanning resumes in the table after a code point above the limit.
+    assertThat(below.findCandidate("\u0800\u4e2d\ud83d\ude00\u07fe\u07ff", 0, false)).isEqualTo(5);
+    assertThat(above.findCandidate("\u0436\u0436\u0800q", 1, false)).isEqualTo(2);
+    assertThat(above.findCandidate("\u0436\u0436\u0800q", 3, false)).isEqualTo(3);
+  }
+
+  @Test
+  void charClassScanMatchesCodePointReference() {
+    Random random = new Random(0x7FF);
+    for (CharClassScanInfo scanInfo : lowTableClasses()) {
+      StringStartAccelerator.CharClass accelerator =
+          StringStartAccelerator.CharClass.create(scanInfo);
+      for (int trial = 0; trial < 300; trial++) {
+        StringBuilder sb = new StringBuilder();
+        int tokens = random.nextInt(24);
+        for (int i = 0; i < tokens; i++) {
+          sb.append(LOW_TABLE_ALPHABET[random.nextInt(LOW_TABLE_ALPHABET.length)]);
+        }
+        String text = sb.toString();
+        for (int from = 0; from <= text.length(); from++) {
+          assertThat(accelerator.findCandidate(text, from, false))
+              .as("%s on %s from %d", scanInfo, escape(text), from)
+              .isEqualTo(referenceCandidate(scanInfo, text, from));
+        }
+      }
+    }
+  }
+
+  private static String escape(String text) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < text.length(); i++) {
+      sb.append(String.format("\\u%04x", (int) text.charAt(i)));
+    }
+    return sb.toString();
   }
 
   @Test

@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.CharBuffer;
 import java.util.List;
+import java.util.Random;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -138,6 +139,86 @@ class StartAcceleratorDifferentialTest {
           .as("UTF-8 find() divergence for /%s/ on input %s", regex, input)
           .isEqualTo(expected);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "\u041c\u043e\u0441\u043a\u0432\u0430|\u041a\u0430\u0437\u0430\u043d\u044c|\u0422\u0432",
+        "(?iu)\u03c3x|\u03c8y|\u0436z",
+        "(?iu)k\u044f|\u0436k|\u03c8k",
+        "(?i)k\u044f|\u017fa|\u212ab|\u0436c",
+        "(?iu)\u00dfx|\u00e5y|\u0436z",
+        "[\u07ff\u0800q]x",
+        "\ud83d\ude00a|\u0436b|\u03c8c",
+        "[,;.] \\p{Lu}"
+      })
+  @DisplayName("Ablation: class start scans over non-ASCII text match the unaccelerated search")
+  void nonAsciiClassStartMatchesBaseline(String regex) {
+    String[] alphabet = {
+      "a",
+      "k",
+      "q",
+      "x",
+      "z",
+      " ",
+      ",",
+      "\u017f",
+      "\u212a",
+      "\u00df",
+      "\u1e9e",
+      "\u00e5",
+      "\u00c5",
+      "\u212b",
+      "\u03a3",
+      "\u03c3",
+      "\u03c2",
+      "\u03c8",
+      "\u0416",
+      "\u0436",
+      "\u044f",
+      "\u041c",
+      "\u0422",
+      "\u07ff",
+      "\u0800",
+      "\u4e2d",
+      "\ud83d\ude00",
+      "\ud83d",
+      "\ude00",
+      "\u041c\u043e\u0441\u043a\u0432\u0430"
+    };
+    Pattern accelerated = Pattern.compile(regex, 0, ACCELERATED);
+    Pattern control = Pattern.compile(regex, 0, UNACCELERATED);
+    Random random = new Random(regex.hashCode());
+    for (int trial = 0; trial < 300; trial++) {
+      StringBuilder sb = new StringBuilder();
+      int tokens = random.nextInt(40);
+      for (int i = 0; i < tokens; i++) {
+        sb.append(alphabet[random.nextInt(alphabet.length)]);
+      }
+      String text = sb.toString();
+      String expected = spans(control.matcher(text));
+      for (CharSequence input : List.of(text, CharBuffer.wrap(text))) {
+        assertThat(spans(accelerated.matcher(input)))
+            .as("/%s/ on %s %s", regex, input.getClass().getSimpleName(), text)
+            .isEqualTo(expected);
+      }
+      // Lone surrogates are not valid UTF-8.
+      if (text.codePoints().noneMatch(cp -> cp >= 0xD800 && cp <= 0xDFFF)) {
+        Utf8Input utf8 = Utf8Input.validated(text.getBytes(UTF_8));
+        assertThat(accelerated.find(utf8))
+            .as("/%s/ on UTF-8 %s", regex, text)
+            .isEqualTo(!expected.isEmpty());
+      }
+    }
+  }
+
+  private static String spans(Matcher matcher) {
+    StringBuilder sb = new StringBuilder();
+    while (matcher.find()) {
+      sb.append(matcher.start()).append('-').append(matcher.end()).append(' ');
+    }
+    return sb.toString();
   }
 
   @Test
