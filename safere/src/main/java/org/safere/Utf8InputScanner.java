@@ -314,6 +314,12 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
   }
 
   @Override
+  public int lowAt(int pos) {
+    // Code points from U+0080 take two or more bytes; the DFA fast loops step one unit at a time.
+    return asciiAt(pos);
+  }
+
+  @Override
   public int singleUnitCodePointAt(int pos) {
     return asciiAt(pos);
   }

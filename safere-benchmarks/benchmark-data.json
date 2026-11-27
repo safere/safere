@@ -25289,6 +25289,168 @@
           65536
         ]
       }
+    },
+    {
+      "id": "NonAsciiScanBenchmark.lettersCyrillic.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "\\p{L}+"
+      ],
+      "inputs": [
+        "literalAlternation.cyrillicProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 12363
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "NonAsciiScanBenchmark.lettersGreek.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "\\p{L}+"
+      ],
+      "inputs": [
+        "literalAlternation.greekProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 12038
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "NonAsciiScanBenchmark.lettersMixedScript.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "\\p{L}+"
+      ],
+      "inputs": [
+        "literalAlternation.mixedScriptProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 12256
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "NonAsciiScanBenchmark.cyrillicClass.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "[а-яА-ЯёЁ]+"
+      ],
+      "inputs": [
+        "literalAlternation.cyrillicProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 12363
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "NonAsciiScanBenchmark.multilineLettersMixed.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "(?m)^\\p{L}+"
+      ],
+      "inputs": [
+        "literalAlternation.mixedScriptProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 1362
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "NonAsciiScanBenchmark.cyrillicNoMatch.{size}",
+      "operation": "find",
+      "patterns": [
+        "[а-яА-ЯёЁ]{20}"
+      ],
+      "inputs": [
+        "literalAlternation.cyrillicFail.{size}"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
     }
   ]
 }

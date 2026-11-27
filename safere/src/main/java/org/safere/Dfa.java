@@ -236,13 +236,13 @@ final class Dfa {
   private final boolean splitUnicodeWordClasses;
 
   /**
-   * Fast ASCII-to-class lookup table. For code points 0–127, {@code asciiClassMap[cp]} gives the
-   * equivalence class index directly, avoiding binary search. -1 means "not populated" (should not
-   * happen for valid ASCII).
+   * Class lookup table for code points below {@link #LOW_LIMIT}: {@code lowClassMap[cp]} is the
+   * equivalence class of {@code cp}, including the Unicode word split. Stored as {@code int[]}
+   * rather than {@code char[]} to avoid a narrowing load penalty in the hot DFA transition loops.
    */
-  private final int[] asciiClassMap;
+  private final int[] lowClassMap;
 
-  /** Cache for mapping code points >= 128 to their equivalence class. */
+  /** Cache for mapping code points >= {@link #LOW_LIMIT} to their equivalence class. */
   private final int[] cacheCps = new int[256];
 
   private final int[] cacheClasses = new int[256];
@@ -393,20 +393,28 @@ final class Dfa {
   // ---------------------------------------------------------------------------
 
   /**
-   * Pre-computed immutable DFA setup: equivalence class boundaries and ASCII lookup table. These
-   * are derived solely from the compiled {@link Prog} and can be shared across all DFA instances
-   * for the same program (e.g., across multiple {@link org.safere.Matcher} instances).
+   * Pre-computed immutable DFA setup: equivalence class boundaries and low lookup table. These are
+   * derived solely from the compiled {@link Prog} and can be shared across all DFA instances for
+   * the same program (e.g., across multiple {@link org.safere.Matcher} instances).
    */
   // TODO(#98): Replace int[] with Guava ImmutableIntArray to get proper value semantics.
   @SuppressWarnings("ArrayRecordComponent")
   record Setup(
-      int[] boundaries, int numClasses, int[] asciiClassMap, boolean splitUnicodeWordClasses) {}
+      int[] boundaries, int numClasses, int[] lowClassMap, boolean splitUnicodeWordClasses) {}
 
   /**
    * Builds a reusable {@link Setup} from a compiled program. The result is immutable and can be
    * stored on a {@link org.safere.Pattern} for sharing across matchers.
    */
   static Setup buildSetup(Prog prog) {
+    return buildSetup(prog, null);
+  }
+
+  /**
+   * Builds a reusable {@link Setup}, returning {@code shared} instead when it describes the same
+   * classes, so that the forward and reverse programs of a pattern can share one lookup table.
+   */
+  static Setup buildSetup(Prog prog, Setup shared) {
     int[] boundaries = buildBoundaries(prog);
     boolean splitUnicodeWordClasses = false;
     for (int i = 0; i < prog.size(); i++) {
@@ -421,14 +429,14 @@ final class Dfa {
     // Unicode word membership is a separate discriminator, avoiding a transition column for
     // every Unicode word range. Each original interval needs at most two columns, and EOF
     // retains its own column. Classification must agree with computeNext's word predicate.
-    int numClasses = (boundaries.length + 1) * (splitUnicodeWordClasses ? 2 : 1) + 1;
-    int[] asciiClassMap = buildAsciiClassMap(boundaries);
-    if (splitUnicodeWordClasses) {
-      for (int cp = 0; cp < asciiClassMap.length; cp++) {
-        asciiClassMap[cp] = asciiClassMap[cp] * 2 + (Nfa.isWordChar(cp) ? 1 : 0);
-      }
+    if (shared != null
+        && shared.splitUnicodeWordClasses == splitUnicodeWordClasses
+        && Arrays.equals(shared.boundaries, boundaries)) {
+      return shared;
     }
-    return new Setup(boundaries, numClasses, asciiClassMap, splitUnicodeWordClasses);
+    int numClasses = (boundaries.length + 1) * (splitUnicodeWordClasses ? 2 : 1) + 1;
+    int[] lowClassMap = buildLowClassMap(boundaries, splitUnicodeWordClasses);
+    return new Setup(boundaries, numClasses, lowClassMap, splitUnicodeWordClasses);
   }
 
   Dfa(Prog prog, int maxStates, Setup setup, boolean longest) {
@@ -509,7 +517,7 @@ final class Dfa {
     this.numClasses = setup.numClasses;
     this.stateIdMultiplier = Math.ceilDiv(1L << Integer.SIZE, numClasses);
     this.splitUnicodeWordClasses = setup.splitUnicodeWordClasses;
-    this.asciiClassMap = setup.asciiClassMap;
+    this.lowClassMap = setup.lowClassMap;
     Arrays.fill(this.cacheCps, -1);
     this.expandVisitedGen = new int[prog.size()];
     this.expandStack = new int[prog.size()];
@@ -714,14 +722,47 @@ final class Dfa {
   }
 
   /**
-   * Builds a 128-element lookup table mapping ASCII code points (0–127) to their equivalence class
-   * indices. This avoids binary search for the most common characters.
+   * Exclusive upper bound of the code points that {@link #lowClassMap} maps directly. Every code
+   * point below it is a single UTF-16 unit, so the String fast loops can step through it like
+   * ASCII.
    */
-  private static int[] buildAsciiClassMap(int[] boundaries) {
-    int[] map = new int[128];
-    for (int cp = 0; cp < 128; cp++) {
-      int idx = Arrays.binarySearch(boundaries, cp);
-      map[cp] = (idx >= 0) ? idx : (-idx - 1) - 1;
+  static final int LOW_LIMIT = 0x800;
+
+  /** Unicode word-character membership of the code points below {@link #LOW_LIMIT}. */
+  private static final long[] LOW_UNICODE_WORD_CHARS = buildLowUnicodeWordChars();
+
+  private static long[] buildLowUnicodeWordChars() {
+    long[] bits = new long[LOW_LIMIT / Long.SIZE];
+    for (int cp = 0; cp < LOW_LIMIT; cp++) {
+      if (Nfa.isUnicodeWordChar(cp)) {
+        bits[cp >>> 6] |= 1L << cp;
+      }
+    }
+    return bits;
+  }
+
+  /** Returns {@link Nfa#isUnicodeWordChar} for a code point below {@link #LOW_LIMIT}. */
+  static boolean isLowUnicodeWordChar(int cp) {
+    return (LOW_UNICODE_WORD_CHARS[cp >>> 6] & (1L << cp)) != 0;
+  }
+
+  /**
+   * Builds the table mapping each code point below {@link #LOW_LIMIT} to its equivalence class, one
+   * fill per interval. This avoids binary search for the most common characters.
+   */
+  private static int[] buildLowClassMap(int[] boundaries, boolean splitUnicodeWordClasses) {
+    int[] map = new int[LOW_LIMIT];
+    // boundaries[0] is 0, and each interval [boundaries[i], boundaries[i + 1]) is class i.
+    for (int i = 0; i < boundaries.length && boundaries[i] < LOW_LIMIT; i++) {
+      int end = i + 1 < boundaries.length ? Math.min(boundaries[i + 1], LOW_LIMIT) : LOW_LIMIT;
+      Arrays.fill(map, boundaries[i], end, i);
+    }
+    if (splitUnicodeWordClasses) {
+      // Like classOf, which splits code points above ASCII by Unicode word membership.
+      for (int cp = 0; cp < LOW_LIMIT; cp++) {
+        boolean word = cp < 128 ? Nfa.isWordChar(cp) : isLowUnicodeWordChar(cp);
+        map[cp] = map[cp] * 2 + (word ? 1 : 0);
+      }
     }
     return map;
   }
@@ -731,8 +772,8 @@ final class Dfa {
     if (cp < 0) {
       return numClasses - 1;
     }
-    if (cp < 128) {
-      return asciiClassMap[cp];
+    if (cp < LOW_LIMIT) {
+      return lowClassMap[cp];
     }
     int cacheIdx = cp & 255;
     if (cacheCps[cacheIdx] == cp) {
@@ -1050,7 +1091,7 @@ final class Dfa {
   }
 
   /** Returns the cursor position in the high word and cached state offset in the low word. */
-  private long scanCachedReverseAscii(
+  private long scanCachedReverseLow(
       InputScanner text,
       int pos,
       int limit,
@@ -1058,13 +1099,13 @@ final class Dfa {
       int posDepThreshold,
       int maxInputUnits) {
     int[] transitions = this.transitions;
-    int[] asciiClassMap = this.asciiClassMap;
+    int[] lowClassMap = this.lowClassMap;
     while (pos > limit) {
-      int ch = text.asciiAt(pos - 1);
+      int ch = text.lowAt(pos - 1);
       if (ch < 0 || transitionDependsOnPosition(ch, pos - 1, posDepThreshold)) {
         break;
       }
-      int next = transitions[stateOffset + asciiClassMap[ch]];
+      int next = transitions[stateOffset + lowClassMap[ch]];
       // Unknown, dead, and accepting transitions go through ordinary state handling.
       if (next <= 0) {
         break;
@@ -1080,7 +1121,7 @@ final class Dfa {
 
   /**
    * Continues a cached scan that needs the earliest or anchored start. The limit is at least
-   * startLimit, so every consumed ASCII transition stays inside the search bounds.
+   * startLimit, so every consumed cached transition stays inside the search bounds.
    */
   private CachedReverseScan scanCachedReverseMatches(
       InputScanner text,
@@ -1095,7 +1136,7 @@ final class Dfa {
       boolean ambiguous) {
     int[] transitions = this.transitions;
     State[] statesById = this.statesById;
-    int[] asciiClassMap = this.asciiClassMap;
+    int[] lowClassMap = this.lowClassMap;
     boolean needEndMatch = prog.anchorEnd();
     // No states can be created inside this cached loop. A cache with no proofs needs no
     // per-transition proof check, even when it contains many accepting states.
@@ -1105,11 +1146,11 @@ final class Dfa {
       if (WorkCounterConfig.ENABLED && maxInputUnits != Integer.MAX_VALUE) {
         WorkCounter.record();
       }
-      int ch = text.asciiAt(pos - 1);
+      int ch = text.lowAt(pos - 1);
       if (ch < 0 || transitionDependsOnPosition(ch, pos - 1, posDepThreshold)) {
         break;
       }
-      int next = transitions[stateOffset + asciiClassMap[ch]];
+      int next = transitions[stateOffset + lowClassMap[ch]];
       if (next == 0) {
         break;
       }
@@ -1640,7 +1681,7 @@ final class Dfa {
   private int positionDependentThreshold(InputScanner text) {
     if (!hasPositionDependentTransitions) {
       // Without position-dependent assertions, trailing line endings cannot affect cached steps.
-      // The reverse ASCII fast path can also include those trailing line endings.
+      // The reverse fast path can also include those trailing line endings.
       return text.length();
     }
     if (hasGraphemeSemantics) {
@@ -2280,8 +2321,8 @@ final class Dfa {
     int[] transitions = this.transitions;
     State[] statesById = this.statesById;
     boolean[] isAcceleratedState = this.isAcceleratedState;
-    int[] asciiClassMap = this.asciiClassMap;
-    // Fast path: loop through ASCII characters (characters < 128)
+    int[] lowClassMap = this.lowClassMap;
+    // Fast path: loop through code points below LOW_LIMIT, which are single UTF-16 units
     while (pos < textLen) {
       updateInnerProbeState(pos);
       if (s.isStartState
@@ -2361,14 +2402,14 @@ final class Dfa {
       int sId = s.id * numClasses;
       if (breakOnAcceleratedState) {
         while (pos < limit) {
-          int ch = text.asciiAt(pos);
+          int ch = text.lowAt(pos);
           if (ch < 0 || transitionDependsOnPosition(ch, pos + 1, posDepThreshold)) {
             break;
           }
           if (WorkCounterConfig.ENABLED) {
             WorkCounter.recordForwardDfaStep();
           }
-          int cls = asciiClassMap[ch];
+          int cls = lowClassMap[ch];
           int nsId = transitions[sId + cls];
           if (nsId == 0) {
             break;
@@ -2408,14 +2449,14 @@ final class Dfa {
         }
       } else {
         while (pos < limit) {
-          int ch = text.asciiAt(pos);
+          int ch = text.lowAt(pos);
           if (ch < 0 || transitionDependsOnPosition(ch, pos + 1, posDepThreshold)) {
             break;
           }
           if (WorkCounterConfig.ENABLED) {
             WorkCounter.recordForwardDfaStep();
           }
-          int cls = asciiClassMap[ch];
+          int cls = lowClassMap[ch];
           int nsId = transitions[sId + cls];
           if (nsId == 0) {
             break;
@@ -2455,11 +2496,11 @@ final class Dfa {
         break; // fall back to general loop for position-dependent flags
       }
 
-      int ch = text.asciiAt(pos);
+      int ch = text.lowAt(pos);
       if (ch < 0 || transitionDependsOnPosition(ch, pos + 1, posDepThreshold)) {
         break; // fall back to general loop
       }
-      int cls = asciiClassMap[ch];
+      int cls = lowClassMap[ch];
       State ns = s.next[cls];
       if (ns == null) {
         int effectiveNextPos = pos + 1;
@@ -2492,7 +2533,7 @@ final class Dfa {
       pos++;
     }
 
-    // General loop handles non-ASCII, position-dependent checks, and trailing end-of-text
+    // General loop handles other code points, position-dependent checks, and trailing end-of-text
     // sentinel
     generalLoop:
     while (pos <= textLen) {
@@ -2575,8 +2616,8 @@ final class Dfa {
             cp = singleUnitCodePoint;
             nextPos = pos + 1;
             cls =
-                singleUnitCodePoint < asciiClassMap.length
-                    ? asciiClassMap[singleUnitCodePoint]
+                singleUnitCodePoint < lowClassMap.length
+                    ? lowClassMap[singleUnitCodePoint]
                     : classOf(singleUnitCodePoint);
           } else {
             long decoded = text.decodeForward(pos);
@@ -2747,8 +2788,8 @@ final class Dfa {
     }
 
     State[] statesById = this.statesById;
-    int[] asciiClassMap = this.asciiClassMap;
-    // Fast path: scan backward through ASCII characters
+    int[] lowClassMap = this.lowClassMap;
+    // Fast path: scan backward through code points below LOW_LIMIT
     while (pos > scanLimit) {
       if (pos <= posDepThreshold) {
         if ((longest || needEndMatch) && s.isMatch()) {
@@ -2774,7 +2815,7 @@ final class Dfa {
           s = statesById[stateId(cursor.stateOffset())];
         } else {
           long cursor =
-              scanCachedReverseAscii(
+              scanCachedReverseLow(
                   text, pos, scanLimit, s.id * numClasses, posDepThreshold, maxInputUnits);
           pos = (int) (cursor >>> 32);
           s = statesById[stateId((int) cursor)];
@@ -2791,11 +2832,11 @@ final class Dfa {
       if (WorkCounterConfig.ENABLED && maxInputUnits != Integer.MAX_VALUE) {
         WorkCounter.record();
       }
-      int ch = text.asciiAt(pos - 1);
+      int ch = text.lowAt(pos - 1);
       if (ch < 0 || transitionDependsOnPosition(ch, pos - 1, posDepThreshold)) {
         break; // fall back
       }
-      int cls = asciiClassMap[ch];
+      int cls = lowClassMap[ch];
       State ns = s.next[cls];
       if (ns == null) {
         int effectivePrevPos = pos - 1;
@@ -2864,8 +2905,8 @@ final class Dfa {
           cp = singleUnitCodePoint;
           prevPos = pos - 1;
           cls =
-              singleUnitCodePoint < asciiClassMap.length
-                  ? asciiClassMap[singleUnitCodePoint]
+              singleUnitCodePoint < lowClassMap.length
+                  ? lowClassMap[singleUnitCodePoint]
                   : classOf(singleUnitCodePoint);
         } else {
           long decoded = text.decodeBackward(pos);
@@ -3030,18 +3071,18 @@ final class Dfa {
     if (s != deadState) {
       int[] transitions = this.transitions;
       State[] statesById = this.statesById;
-      int[] asciiClassMap = this.asciiClassMap;
-      // Fast path: scan forward through ASCII characters
+      int[] lowClassMap = this.lowClassMap;
+      // Fast path: scan forward through code points below LOW_LIMIT
       int sId = s.id * numClasses;
       while (pos < textLen) {
         if (hasPositionDependentTransitions && pos + 1 >= posDepThreshold) {
           break; // fall back to general loop for position-dependent context
         }
-        int ch = text.asciiAt(pos);
+        int ch = text.lowAt(pos);
         if (ch < 0 || transitionDependsOnPosition(ch, pos + 1, posDepThreshold)) {
           break; // fall back
         }
-        int cls = asciiClassMap[ch];
+        int cls = lowClassMap[ch];
         int nsId = transitions[sId + cls];
         if (nsId == 0) {
           s = statesById[stateId(sId)];
@@ -3114,8 +3155,8 @@ final class Dfa {
             cp = singleUnitCodePoint;
             nextPos = pos + 1;
             cls =
-                singleUnitCodePoint < asciiClassMap.length
-                    ? asciiClassMap[singleUnitCodePoint]
+                singleUnitCodePoint < lowClassMap.length
+                    ? lowClassMap[singleUnitCodePoint]
                     : classOf(singleUnitCodePoint);
           } else {
             long decoded = text.decodeForward(pos);

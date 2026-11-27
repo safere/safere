@@ -672,9 +672,9 @@ class DfaTest {
       // Use a synthetic alphabet to reach the byte budget without compiling a huge pattern.
       int[] boundaries = new int[1_100_000];
       Arrays.setAll(boundaries, index -> index + 1);
-      int[] asciiClasses = new int[128];
-      Arrays.setAll(asciiClasses, index -> index);
-      Dfa.Setup setup = new Dfa.Setup(boundaries, boundaries.length + 2, asciiClasses, false);
+      int[] lowClasses = new int[Dfa.LOW_LIMIT];
+      Arrays.setAll(lowClasses, index -> index);
+      Dfa.Setup setup = new Dfa.Setup(boundaries, boundaries.length + 2, lowClasses, false);
       Dfa dfa = new Dfa(prog, 10_000, setup, false);
 
       assertThat(dfa.doSearch("a", 0, true, false)).isNull();

@@ -32,6 +32,12 @@ final class StringInputScanner implements InputScanner {
   }
 
   @Override
+  public int lowAt(int pos) {
+    char c = text.charAt(pos);
+    return c < Dfa.LOW_LIMIT ? c : -1;
+  }
+
+  @Override
   public int indexOfAscii(int ascii, int fromIndex, int limit) {
     return indexOfAscii(text, ascii, fromIndex, limit);
   }

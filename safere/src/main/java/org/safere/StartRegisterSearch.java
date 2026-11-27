@@ -166,7 +166,15 @@ final class StartRegisterSearch {
   /** Lower bounds of the non-ASCII equivalence classes, starting with 128; null if too many. */
   private final int[] nonAsciiBounds;
 
-  /** Columns per state: ASCII, non-ASCII classes (doubled for Unicode word-ness), end of text. */
+  /**
+   * Transition column of each code point below {@link Dfa#LOW_LIMIT}; see {@link #nonAsciiColumn}.
+   */
+  private final int[] lowColumns;
+
+  /**
+   * Columns per state: ASCII, non-ASCII classes (doubled for Unicode word-ness), end of text, and
+   * the unfilled column when non-ASCII columns are not cached.
+   */
   private final int row;
 
   private final int eotColumn;
@@ -233,7 +241,8 @@ final class StartRegisterSearch {
       this.nonAsciiBounds = null;
       this.eotColumn = 128;
     }
-    this.row = eotColumn + 1;
+    this.row = nonAsciiBounds != null ? eotColumn + 1 : eotColumn + 2;
+    this.lowColumns = buildLowColumns();
     // Per-row metadata includes one int, four flags, two references, and hash table buckets.
     this.cacheRowBytes = (row + 1L) * Integer.BYTES + 4L * Byte.BYTES + 5L * REFERENCE_BYTES;
     // Four rows fit easily even at the maximum width allowed above. Program-sized search
@@ -409,18 +418,19 @@ final class StartRegisterSearch {
           pos = (int) (restart >>> 32);
         }
       }
-      // Plain cached ASCII transitions keep both registers. On exit, ch and t describe pos.
+      // Plain cached transitions on code points below Dfa.LOW_LIMIT keep both registers. On exit,
+      // ch and t describe pos.
       int ch = -1;
       int t = 0;
       while (pos < len) {
-        ch = text.asciiAt(pos);
+        ch = text.lowAt(pos);
         if (ch < 0) {
           break;
         }
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.recordForwardDfaStep();
         }
-        t = transitions[sid * row + ch];
+        t = transitions[sid * row + lowColumns[ch]];
         if (t <= 0) {
           break;
         }
@@ -461,7 +471,7 @@ final class StartRegisterSearch {
       } else if (ch >= 0) {
         cp = ch;
         nextPos = pos + 1;
-        column = ch;
+        column = lowColumns[ch];
       } else {
         if (WorkCounterConfig.ENABLED) {
           WorkCounter.recordForwardDfaStep();
@@ -470,13 +480,11 @@ final class StartRegisterSearch {
         cp = InputScanner.codePoint(decoded);
         nextPos = InputScanner.position(decoded);
         column = nonAsciiColumn(cp);
-        if (column < 0) {
-          return FALLBACK;
-        }
         t = transitions[sid * row + column];
       }
       if (t == ACCEL) {
-        // A plain self-loop: skip to the next escape (or non-ASCII input), keeping the registers.
+        // A plain self-loop on ASCII: skip to the next escape (or non-ASCII input), keeping the
+        // registers.
         int escape =
             accelSkipsNonAscii[sid]
                 ? StateAccelerator.findNextEscape(accelOf[sid], text, nextPos, len)
@@ -644,13 +652,14 @@ final class StartRegisterSearch {
   }
 
   /**
-   * Returns the transition column of a non-ASCII code point, or -1 when non-ASCII columns are not
-   * cached for this program.
+   * Returns the transition column of a non-ASCII code point. When non-ASCII columns are not cached
+   * for this program, that is the unfilled column after {@link #eotColumn}, whose transitions stay
+   * unknown and make {@link #computeTransition} fall back.
    */
   private int nonAsciiColumn(int cp) {
     int[] bounds = nonAsciiBounds;
     if (bounds == null) {
-      return -1;
+      return eotColumn + 1;
     }
     int index = Arrays.binarySearch(bounds, cp);
     if (index < 0) {
@@ -660,6 +669,74 @@ final class StartRegisterSearch {
       index = 2 * index + (Nfa.isUnicodeWordChar(cp) ? 1 : 0);
     }
     return 128 + index;
+  }
+
+  /** Unfilled fallback column index when non-ASCII columns are not cached (eotColumn == 128). */
+  private static final int UNFILLED_FALLBACK_COLUMN = 128 + 1;
+
+  /** Shared {@link #lowColumns} for programs with no boundaries in {@code [128, Dfa.LOW_LIMIT)}. */
+  private static final int[] LOW_COLUMNS_ASCII_PLAIN = buildSharedLowColumns(false, false);
+
+  /** Shared {@link #lowColumns} for word-boundary programs with no boundaries below LOW_LIMIT. */
+  private static final int[] LOW_COLUMNS_ASCII_WORD = buildSharedLowColumns(true, false);
+
+  /**
+   * Shared {@link #lowColumns} when non-ASCII columns are not cached (unfilled fallback column).
+   */
+  private static final int[] LOW_COLUMNS_UNFILLED = buildSharedLowColumns(false, true);
+
+  private static int[] buildSharedLowColumns(boolean wordBoundary, boolean unfilled) {
+    int[] columns = new int[Dfa.LOW_LIMIT];
+    for (int c = 0; c < 128; c++) {
+      columns[c] = c;
+    }
+    if (unfilled) {
+      Arrays.fill(columns, 128, Dfa.LOW_LIMIT, UNFILLED_FALLBACK_COLUMN);
+    } else if (wordBoundary) {
+      for (int cp = 128; cp < Dfa.LOW_LIMIT; cp++) {
+        columns[cp] = 128 + (Dfa.isLowUnicodeWordChar(cp) ? 1 : 0);
+      }
+    } else {
+      Arrays.fill(columns, 128, Dfa.LOW_LIMIT, 128);
+    }
+    return columns;
+  }
+
+  /** Builds {@link #lowColumns} like {@link #nonAsciiColumn}, one interval at a time. */
+  private int[] buildLowColumns() {
+    int[] bounds = nonAsciiBounds;
+    if (bounds == null) {
+      assert eotColumn + 1 == UNFILLED_FALLBACK_COLUMN;
+      return LOW_COLUMNS_UNFILLED;
+    }
+    if (bounds.length == 1 || bounds[1] >= Dfa.LOW_LIMIT) {
+      return hasWordBoundary ? LOW_COLUMNS_ASCII_WORD : LOW_COLUMNS_ASCII_PLAIN;
+    }
+    int[] columns = new int[Dfa.LOW_LIMIT];
+    for (int c = 0; c < 128; c++) {
+      columns[c] = c;
+    }
+    for (int i = 0; i < bounds.length && bounds[i] < Dfa.LOW_LIMIT; i++) {
+      int end = i + 1 < bounds.length ? Math.min(bounds[i + 1], Dfa.LOW_LIMIT) : Dfa.LOW_LIMIT;
+      if (hasWordBoundary) {
+        for (int cp = bounds[i]; cp < end; cp++) {
+          columns[cp] = 128 + 2 * i + (Dfa.isLowUnicodeWordChar(cp) ? 1 : 0);
+        }
+      } else {
+        Arrays.fill(columns, bounds[i], end, 128 + i);
+      }
+    }
+    return columns;
+  }
+
+  /** Returns the low-code-point column table for testing. */
+  int[] lowColumnsForTesting() {
+    return lowColumns;
+  }
+
+  /** Returns {@link #nonAsciiColumn} for testing. */
+  int nonAsciiColumnForTesting(int cp) {
+    return nonAsciiColumn(cp);
   }
 
   /** Clears every cached state and transition after the cache budget ran out. */
@@ -900,6 +977,10 @@ final class StartRegisterSearch {
 
   /** Computes and caches a transition; returns 0 when the cache budget ran out. */
   private int computeTransition(St s, int cp, int column) {
+    if (column > eotColumn) {
+      // The unfilled column of non-ASCII input when non-ASCII columns are not cached: fall back.
+      return 0;
+    }
     if (!accelChecked[s.id]) {
       accelChecked[s.id] = true;
       if (analyzeAcceleration(s) && transitions[s.id * row + column] != 0) {

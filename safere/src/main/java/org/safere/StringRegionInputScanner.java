@@ -180,6 +180,12 @@ final class StringRegionInputScanner implements InputScanner, CharSequence {
   }
 
   @Override
+  public int lowAt(int pos) {
+    char c = text.charAt(base + Objects.checkIndex(pos, length));
+    return c < Dfa.LOW_LIMIT ? c : -1;
+  }
+
+  @Override
   public int singleUnitCodePointAt(int pos) {
     char c = text.charAt(base + Objects.checkIndex(pos, length));
     return Character.isHighSurrogate(c)
