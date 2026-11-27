@@ -19459,6 +19459,29 @@
       }
     },
     {
+      "id": "LiteralAlternationBenchmark.firstFindNearMiss",
+      "operation": "find",
+      "patterns": [
+        "aaaaaaaaz|banana|cherry|durian|elderberry|fig"
+      ],
+      "inputs": [
+        "literalAlternation.nearMiss"
+      ],
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "measurement": {
+        "mode": "singleShotColdStart",
+        "timingUnit": "milliseconds",
+        "constraints": [
+          "prematerializedInput",
+          "freshProcessPerInvocation"
+        ]
+      }
+    },
+    {
       "id": "LiteralAlternationBenchmark.nearMiss.9",
       "operation": "find",
       "patterns": [

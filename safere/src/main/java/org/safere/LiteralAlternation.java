@@ -13,9 +13,10 @@ import java.util.Arrays;
  * Complete, ordered literal alternatives for a bounded String and UTF-8 search fast path.
  *
  * <p>String searches with up to three distinct initial characters use per-literal windows. With
- * more initials, whole-String searches hop between candidates after the first window and return to
- * windowed search for dense candidates. String regions use the first-character scan to skip
- * candidate-free stretches and verify matches in short per-literal windows.
+ * more initials, whole-String searches hop between candidates after the first window. After a false
+ * initial, short tails use growing windows. On longer tails, dense initials trigger windowed
+ * searches that check each literal's final character before scanning for the whole literal. String
+ * regions skip candidate-free stretches and verify matches in short per-literal windows.
  *
  * <p>UTF-8 searches use an exact first-byte accelerator when one is available. The default provider
  * can also scan a compact enclosing range on longer inputs. Dense range candidates near the start
@@ -27,6 +28,8 @@ final class LiteralAlternation {
   private static final int PROBE_LENGTH = 1_024;
   private static final int MAX_ALTERNATIVES = 8;
   private static final int WINDOW_LENGTH = 256;
+  private static final int SHORT_TAIL_LIMIT = 128;
+  private static final int SHORT_TAIL_WINDOW = 64;
   private static final int MAX_LITERAL_LENGTH = 12;
   private static final int REGION_PROBE_DELAY = 2 * WINDOW_LENGTH;
   // Searches verify first-byte candidates one at a time until they see this many within
@@ -134,7 +137,9 @@ final class LiteralAlternation {
       return search(text, 0, end, end);
     }
     long match = search(text, 0, PROBE_LENGTH, end);
-    return match >= 0 ? match : searchGrowingWindows(text, PROBE_LENGTH, end, PROBE_LENGTH * 2);
+    return match >= 0
+        ? match
+        : searchGrowingWindows(text, PROBE_LENGTH, end, PROBE_LENGTH * 2, false);
   }
 
   /** Searches an opaque String region and returns region-relative bounds. */
@@ -224,9 +229,14 @@ final class LiteralAlternation {
         }
       }
       position = candidate + 1;
+      // Bound the extra scanning a sparse tail pays after one false initial. The first window
+      // also limits how far we scan before checking a nearby lower-priority literal.
+      if (end - position <= SHORT_TAIL_LIMIT) {
+        return searchGrowingWindows(text, position, end, SHORT_TAIL_WINDOW, false);
+      }
       if (++candidates == DENSE_CANDIDATES) {
         if (candidate - spanStart < DENSE_CANDIDATE_SPAN) {
-          return searchGrowingWindows(text, position, end, PROBE_LENGTH);
+          return searchGrowingWindows(text, position, end, PROBE_LENGTH, true);
         }
         candidates = 0;
         spanStart = candidate;
@@ -309,7 +319,8 @@ final class LiteralAlternation {
       if (WorkCounterConfig.ENABLED) {
         WorkCounter.record(literal.length);
       }
-      if (literal.length <= length - position
+      if (literal[0] == bytes[offset + position]
+          && literal.length <= length - position
           && ByteSwarScan.matchesAt(bytes, offset, literal, position)) {
         return ((long) position << 32) | (position + literal.length);
       }
@@ -363,13 +374,15 @@ final class LiteralAlternation {
     return bestEnd < 0 ? NO_MATCH : ((long) bestStart << 32) | bestEnd;
   }
 
-  private long searchGrowingWindows(String text, int start, int end, int windowLength) {
+  private long searchGrowingWindows(
+      String text, int start, int end, int windowLength, boolean denseInitials) {
     while (start < end) {
       int remaining = end - start;
       int width = Math.min(windowLength, remaining);
-      // Combine a small final remainder with this window, avoiding another range search.
-      int limit = remaining - width <= PROBE_LENGTH * 4 ? end : start + width;
-      long match = search(text, start, limit, end);
+      // Merge a small remainder only after the windows have grown past the short-tail probe.
+      int limit =
+          width >= PROBE_LENGTH && remaining - width <= PROBE_LENGTH * 4 ? end : start + width;
+      long match = search(text, start, limit, end, denseInitials);
       if (match >= 0) {
         return match;
       }
@@ -383,17 +396,39 @@ final class LiteralAlternation {
 
   /** Searches literal starts in [from, limit), allowing matches to end at or before {@code end}. */
   private long search(String text, int from, int limit, int end) {
+    return search(text, from, limit, end, false);
+  }
+
+  private long search(String text, int from, int limit, int end, boolean denseInitials) {
     int bestStart = limit;
     int bestEnd = -1;
     int length = text.length();
     for (String literal : literals) {
       int searchEnd = bestStart + Math.min(literal.length() - 1, end - bestStart);
+      int literalFrom = from;
+      if (denseInitials) {
+        // A match must end with the literal's final character. Skip starts whose ends precede
+        // its first occurrence, so a run of matching initials need not compare long prefixes.
+        int offset = literal.length() - 1;
+        if (searchEnd - from <= offset) {
+          continue;
+        }
+        int last = text.indexOf(literal.charAt(offset), from + offset, searchEnd);
+        if (WorkCounterConfig.ENABLED) {
+          WorkCounter.record((last < 0 ? searchEnd : last + 1) - (from + offset));
+        }
+        if (last < 0) {
+          continue;
+        }
+        literalFrom = last - offset;
+      }
       int idx =
           searchEnd == length
-              ? text.indexOf(literal, from)
-              : text.indexOf(literal, from, searchEnd);
+              ? text.indexOf(literal, literalFrom)
+              : text.indexOf(literal, literalFrom, searchEnd);
       if (WorkCounterConfig.ENABLED) {
-        WorkCounter.record(idx >= 0 ? idx - from + literal.length() : searchEnd - from);
+        WorkCounter.record(
+            idx >= 0 ? idx - literalFrom + literal.length() : searchEnd - literalFrom);
       }
       if (idx >= 0 && idx < bestStart) {
         bestStart = idx;
