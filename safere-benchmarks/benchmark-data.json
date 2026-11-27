@@ -5246,6 +5246,42 @@
         "length": 16384
       },
       "shared": true
+    },
+    {
+      "id": "logLine.short.miss",
+      "recipe": {
+        "kind": "literal",
+        "text": "2026-11-27T08:15:42.123Z INFO  [worker-07] request handled: status=200 in 23 ms path=/api/v2/orders/9817 user=alice region=eu-west-1 bytes=48213"
+      },
+      "shared": true
+    },
+    {
+      "id": "logLine.short.hit",
+      "recipe": {
+        "kind": "literal",
+        "text": "2026-11-27T08:15:42.123Z ERROR [worker-07] request failed: upstream timeout after 3000 ms path=/api/v2/orders/9817 user=alice region=eu-west-1"
+      },
+      "shared": true
+    },
+    {
+      "id": "logLine.log.everyLine",
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "2026-11-27T08:15:42.123Z WARN  [worker-07] k=v ............................................................................................................................................................................................................................................................. ERROR upstream timeout path=/api/v2/orders/9817                                                                                                                                                                   \n",
+        "length": 1048576
+      },
+      "shared": true
+    },
+    {
+      "id": "logLine.log.every32",
+      "recipe": {
+        "kind": "periodicAlternationToLength",
+        "hitUnit": "2026-11-27T08:15:42.123Z ERROR [worker-07] request failed: upstream timeout after 3000 ms path=/api/v2/orders/9817             \n",
+        "missUnit": "2026-11-27T08:15:42.123Z INFO  [worker-07] request handled: status=200 in 23 ms path=/api/v2/orders/9817                       \n",
+        "hitInterval": 32,
+        "length": 1048576
+      },
+      "shared": true
     }
   ],
   "workloads": [
@@ -25115,6 +25151,254 @@
       "measurement": {
         "mode": "averageTime",
         "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.find.short.miss.{pattern}",
+      "operation": "find",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.short.miss"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "unanchored",
+            "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          }
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.find.short.hit.{pattern}",
+      "operation": "find",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.short.hit"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "unanchored",
+            "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          }
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.exists.short.miss.{pattern}",
+      "operation": "exists",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.short.miss"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "unanchored",
+            "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          }
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.exists.short.hit.{pattern}",
+      "operation": "exists",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.short.hit"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "unanchored",
+            "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          }
+        ]
+      },
+      "resultConsumption": "boolean",
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.findAllCount.everyLine.{pattern}",
+      "operation": "findAllCount",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.log.everyLine"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "unanchored",
+            "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          },
+          {
+            "id": "unixLinesMultiline",
+            "value": {
+              "java": "(?dm)^.*ERROR.*$",
+              "alternates": {
+                "re2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "rust-regex": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "pcre2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "dotnet": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 2048
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.findAllCount.every32.{pattern}",
+      "operation": "findAllCount",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.log.every32"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          },
+          {
+            "id": "unixLinesMultiline",
+            "value": {
+              "java": "(?dm)^.*ERROR.*$",
+              "alternates": {
+                "re2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "rust-regex": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "pcre2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "dotnet": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 256
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
         "constraints": [
           "prematerializedInput"
         ]

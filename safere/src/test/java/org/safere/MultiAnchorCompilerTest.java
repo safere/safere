@@ -909,6 +909,64 @@ class MultiAnchorCompilerTest {
   }
 
   @Test
+  void lineAnchoredLeadingClassOfWholeLinesGetsLeadingExpansion() {
+    // A leading class that matches everything but line terminators reads whole lines in the DFA
+    // anyway, so the inner literal drives the start plan, and the walk back stops at the line
+    // start.
+    for (String regex :
+        List.of(
+            "(?m)^.*ERROR.*$",
+            "(?dm)^.*ERROR.*$",
+            "(?m)^.*?ERROR",
+            "(?m)^.+ERROR",
+            "(?m)^(.*)ERROR(.*)$",
+            "(?m)^[^\\n]*ERROR",
+            "(?m)^[^\\r\\n]*ERROR",
+            "(?im)^.*error.*$",
+            "(?m)^(?d:.*)ERROR",
+            "(?dm)^(?-d:.*)ERROR")) {
+      StartPlan plan = Pattern.compile(regex).startPlan();
+      assertThat(plan).as(regex).isInstanceOf(StartPlan.LeadingExpansion.class);
+      StartPlan.LeadingExpansion le = (StartPlan.LeadingExpansion) plan;
+      assertThat(le.hasLeadingAssertions()).as(regex).isTrue();
+      assertThat(le.lineAnchored()).as(regex).isTrue();
+      assertThat(le.innerPlan()).as(regex).isInstanceOf(StartPlan.Literal.class);
+    }
+    // A fixed-offset inner literal is just as sparse.
+    for (String regex : List.of("(?m)^.*[0-9]{2}ERROR", "(?m)^.+(?:bz{8}|a)ERROR")) {
+      StartPlan plan = Pattern.compile(regex).startPlan();
+      assertThat(plan).as(regex).isInstanceOf(StartPlan.LeadingExpansion.class);
+      assertThat(((StartPlan.LeadingExpansion) plan).innerPlan())
+          .as(regex)
+          .isInstanceOf(StartPlan.FixedOffset.class);
+    }
+  }
+
+  @Test
+  void lineAnchoredLeadingClassThatStopsWithinALineKeepsLineAnchor() {
+    for (String regex :
+        List.of(
+            // Narrow classes, and wide classes that stop at other characters too: the line-anchor
+            // DFA can skip to the next line once the run ends.
+            "(?m)^\\w+: ",
+            "(?m)^[a-z]+ERROR",
+            "(?m)^\\s*ERROR",
+            "(?m)^\\S+ERROR",
+            // A class containing `\n` would walk back across lines.
+            "(?m)^[^,]*,ERROR",
+            // DOTALL `.` never stops before the search start.
+            "(?sm)^.*ERROR",
+            "(?m)^(?s:.*)ERROR",
+            // Wide leading classes only pay for the walk with an exact literal inner plan.
+            "(?m)^.*(?:ERROR|WARN)",
+            "(?m)^.*[0-9]")) {
+      assertThat(Pattern.compile(regex).startPlan())
+          .as(regex)
+          .isInstanceOf(StartPlan.LineAnchor.class);
+    }
+  }
+
+  @Test
   void wideLeadingExpansionSubsumesFindRejectWhenItsLiteralImpliesThePlan() {
     assertThat(startSubsumesFindReject(".*error: \\w+")).isTrue();
     assertThat(startSubsumesFindReject("[^\\n]*\\bSCRUB:strip_line\\b[^\\n]*\\n?")).isTrue();

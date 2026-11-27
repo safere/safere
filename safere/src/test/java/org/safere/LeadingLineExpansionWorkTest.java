@@ -160,6 +160,53 @@ class LeadingLineExpansionWorkTest {
     assertThat(utf8Steps).isLessThan(text.length() / 2);
   }
 
+  /**
+   * A line-anchored expansion walks back no further than the search start, so many hits on one long
+   * line don't make later finds rescan the line: a lazy {@code ^.*?ERROR} matches once at the line
+   * start, and each later find walks back only to the previous match end. Hits are further apart
+   * than {@link MultiAnchorCompiler#MIN_WIDE_LEADING_SKIP}, so every find runs the walk.
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "(?m)^.*ERROR.*$",
+        "(?m)^.*ERROR",
+        "(?m)^.*?ERROR",
+        "(?dm)^.*?ERROR",
+        "(?m)^.+?ERROR"
+      })
+  void manyHitsOnOneLongLineStayLinear(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex);
+    String gap = "x".repeat(MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP + 44);
+    for (int hits : new int[] {100, 1_000}) {
+      String text =
+          gap
+              + "\n"
+              + (gap + "ERROR").repeat(hits)
+              + "\r\n"
+              + gap
+              + "ERROR\u2028"
+              + gap
+              + "ERROR\n";
+      int expected = (int) jdk.matcher(text).results().count();
+      byte[] bytes = text.getBytes(UTF_8);
+      long stringWork =
+          WorkCounter.countWithForwardDfaStepsForTesting(
+              () -> assertThat(count(pattern.matcher(text))).isEqualTo(expected));
+      long utf8Work =
+          WorkCounter.countWithForwardDfaStepsForTesting(() ->
+              assertThat(count(pattern.matcher(Utf8Input.trusted(bytes)))).isEqualTo(expected));
+      assertThat(stringWork).as("%s String hits=%d", regex, hits).isLessThan(10L * text.length());
+      assertThat(utf8Work).as("%s UTF-8 hits=%d", regex, hits).isLessThan(10L * text.length());
+      // The expansion ran and skipped ahead of the DFA.
+      WorkCounter.StartAccelerationWork start =
+          WorkCounter.countStartAccelerationForTesting(() -> count(pattern.matcher(text)));
+      assertThat(start.calls()).as("%s", start).isPositive();
+      assertThat(start.skippedUnits()).as("%s", start).isPositive();
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("excludedSeparatorCases")
   void rejectedInnerHitsDoNotRescanThePrefix(String regex, String separator, boolean utf8) {

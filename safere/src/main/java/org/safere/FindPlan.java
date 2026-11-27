@@ -25,6 +25,10 @@ package org.safere;
  * @param existenceStartsAtInner whether an existence-only search may start at the first inner
  *     candidate of a leading expansion instead of its expanded start (see {@link
  *     #existenceStartsAtInner(MultiAnchorDescriptor.StartPlan)})
+ * @param rejectUnlessStartScans whether a {@code startSubsumesReject} plan still runs the reject
+ *     prefilter whenever its start search doesn't scan for the literal: on inputs shorter than
+ *     {@link MultiAnchorCompiler#MIN_WIDE_LEADING_SKIP}, or when the caller doesn't run the start
+ *     search (see {@link #rejectMode})
  */
 record FindPlan(
     RejectPrefilter stringReject,
@@ -32,7 +36,8 @@ record FindPlan(
     boolean startPrecedesReject,
     boolean startSubsumesReject,
     boolean wideLeadingExpansion,
-    boolean existenceStartsAtInner) {
+    boolean existenceStartsAtInner,
+    boolean rejectUnlessStartScans) {
 
   /** No reject prefilter applies. */
   static final int REJECT_NONE = 0;
@@ -72,6 +77,10 @@ record FindPlan(
     }
     if (startPrecedesReject && startSearchRuns && remaining < MAX_LITERAL_START_FIRST_LENGTH) {
       return REJECT_TAIL;
+    }
+    if (rejectUnlessStartScans
+        && (!startSearchRuns || remaining < MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP)) {
+      return REJECT_FIRST;
     }
     return startSubsumesReject ? REJECT_NONE : REJECT_FIRST;
   }
@@ -114,13 +123,28 @@ record FindPlan(
       RejectPrefilter utf8Reject,
       boolean startSearchAvailable) {
     MultiAnchorDescriptor.StartPlan startPlan = multiAnchor.startPlan();
+    boolean startSubsumesReject = startSearchAvailable && multiAnchor.startSubsumesFindReject();
     return new FindPlan(
         stringReject,
         utf8Reject,
         startSearchAvailable && stringReject != null && multiAnchor.startPrecedesFindReject(),
-        startSearchAvailable && multiAnchor.startSubsumesFindReject(),
+        startSubsumesReject,
         isWideLeadingExpansion(startPlan),
-        existenceStartsAtInner(startPlan));
+        existenceStartsAtInner(startPlan),
+        startSubsumesReject && isLineAnchoredWideExpansion(startPlan));
+  }
+
+  /**
+   * Returns whether the start plan is a wide leading expansion chosen over a line-anchor plan. Its
+   * start search doesn't scan for the literal on inputs shorter than {@link
+   * MultiAnchorCompiler#MIN_WIDE_LEADING_SKIP}, nor for callers that don't run it, and there a
+   * short or unscanned input without the literal would run the multiline DFA over the whole input,
+   * where the line-anchor plan it replaces failed in one reject prefilter scan.
+   */
+  static boolean isLineAnchoredWideExpansion(MultiAnchorDescriptor.StartPlan startPlan) {
+    return isWideLeadingExpansion(startPlan)
+        && startPlan instanceof MultiAnchorDescriptor.StartPlan.LeadingExpansion le
+        && le.lineAnchored();
   }
 
   static boolean isWideLeadingExpansion(MultiAnchorDescriptor.StartPlan startPlan) {

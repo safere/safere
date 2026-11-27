@@ -194,6 +194,144 @@ class LeadingLineExpansionTest {
     }
   }
 
+  private static final List<String> LINE_ANCHORED_REGEXES =
+      List.of(
+          "^.*ERROR.*$",
+          "^.*ERROR",
+          "^.*?ERROR",
+          "^.*?ERROR.*?$",
+          "^(.*)(ERROR)(.*)$",
+          "^(.*?)ERROR(.*?)$",
+          "^.+ERROR",
+          "^.+?ERROR\\w*",
+          "^[^\\n]*ERROR[^\\n]*",
+          "^[^\\r\\n]*ERROR",
+          "^.*ERROR$",
+          "^.*\\bERROR\\b.*$",
+          "^.*ERROR \\d+",
+          "^.*[0-9]{2}ERROR",
+          "^.+(?:bz{8}|a)ERROR",
+          "^(?d:.*)ERROR",
+          "^(?-d:.*)ERROR");
+
+  private static final List<String> TERMINATORS =
+      List.of("\n", "\r\n", "\r", "\u0085", "\u2028", "\u2029");
+
+  /**
+   * Inputs for {@link #LINE_ANCHORED_REGEXES}, one per line terminator: matching and non-matching
+   * lines, several hits on one line, a hit at the very start and end, empty lines, and a line long
+   * enough for the walk back to pay off.
+   */
+  private static List<String> lineAnchoredInputs() {
+    List<String> inputs = new ArrayList<>();
+    for (String t : TERMINATORS) {
+      inputs.add(
+          String.join(
+              t,
+              "ERROR 1 at start",
+              "info ok",
+              PAD + " ERROR 2 after padding",
+              "",
+              "x ERROR 3 y ERROR 4 z",
+              "ERRORERROR",
+              "é ERROR 5 é",
+              PAD,
+              "no hit here",
+              "trailing ERROR"));
+      inputs.add(PAD + t + "a ERROR 6" + t + t);
+      inputs.add(PAD + "ERROR 7" + t + "ERR" + t + "OR" + t + "ERROR");
+      inputs.add(PAD + t + "x 42ERROR" + t + "abzzzzzzzzERROR" + t + PAD + "aERROR" + t + "7ERROR");
+    }
+    // Mixed terminators, including a CR LF split across hits and a supplementary character.
+    inputs.add(PAD + "\r" + "\nERROR 8\r\r\nERROR 9\n\r😀 ERROR 10\u2028\u2029ERROR");
+    return inputs;
+  }
+
+  @Test
+  void lineAnchoredFindAgreesWithJdk() {
+    for (int flags : new int[] {Pattern.MULTILINE, Pattern.MULTILINE | Pattern.UNIX_LINES}) {
+      for (String regex : LINE_ANCHORED_REGEXES) {
+        Pattern pattern = Pattern.compile(regex, flags);
+        java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex, flags);
+        for (String input : lineAnchoredInputs()) {
+          String what = "%s (flags %d) on %s".formatted(regex, flags, input);
+          assertThat(findAll(pattern.matcher(input)))
+              .as(what)
+              .isEqualTo(findAll(jdk.matcher(input)));
+          assertThat(findAllUtf8(pattern, input))
+              .as("UTF-8 " + what)
+              .isEqualTo(jdkUtf8(jdk, input));
+          assertThat(pattern.asPredicate().test(input))
+              .as("predicate " + what)
+              .isEqualTo(jdk.matcher(input).find());
+          // Within the padding, every start behaves alike, so sample it sparsely.
+          for (int from = 0;
+              from <= input.length();
+              from += from < input.length() && input.charAt(from) == 'p' ? 23 : 1) {
+            java.util.regex.Matcher expected = jdk.matcher(input);
+            Matcher actual = pattern.matcher(input);
+            boolean found = expected.find(from);
+            assertThat(actual.find(from)).as("%s from %d", what, from).isEqualTo(found);
+            if (found) {
+              assertThat(groups(actual)).as("%s from %d", what, from).isEqualTo(groups(expected));
+              assertThat(findAll(actual))
+                  .as("%s after from %d", what, from)
+                  .isEqualTo(findAll(expected));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void lineAnchoredRegionsAgreeWithJdk() {
+    for (String t : TERMINATORS) {
+      // The padding makes the skip long enough for the expansion to run from region starts in it.
+      String input =
+          PAD + String.join(t, "aa ERROR one", "bb", "cc ERROR two ERROR", "", "42ERROR", "ERROR");
+      List<Integer> bounds = new ArrayList<>();
+      for (int i = 0; i <= input.length(); i += i < PAD.length() - 8 ? 37 : 1) {
+        bounds.add(i);
+      }
+      for (int flags : new int[] {Pattern.MULTILINE, Pattern.MULTILINE | Pattern.UNIX_LINES}) {
+        for (String regex : LINE_ANCHORED_REGEXES) {
+          Pattern pattern = Pattern.compile(regex, flags);
+          java.util.regex.Pattern jdk = java.util.regex.Pattern.compile(regex, flags);
+          for (int start : bounds) {
+            for (int end : bounds) {
+              if (end < start) {
+                continue;
+              }
+              if (splitsCrLf(input, start) || splitsCrLf(input, end)) {
+                // Opaque bounds inside CR LF are an approved divergence (LineAnchorRegionTest).
+                continue;
+              }
+              for (boolean transparent : new boolean[] {false, true}) {
+                java.util.regex.Matcher expected = jdk.matcher(input);
+                expected.region(start, end).useTransparentBounds(transparent);
+                Matcher actual = pattern.matcher(input);
+                actual.region(start, end).useTransparentBounds(transparent);
+                assertThat(findAll(actual))
+                    .as(
+                        "%s (flags %d) region [%d, %d) transparent=%s on %s",
+                        regex, flags, start, end, transparent, input)
+                    .isEqualTo(findAll(expected));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private static boolean splitsCrLf(String input, int index) {
+    return index > 0
+        && index < input.length()
+        && input.charAt(index - 1) == '\r'
+        && input.charAt(index) == '\n';
+  }
+
   @Test
   void failedAttemptAtLineStartMovesOnToLaterLine() {
     // The first line holds the literal, but its tail cannot match, so the start candidate at that
