@@ -50,7 +50,7 @@ final class Prog {
   private boolean hasTextAnchor;
   private boolean hasEmptyWidth;
   private boolean hasPreviousMatchEnd;
-  private boolean flatNfaSupported;
+  private boolean scalarTailMemoSupported;
 
   /** Creates an empty program. */
   public Prog() {}
@@ -145,18 +145,17 @@ final class Prog {
     hasTextAnchor = computeHasTextAnchor();
     hasEmptyWidth = false;
     hasPreviousMatchEnd = false;
-    flatNfaSupported = !hasGraphemeSemantics;
+    scalarTailMemoSupported = !hasGraphemeSemantics;
     for (Inst inst : instArray) {
       hasEmptyWidth |= inst.op == InstOp.EMPTY_WIDTH;
       hasPreviousMatchEnd |= inst.op == InstOp.PREVIOUS_MATCH_END;
       if (inst.op == InstOp.ALT_MATCH
           || inst.op == InstOp.LOOP_ENTER
           || inst.op == InstOp.PROGRESS_CHECK) {
-        flatNfaSupported = false;
+        scalarTailMemoSupported = false;
       }
     }
     hasEmptyWidth |= hasPreviousMatchEnd;
-    flatNfaSupported &= !hasPreviousMatchEnd;
     lineStartUnixLines = true;
     for (Inst inst : instArray) {
       if (inst.op == InstOp.EMPTY_WIDTH && (inst.arg & EmptyOp.BEGIN_LINE) != 0) {
@@ -765,8 +764,13 @@ final class Prog {
 
   /** Whether ordinary scalar NFA execution can use this program's flattened representation. */
   boolean supportsFlatNfa() {
+    return supportsScalarTailMemo() && !hasPreviousMatchEnd;
+  }
+
+  /** Whether a queued instruction can determine acceptance independently of the other threads. */
+  boolean supportsScalarTailMemo() {
     // The compiler assigns loop registers after freeze().
-    return flatNfaSupported && numLoopRegs == 0;
+    return scalarTailMemoSupported && numLoopRegs == 0;
   }
 
   public void flatten() {

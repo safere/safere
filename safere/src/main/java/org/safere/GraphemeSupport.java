@@ -403,6 +403,10 @@ final class GraphemeSupport {
     return VISIT_KEY_VARIANT_BITS;
   }
 
+  static boolean hasPositiveMatchStart(Context context, int matchStart) {
+    return matchStart > (context instanceof StringRegionContext view ? view.offset : 0);
+  }
+
   static int visitVariant(
       CharSequence text,
       int pos,

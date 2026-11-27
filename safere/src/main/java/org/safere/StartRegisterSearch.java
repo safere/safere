@@ -208,6 +208,9 @@ final class StartRegisterSearch {
   /** The caller's start-acceleration backoff (see {@link AdaptiveBackoff}), carried in and out. */
   private long startBackoff;
 
+  private int searchEnd;
+  private int nativeScanUnits;
+
   private StartRegisterSearch(
       Prog prog, StringStartAccelerator stringAccelerator, Utf8StartAccelerator utf8Accelerator) {
     this.prog = prog;
@@ -289,6 +292,8 @@ final class StartRegisterSearch {
    */
   long find(InputScanner text, int startPos, long startBackoff) {
     this.startBackoff = startBackoff;
+    searchEnd = startPos;
+    nativeScanUnits = 0;
     if (pause > 0) {
       pause--;
       return SKIPPED;
@@ -329,6 +334,14 @@ final class StartRegisterSearch {
   /** Returns the start-acceleration backoff after the last {@link #find}. */
   long startBackoff() {
     return startBackoff;
+  }
+
+  int searchEnd() {
+    return searchEnd;
+  }
+
+  int nativeScanUnits() {
+    return nativeScanUnits;
   }
 
   /** Runs one search without the adaptive switch, for differential tests. */
@@ -396,7 +409,7 @@ final class StartRegisterSearch {
         // Every attempt but the fresh one died: no match starts before pos.
         startEntry = false;
         if (pos - startPos > HANDOFF_DISTANCE) {
-          return HANDOFF - pos;
+          return stop(HANDOFF - pos, pos);
         }
         if (pos >= resumePos) {
           long restart = restart(text, pos, len, sid);
@@ -471,23 +484,18 @@ final class StartRegisterSearch {
         nextPos = InputScanner.position(decoded);
         column = nonAsciiColumn(cp);
         if (column < 0) {
-          return FALLBACK;
+          return stop(FALLBACK, pos);
         }
         t = transitions[sid * row + column];
       }
       if (t == ACCEL) {
-        // A plain self-loop: skip to the next escape (or non-ASCII input), keeping the registers.
-        int escape =
-            accelSkipsNonAscii[sid]
-                ? StateAccelerator.findNextEscape(accelOf[sid], text, nextPos, len)
-                : StateAccelerator.findNextAsciiOrNonAsciiEscape(accelOf[sid], text, nextPos, len);
-        pos = escape < 0 ? len : escape;
+        pos = selfLoopEnd(text, sid, nextPos, len);
         continue;
       }
       if (t == 0) {
         t = computeTransition(states[sid], cp, column);
         if (t == 0) {
-          return FALLBACK;
+          return stop(FALLBACK, pos);
         }
         transitions = this.transitions;
         if (t == ACCEL) {
@@ -529,7 +537,7 @@ final class StartRegisterSearch {
         matchEnd = nextPos;
       }
       if (stopOf[next] || cp < 0) {
-        return finish(matchStart, matchEnd);
+        return stop(finish(matchStart, matchEnd), nextPos);
       }
       if (r0 < 0 && ++blindEvents > BLIND_EVENTS && blindFallback(startPos, nextPos, blindEvents)) {
         return FALLBACK;
@@ -538,6 +546,24 @@ final class StartRegisterSearch {
       pos = nextPos;
       startEntry = startLikeOf[next];
     }
+  }
+
+  private long stop(long result, int end) {
+    searchEnd = end;
+    return result;
+  }
+
+  /** Skips a plain self-loop without changing its registers. */
+  private int selfLoopEnd(InputScanner text, int sid, int nextPos, int len) {
+    int escape =
+        accelSkipsNonAscii[sid]
+            ? StateAccelerator.findNextEscape(accelOf[sid], text, nextPos, len)
+            : StateAccelerator.findNextAsciiOrNonAsciiEscape(accelOf[sid], text, nextPos, len);
+    int end = escape < 0 ? len : escape;
+    if (accelSkipsNonAscii[sid] && accelOf[sid] instanceof StateAccelerator.SingleAsciiEscape) {
+      nativeScanUnits += end - nextPos;
+    }
+    return end;
   }
 
   private AcceleratorPolicy startPolicy(InputScanner text) {
@@ -558,7 +584,7 @@ final class StartRegisterSearch {
   private long restart(InputScanner text, int pos, int len, int sid) {
     int candidate = nextCandidate(text, pos, len);
     if (candidate < 0) {
-      return NO_MATCH;
+      return stop(NO_MATCH, len);
     }
     if (candidate == pos) {
       return ((long) pos << 32) | sid;
@@ -566,11 +592,11 @@ final class StartRegisterSearch {
     // The start state's word context comes from the code points around the candidate, so it must
     // not split one. Accelerator candidates are boundaries; this keeps the search safe if not.
     if (!text.isCodePointBoundary(candidate)) {
-      return FALLBACK;
+      return stop(FALLBACK, candidate);
     }
     St s = startState(text, candidate);
     if (s == null || s.matchRank != NONE) {
-      return FALLBACK;
+      return stop(FALLBACK, candidate);
     }
     return ((long) candidate << 32) | s.id;
   }

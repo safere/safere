@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Work-bound tests for find() with the start-register search. */
 @DisabledForCrosscheck("WorkCounter and the UTF-8 input API are SafeRE-specific")
@@ -42,6 +44,25 @@ class StartRegisterWorkTest {
   void denseUtf8FindAllScansTheInputOnce() {
     assertOnePass("\\b\\w+\\b", true);
     assertOnePass("\\b[a-z]+\\b", true);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a.*z|a", "(?:aa)*z|a"})
+  void handsOffOverlappingFailedTails(String regex) {
+    Pattern pattern = Pattern.compile(regex);
+    assertThat(pattern.startRegisterSearch(new Pattern.ThreadCache())).isNotNull();
+    for (boolean utf8 : new boolean[] {false, true}) {
+      String smallInput = "a".repeat(256);
+      String largeInput = smallInput.repeat(4);
+      long small =
+          WorkCounter.countWithForwardDfaStepsForTesting(
+              () -> assertThat(findAll(pattern, smallInput, utf8)).isEqualTo(smallInput.length()));
+      long large =
+          WorkCounter.countWithForwardDfaStepsForTesting(
+              () -> assertThat(findAll(pattern, largeInput, utf8)).isEqualTo(largeInput.length()));
+      assertThat(small).isPositive();
+      assertThat(large).as("%s, UTF-8=%s", regex, utf8).isLessThanOrEqualTo(6 * small);
+    }
   }
 
   @Test

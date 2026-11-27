@@ -296,6 +296,59 @@ class DiagnosticsTest {
   }
 
   @Test
+  void aFewMatchesBeforeAnAcceleratedTailStayInTheDfa() {
+    Pattern.setDiagnostics(diagnostics);
+    Pattern pattern = Pattern.compile("a[^z]*z|a");
+    String tail = "b".repeat(16_384);
+    String input = "a".repeat(16) + tail;
+    Matcher stringMatcher = pattern.matcher(input);
+    Utf8Matcher utf8Matcher = pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8)));
+    for (int i = 0; i < 16; i++) {
+      assertThat(stringMatcher.find()).isTrue();
+      assertThat(utf8Matcher.find()).isTrue();
+    }
+    assertThat(stringMatcher.find()).isFalse();
+    assertThat(utf8Matcher.find()).isFalse();
+    assertThat(operationsFor(pattern))
+        .noneMatch(event -> event.boundaryStrategy() == MatchStrategy.NFA);
+
+    assertThat(pattern.matcher(input).replaceAll("x")).isEqualTo("x".repeat(16) + tail);
+    OperationDiagnostics replacement = operationsFor(pattern).getLast();
+    assertThat(replacement.boundaryStrategy()).isEqualTo(MatchStrategy.DFA);
+    // The first boundary strategy misses later handoffs. Expect one DFA search per match
+    // and one final search that rejects the rest of the input.
+    assertThat(replacement.forwardDfaSearchCount()).isEqualTo(17);
+  }
+
+  @ParameterizedTest
+  @MethodSource("preparedSearchRetryCases")
+  void preparedSearchResumesAfterShortMatchesInsideAFailedTail(
+      String regex, String word, boolean region) {
+    Pattern.setDiagnostics(diagnostics);
+    Pattern pattern = Pattern.compile(regex);
+    String input = " " + "x".repeat(32) + " " + (word + " ").repeat(1024);
+    Matcher matcher = pattern.matcher(input);
+    if (region) {
+      matcher.region(1, input.length());
+    }
+    for (int i = 0; i < 1056; i++) {
+      assertThat(matcher.find()).isTrue();
+    }
+    List<OperationDiagnostics> operations = operationsFor(pattern);
+    assertThat(operations).anyMatch(event -> event.boundaryStrategy() == MatchStrategy.NFA);
+    assertThat(operations.subList(operations.size() - 100, operations.size()))
+        .noneMatch(event -> event.boundaryStrategy() == MatchStrategy.NFA);
+  }
+
+  static Stream<Arguments> preparedSearchRetryCases() {
+    return Stream.of(
+        Arguments.of("x[\\w ]*z|x|\\w+", "word", false),
+        Arguments.of("(x[\\w ]*z)|x|\\w+", "word", false),
+        Arguments.of("x[\\w ]*z|x|\\w+", "word", true),
+        Arguments.of("x[\\w ]*z|x|\\w+", "w".repeat(70), false));
+  }
+
+  @Test
   void forcedBitStateAndNfaReportTheExactEngine() {
     Pattern.setDiagnostics(diagnostics);
     EnginePathOptions bitStateOnly =
