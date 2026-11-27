@@ -5246,6 +5246,68 @@
         "length": 16384
       },
       "shared": true
+    },
+    {
+      "id": "literalAlternation.cyrillicProse.{size}",
+      "axes": {
+        "size": [
+          65536
+        ]
+      },
+      "recipe": {
+        "kind": "periodicAlternationToLength",
+        "hitUnit": "Вчера мы приехали в Казань, там было тепло и тихо.\n",
+        "missUnit": "Утром шёл дождь, и улицы были пустыми и тихими.\n",
+        "hitInterval": 8,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "literalAlternation.greekProse.{size}",
+      "axes": {
+        "size": [
+          65536
+        ]
+      },
+      "recipe": {
+        "kind": "periodicAlternationToLength",
+        "hitUnit": "Χθες φτάσαμε στην Πάτρα και ο καιρός ήταν καλός.\n",
+        "missUnit": "Σήμερα το πρωί έβρεχε και οι δρόμοι ήταν άδειοι.\n",
+        "hitInterval": 8,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "literalAlternation.mixedScriptProse.{size}",
+      "axes": {
+        "size": [
+          65536
+        ]
+      },
+      "recipe": {
+        "kind": "periodicAlternationToLength",
+        "hitUnit": "Χθες φτάσαμε στην Πάτρα και ο καιρός ήταν καλός.\n",
+        "missUnit": "Утром шёл дождь, и улицы были пустыми и тихими.\n",
+        "hitInterval": 8,
+        "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "literalAlternation.cyrillicFail.{size}",
+      "axes": {
+        "size": [
+          65536
+        ]
+      },
+      "recipe": {
+        "kind": "repeatToLength",
+        "unit": "Утром шёл дождь, и улицы были пустыми и тихими.\n",
+        "length": "{size}"
+      },
+      "shared": true
     }
   ],
   "workloads": [
@@ -25117,6 +25179,114 @@
         "timingUnit": "nanoseconds",
         "constraints": [
           "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LiteralAlternationBenchmark.cyrillicProse.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "Москва|Казань|Самара|Тверь"
+      ],
+      "inputs": [
+        "literalAlternation.cyrillicProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 170
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "LiteralAlternationBenchmark.greekProse.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "Αθήνα|Πάτρα|Λάρισα|Βόλος"
+      ],
+      "inputs": [
+        "literalAlternation.greekProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 168
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "LiteralAlternationBenchmark.mixedScriptProse.{size}",
+      "operation": "findAllCount",
+      "patterns": [
+        "Москва|Казань|Самара|Тверь|Αθήνα|Πάτρα|Λάρισα|Βόλος"
+      ],
+      "inputs": [
+        "literalAlternation.mixedScriptProse.{size}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 171
+      },
+      "axes": {
+        "size": [
+          65536
+        ]
+      }
+    },
+    {
+      "id": "LiteralAlternationBenchmark.cyrillicFail.{size}",
+      "operation": "find",
+      "patterns": [
+        "Москва|Казань|Самара|Тверь|Пермь"
+      ],
+      "inputs": [
+        "literalAlternation.cyrillicFail.{size}"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      },
+      "axes": {
+        "size": [
+          65536
         ]
       }
     }
