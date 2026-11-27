@@ -212,6 +212,9 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
       }
     }
     ScanAudit.record(ScanKind.TRIPLE, ScanDirection.FORWARD, window, ScanPath.SWAR);
+    if (window >= NON_ASCII_SKIP_MIN_LENGTH && (b0 | b1 | b2) >= 0 && bytes[offset + start] < 0) {
+      start = ByteSwarScan.firstAsciiAfterNonAsciiPrefix(bytes, offset, scanLen, start);
+    }
     if (start < scanLen) {
       byte value = bytes[offset + start];
       if (value == b0 || value == b1 || value == b2) {
@@ -417,11 +420,6 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
       }
       case 6 -> {
         if (useSpecializedAsciiTriple(ranges, scanLen - start)) {
-          if (scanLen - start >= 128
-              && bytes[offset + start] < 0
-              && VectorScanProviders.providerForPolicy(ScanKind.TRIPLE, scanLen - start) == null) {
-            start = ByteSwarScan.skipNonAsciiBlocks(bytes, offset, scanLen, start);
-          }
           return scanByteTriple(
               scanLen, (byte) ranges[0], (byte) ranges[2], (byte) ranges[4], start);
         }

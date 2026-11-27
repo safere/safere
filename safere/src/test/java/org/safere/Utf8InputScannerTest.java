@@ -224,6 +224,38 @@ class Utf8InputScannerTest {
   }
 
   @Test
+  void asciiTripleScanResumesAtTheFirstMemberWithinTheViewAndLimit() {
+    // Vary the byte alignment of the view and the first member within a 32-byte block.
+    for (int offset = 0; offset < Long.BYTES; offset++) {
+      for (int repeats = 42; repeats < 74; repeats++) {
+        String prefix = "Z".repeat(offset) + "Y";
+        byte[] storage = (prefix + "中".repeat(repeats) + "_ZY").getBytes(UTF_8);
+        int first = 1 + 3 * repeats;
+        Utf8InputScanner scanner = new Utf8InputScanner(storage, offset, first + 2);
+        assertThat(scanner.indexOfAsciiTriple('Y', 'Z', '_', 1, storage.length)).isEqualTo(first);
+        assertThat(scanner.indexOfAsciiTriple('Y', 'Z', '_', 1, first)).isEqualTo(-1);
+      }
+    }
+  }
+
+  @Test
+  void asciiTripleScanDoesNotLoadBeyondAnExactSizeShortInput() {
+    for (String scalar : new String[] {"é", "中", "😀"}) {
+      byte[] storage = ("abc" + scalar.repeat(5)).getBytes(UTF_8);
+      Utf8InputScanner scanner = new Utf8InputScanner(storage);
+      assertThat(scanner.indexOfAsciiTriple('X', 'Y', 'Z', 3, storage.length)).isEqualTo(-1);
+    }
+  }
+
+  @Test
+  void nonAsciiCandidatesStopTripleScansInsideLongRuns() {
+    byte[] bytes = ("_a" + "中".repeat(16) + "é" + "中".repeat(64) + "X").getBytes(UTF_8);
+    Utf8InputScanner scanner = new Utf8InputScanner(bytes, 1, bytes.length - 1);
+    int limit = scanner.length();
+    assertThat(scanner.indexOfAsciiTripleOrNonAscii('X', 'Y', 'Z', 0, limit)).isEqualTo(1);
+  }
+
+  @Test
   void asciiCodePointClassSearchHonorsStartsAndSkipsNonAsciiScalars() {
     byte[] bytes = "5é😀a7".getBytes(UTF_8);
     int[] digits = {'0', '9'};

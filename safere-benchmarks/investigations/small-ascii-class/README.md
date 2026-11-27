@@ -8,6 +8,16 @@ capture-bearing and suffix-verification callers, repeated finds, and replacement
 These exercise filter acceptance, rejection, and fallback without changing the
 operation or result consumption of the motivating workload.
 
+The `dfaTriple` workloads match a DFA loop with three ASCII escapes. They cover
+long and short multibyte runs, frequent escapes, and alternating ASCII and
+multibyte characters. The gap sweep places 6 to 192 `é` characters before
+each of 4096 `:1` escapes. [Issue #1264](https://github.com/safere/safere/issues/1264)
+
+The `dfaTripleUnmasked` controls measure the long run and 12-character gap with
+three escape bytes that differ by at least two bits per pair. The optimized
+scanner usually finds the escape at the first ASCII byte and returns from the
+single-byte check.
+
 Use the shared runner with the default provider, for example:
 
 ```bash

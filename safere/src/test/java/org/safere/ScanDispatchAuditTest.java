@@ -156,7 +156,8 @@ class ScanDispatchAuditTest {
       window = classProvider.minimumWindowLength(ScanKind.CLASS) - 1;
     }
     int scanWindow = window;
-    Utf8InputScanner scanner = new Utf8InputScanner(LONG_INPUT);
+    // A skippable prefix must not shrink the window used for provider selection.
+    Utf8InputScanner scanner = new Utf8InputScanner("é".repeat(scanWindow).getBytes(UTF_8));
     long bitmap = (1L << ('X' - 64)) | (1L << ('Z' - 64)) | (1L << ('_' - 64));
     List<ScanEvent> events =
         captureScan(() ->
