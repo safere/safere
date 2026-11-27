@@ -181,11 +181,17 @@ final class MultiAnchorDescriptor {
       }
     }
 
+    /**
+     * A repetition of {@code leadingClass} in front of the part {@code innerPlan} scans for. {@code
+     * lineAnchored} marks an expansion chosen over a {@link LineAnchor} plan for a leading
+     * multiline {@code ^}.
+     */
     record LeadingExpansion(
         CharClassScanInfo leadingClass,
         int minRepetition,
         int maxRepetition,
         boolean hasLeadingAssertions,
+        boolean lineAnchored,
         StartPlan innerPlan)
         implements StartPlan {
       public LeadingExpansion {

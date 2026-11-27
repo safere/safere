@@ -5271,6 +5271,17 @@
         "length": 1048576
       },
       "shared": true
+    },
+    {
+      "id": "logLine.log.every32",
+      "recipe": {
+        "kind": "periodicAlternationToLength",
+        "hitUnit": "2026-11-27T08:15:42.123Z ERROR [worker-07] request failed: upstream timeout after 3000 ms path=/api/v2/orders/9817             \n",
+        "missUnit": "2026-11-27T08:15:42.123Z INFO  [worker-07] request handled: status=200 in 23 ms path=/api/v2/orders/9817                       \n",
+        "hitInterval": 32,
+        "length": 1048576
+      },
+      "shared": true
     }
   ],
   "workloads": [
@@ -25159,6 +25170,10 @@
           {
             "id": "unanchored",
             "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
           }
         ]
       },
@@ -25189,6 +25204,10 @@
           {
             "id": "unanchored",
             "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
           }
         ]
       },
@@ -25219,6 +25238,10 @@
           {
             "id": "unanchored",
             "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
           }
         ]
       },
@@ -25249,6 +25272,10 @@
           {
             "id": "unanchored",
             "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
           }
         ]
       },
@@ -25279,6 +25306,34 @@
           {
             "id": "unanchored",
             "value": ".*ERROR.*"
+          },
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          },
+          {
+            "id": "unixLinesMultiline",
+            "value": {
+              "java": "(?dm)^.*ERROR.*$",
+              "alternates": {
+                "re2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "rust-regex": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "pcre2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "dotnet": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                }
+              }
+            }
           }
         ]
       },
@@ -25286,6 +25341,60 @@
       "expected": {
         "type": "integer",
         "value": 2048
+      },
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "microseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      }
+    },
+    {
+      "id": "LogLineBenchmark.findAllCount.every32.{pattern}",
+      "operation": "findAllCount",
+      "patterns": [
+        "{pattern}"
+      ],
+      "inputs": [
+        "logLine.log.every32"
+      ],
+      "axes": {
+        "pattern": [
+          {
+            "id": "multiline",
+            "value": "(?m)^.*ERROR.*$"
+          },
+          {
+            "id": "unixLinesMultiline",
+            "value": {
+              "java": "(?dm)^.*ERROR.*$",
+              "alternates": {
+                "re2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "rust-regex": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "pcre2": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                },
+                "dotnet": {
+                  "pattern": "(?m)^.*ERROR.*$",
+                  "reason": "Only \\n ends a line for `.`, `^` and `$` in this engine, as with Java's UNIX_LINES"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "resultConsumption": "integer",
+      "expected": {
+        "type": "integer",
+        "value": 256
       },
       "measurement": {
         "mode": "averageTime",

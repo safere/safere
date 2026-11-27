@@ -46,6 +46,7 @@ class FindPlanTest {
           .+error: \\w+                     | false    | true     | true  | false
           \\b.*error: \\w+                  | false    | true     | true  | false
           ^.*error: \\w+                    | false    | false    | true  | false
+          (?m)^.*error: \\w+                | false    | true     | true  | false
           (?i).*error: \\w+                 | false    | false    | true  | false
           (?s).*error: \\w+                 | false    | false    | false | false
           \\s*# noqa                        | false    | false    | false | true
@@ -95,6 +96,33 @@ class FindPlanTest {
 
     FindPlan subsumed = Pattern.compile(".*error: \\w+").findPlan();
     assertThat(subsumed.rejectMode(subsumed.stringReject(), 10_000, true))
+        .isEqualTo(FindPlan.REJECT_NONE);
+  }
+
+  @Test
+  void lineAnchoredExpansionKeepsTheRejectWhereItsStartSearchDoesNotScan() {
+    // Below MIN_WIDE_LEADING_SKIP the expansion returns the search start without scanning for its
+    // literal, so only the reject prefilter can fail fast there, as it did for the line-anchor
+    // plan.
+    int skip = MultiAnchorCompiler.MIN_WIDE_LEADING_SKIP;
+    for (String regex : List.of("(?m)^.*ERROR.*$", "(?dm)^.*ERROR.*$")) {
+      FindPlan plan = Pattern.compile(regex).findPlan();
+      assertThat(plan.startSubsumesReject()).as(regex).isTrue();
+      assertThat(plan.rejectUnlessStartScans()).as(regex).isTrue();
+      RejectPrefilter reject = plan.stringReject();
+      assertThat(plan.rejectMode(reject, skip, true)).as(regex).isEqualTo(FindPlan.REJECT_NONE);
+      // Without the start search, nothing else would reject the input early.
+      assertThat(plan.rejectMode(reject, 10_000, false)).as(regex).isEqualTo(FindPlan.REJECT_FIRST);
+      for (int remaining : new int[] {skip - 1, 64, 1}) {
+        assertThat(plan.rejectMode(reject, remaining, true))
+            .as("%s remaining=%d", regex, remaining)
+            .isEqualTo(FindPlan.REJECT_FIRST);
+      }
+    }
+    // Unanchored expansions keep skipping the reject on short inputs.
+    FindPlan unanchored = Pattern.compile(".*ERROR.*").findPlan();
+    assertThat(unanchored.rejectUnlessStartScans()).isFalse();
+    assertThat(unanchored.rejectMode(unanchored.stringReject(), 100, true))
         .isEqualTo(FindPlan.REJECT_NONE);
   }
 

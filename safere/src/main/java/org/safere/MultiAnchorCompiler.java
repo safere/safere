@@ -200,6 +200,13 @@ final class MultiAnchorCompiler {
     StartFacets start = analysis.start();
 
     if (start.startAcceleration() != null) {
+      if (allowLeadingExpansion) {
+        MultiAnchorDescriptor.StartPlan.LeadingExpansion leadingExpansion =
+            extractLineLeadingExpansion(metadataAst);
+        if (leadingExpansion != null) {
+          return leadingExpansion;
+        }
+      }
       return new MultiAnchorDescriptor.StartPlan.LineAnchor(start.startAcceleration());
     }
 
@@ -1397,6 +1404,47 @@ final class MultiAnchorCompiler {
     return re;
   }
 
+  /**
+   * Returns a leading expansion for a line-anchored pattern, or {@code null} to keep the
+   * line-anchor plan.
+   *
+   * <p>A line-anchor plan runs the DFA from every line start. When the leading class matches
+   * everything but line terminators, as non-DOTALL {@code .} does in {@code (?m)^.*ERROR.*$}, the
+   * DFA has to read each whole line anyway, while scanning for the inner literal and walking back
+   * to the line start only visits the lines that contain it. As for any wide leading class, the
+   * inner plan must be an exact or fixed-offset literal. The class must exclude {@code \n}, so that
+   * the walk stops at the line start; a class like {@code [^,]} would walk across lines. A class
+   * that also stops elsewhere on a line, such as {@code \S} or {@code \w}, keeps the line-anchor
+   * plan, whose DFA can skip to the next line once the class run ends. The leading {@code ^} only
+   * removes candidates, and the DFA still checks it at the walked-back start, so the candidate
+   * stays a lower bound for the leftmost match, as it does without the anchor.
+   */
+  private static MultiAnchorDescriptor.StartPlan.LeadingExpansion extractLineLeadingExpansion(
+      Regexp re) {
+    MultiAnchorDescriptor.StartPlan.LeadingExpansion le = extractStartLeadingExpansion(re);
+    if (le == null
+        || !(le.innerPlan() instanceof MultiAnchorDescriptor.StartPlan.Literal
+            || le.innerPlan() instanceof MultiAnchorDescriptor.StartPlan.FixedOffset)) {
+      return null;
+    }
+    int[] excluded = excludedCodePoints(le.leadingClass());
+    if (excluded == null || Arrays.binarySearch(excluded, '\n') < 0) {
+      return null;
+    }
+    for (int cp : excluded) {
+      if (!Nfa.isLineTerminator(cp)) {
+        return null;
+      }
+    }
+    return new MultiAnchorDescriptor.StartPlan.LeadingExpansion(
+        le.leadingClass(),
+        le.minRepetition(),
+        le.maxRepetition(),
+        le.hasLeadingAssertions(),
+        true,
+        le.innerPlan());
+  }
+
   private static MultiAnchorDescriptor.StartPlan.LeadingExpansion extractStartLeadingExpansion(
       Regexp re) {
     if (re == null) {
@@ -1518,7 +1566,7 @@ final class MultiAnchorCompiler {
     }
 
     return new MultiAnchorDescriptor.StartPlan.LeadingExpansion(
-        leadingClass, minRepetition, maxRepetition, idx > 0, inner);
+        leadingClass, minRepetition, maxRepetition, idx > 0, false, inner);
   }
 
   static PrefixResult extractPrefix(Regexp re) {
