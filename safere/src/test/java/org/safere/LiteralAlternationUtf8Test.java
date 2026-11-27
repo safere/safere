@@ -89,6 +89,21 @@ class LiteralAlternationUtf8Test {
   }
 
   @Test
+  void longAlternativesPreserveByteOffsetsAndPriorityAcrossWindows() {
+    String literal = "abc".repeat(400) + "end";
+    for (String regex : List.of("abc|middle|" + literal, literal + "|middle|abc")) {
+      Pattern pattern = Pattern.compile(regex);
+      for (String suffix : List.of("", literal, "middle", "ab")) {
+        // Exhaust the candidate probes. The long literal then crosses the first window.
+        String text = "a!".repeat(8) + "é".repeat(590) + suffix + "x".repeat(6_000);
+        assertThat(utf8Finds(pattern, text)).isEqualTo(jdkFinds(regex, text));
+        assertThat(pattern.find(Utf8Input.validated(text.getBytes(UTF_8))))
+            .isEqualTo(!suffix.isEmpty() && !suffix.equals("ab"));
+      }
+    }
+  }
+
+  @Test
   void windowBoundariesPreserveLeftmostMatchAndAlternativePriority() {
     for (String regex :
         List.of(
