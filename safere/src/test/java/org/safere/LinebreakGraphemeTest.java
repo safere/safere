@@ -5,6 +5,7 @@
 
 package org.safere;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -17,10 +18,12 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@code \R} (Unicode linebreak) and {@code \X} (extended grapheme cluster) support.
- * Validates behavior against JDK 21's {@link java.util.regex.Pattern} specification.
+ * Validates behavior against the {@link java.util.regex.Pattern} specification.
  */
 class LinebreakGraphemeTest {
   @Nested
@@ -137,6 +140,27 @@ class LinebreakGraphemeTest {
       Pattern p = Pattern.compile("\\R{2}");
       assertThat(p.matcher("\r\n\n").matches()).isTrue();
       assertThat(p.matcher("\n\n").matches()).isTrue();
+    }
+
+    @Test
+    @DisabledForCrosscheck("OpenJDK rejects a counted \\R match that splits a CRLF pair")
+    void countedLinebreakCanSplitCrLf() {
+      assertFullMatchOnCrLf("\\R{2}");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\\R\\R", "(?:\\r\\n|[\\n\\x0B\\f\\r\\x85\\u2028\\u2029]){2}"})
+    void adjacentAndExpandedLinebreaksCanSplitCrLf(String regex) {
+      assertFullMatchOnCrLf(regex);
+    }
+
+    private static void assertFullMatchOnCrLf(String regex) {
+      String input = "\r\n";
+      Pattern pattern = Pattern.compile(regex);
+      assertThat(pattern.matcher(input).matches()).as("String input").isTrue();
+      assertThat(pattern.matcher(Utf8Input.validated(input.getBytes(UTF_8))).matches())
+          .as("UTF-8 input")
+          .isTrue();
     }
 
     @Test

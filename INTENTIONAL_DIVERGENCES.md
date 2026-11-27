@@ -601,6 +601,24 @@ case expansion with range syntax. The [case-equivalence audit](audits/unicode-ca
 records the complete observed differences over case-mapping participants,
 including the baseline and the rule after #866.
 
+## Counted Unicode Line Breaks on CRLF
+
+The JDK 26 specification defines `\R` as equivalent to
+`(?:\r\n|[\n\x0B\f\r\x85\u2028\u2029])`. SafeRE follows this definition for
+String and direct UTF-8 input. In a full match of `\R{2}` against one CRLF pair,
+the first repetition can consume CR and the second can consume LF. The adjacent
+form `\R\R` and the explicit alternation repeated twice also match.
+[JDK 26 `Pattern` specification](https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/util/regex/Pattern.html#sum)
+
+OpenJDK 26.0.2 rejects the counted form on this input and accepts the adjacent
+and expanded forms. OpenJDK 15 made the counted form match the documented
+alternation. OpenJDK 16 reverted that change because Unicode Technical
+Standard #18 recommends treating CRLF as one line break. The upstream follow-up
+proposes revisiting the definition.
+[SafeRE #1250](https://github.com/safere/safere/issues/1250) ·
+[OpenJDK backout](https://bugs.openjdk.org/browse/JDK-8258259) ·
+[OpenJDK specification follow-up](https://bugs.openjdk.org/browse/JDK-8258119)
+
 ## Grapheme Clusters after Unassigned Code Points
 
 Issue reference: [#925](https://github.com/safere/safere/issues/925).

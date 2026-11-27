@@ -51,11 +51,19 @@ final class StartRegisterSearch {
 
   /**
    * Distance after which a search that has seen no match hands over at the next position where a
-   * new search could begin. The start register only pays for itself on matches (it saves their
-   * reverse scan); long stretches without one are better served by the forward DFA's start-state
-   * acceleration.
+   * new search could begin, including while it stays in a start-like state that loops on itself.
+   * The start register only pays for itself on matches (it saves their reverse scan); long
+   * stretches without one are better served by the forward DFA's start-state acceleration.
    */
-  static final int HANDOFF_DISTANCE = 1024;
+  static final int HANDOFF_DISTANCE = 256;
+
+  /**
+   * Events after which a search may give up when the oldest live attempt has no register. Such a
+   * search can't vouch for a match from that attempt, and on inputs where attempts overlap (a near
+   * miss such as {@code aaaz} over a run of {@code a}) nearly every step runs the slow branch with
+   * both registers unknown, several times the cost of the forward DFA's step.
+   */
+  static final int BLIND_EVENTS = 256;
 
   // Adaptive switch. Each search that finds a match, proves there is none or hands over earns
   // HIT_GAIN credit, up to MAX_CREDIT; each fallback costs FALLBACK_COST. A fallback can rescan up
@@ -395,6 +403,7 @@ final class StartRegisterSearch {
         startPolicy(text) != null ? AdaptiveBackoff.resumePos(startBackoff) : Integer.MAX_VALUE;
     // Set on entering a start-like state, with no match seen, when a handoff or skip may be due.
     boolean startEntry = false;
+    int blindEvents = 0;
     while (true) {
       if (startEntry) {
         // Every attempt but the fresh one died: no match starts before pos.
@@ -530,6 +539,9 @@ final class StartRegisterSearch {
       if (stopOf[next] || cp < 0) {
         return stop(finish(matchStart, matchEnd), nextPos);
       }
+      if (r0 < 0 && ++blindEvents > BLIND_EVENTS && blindFallback(startPos, nextPos, blindEvents)) {
+        return FALLBACK;
+      }
       sid = next;
       pos = nextPos;
       startEntry = startLikeOf[next];
@@ -616,6 +628,15 @@ final class StartRegisterSearch {
       startBackoff = AdaptiveBackoff.recordSkip(startBackoff, pos, candidate, len, policy);
     }
     return candidate;
+  }
+
+  /**
+   * Returns whether a search should fall back: it scanned more than {@link #HANDOFF_DISTANCE} and
+   * at least a quarter of its steps were events that left the oldest live attempt untracked.
+   */
+  private static boolean blindFallback(int startPos, int pos, int blindEvents) {
+    int scanned = pos - startPos;
+    return scanned > HANDOFF_DISTANCE && blindEvents >= scanned / 4;
   }
 
   /** Start of the attempt with rank {@code rank} in a state entered at {@code entry}. */
@@ -1014,8 +1035,12 @@ final class StartRegisterSearch {
           switch (ns.matchRank) {
             case 0 -> ns.id | MATCH0;
             case 1 -> ns.id | MATCH1;
-            // Entering a start-like state from elsewhere is where the search may skip or hand over.
-            default -> startLikeOf[ns.id] && !startLikeOf[s.id] ? ns.id | START_ENTRY : ns.id;
+            // Entering a start-like state from elsewhere, or staying in one, is where the search
+            // may skip or hand over.
+            default ->
+                startLikeOf[ns.id] && (!startLikeOf[s.id] || ns.id == s.id)
+                    ? ns.id | START_ENTRY
+                    : ns.id;
           };
     } else {
       if (infoCount == infoNext.length) {

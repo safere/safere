@@ -123,7 +123,27 @@ class ExportTest(unittest.TestCase):
             (out / 'safere.jar').touch()
             result = subprocess.check_output([str(out / names[0]), '-runs=1'], text=True)
             self.assertIn('--cp=' + str(out / 'safere.jar') + ':', result)
-            self.assertIn('-runs=1', result)
+            driver_options = result.splitlines()[:-1]
+            for supplied, expected in (
+                ([], []),
+                (['-runs=1'], ['-runs=1']),
+                (['corpus with spaces', '-max_total_time=6600', '-timeout=1200'],
+                 ['corpus with spaces', '-max_total_time=6540', '-timeout=1200']),
+                (['-max_total_time=295', '-minimize_crash=1', 'crash input'],
+                 ['-max_total_time=295', '-minimize_crash=1', 'crash input']),
+                (['-minimize_crash=1', '-minimize_crash=0', '-max_total_time=6600'],
+                 ['-minimize_crash=1', '-minimize_crash=0', '-max_total_time=6540']),
+                (['-max_total_time=0061'], ['-max_total_time=1']),
+                (['-max_total_time=60'], ['-max_total_time=60']),
+                (['-max_total_time=1'], ['-max_total_time=1']),
+                (['-max_total_time=0'], ['-max_total_time=0']),
+                (['-max_total_time=-1'], ['-max_total_time=-1']),
+                (['-max_total_time=6600s'], ['-max_total_time=6600s']),
+                (['-max_total_time=2147483648'], ['-max_total_time=2147483648']),
+            ):
+                with self.subTest(supplied=supplied):
+                    result = subprocess.check_output([str(out / names[0]), *supplied], text=True)
+                    self.assertEqual(result.splitlines(), driver_options + expected)
             (out / 'CompileFuzzer').write_text('stale broad launcher')
             with self.assertRaisesRegex(ValueError, 'unenrolled'):
                 exporter.export(out)
