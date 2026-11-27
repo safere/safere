@@ -29,19 +29,12 @@ public final class CompileInitializationProbe {
         System.out.println(COMPILED);
         checkFirstCaptures(pattern);
       }
-      case "cache-budget" -> {
+      case "dfa-search" -> {
         Pattern pattern = Pattern.compile(regex);
         System.out.println(COMPILED);
         Dfa dfa = pattern.forwardLongestMatchDfa();
         if (dfa == null || !dfa.doSearch("abc", 0, true, true).matched()) {
           throw new AssertionError("expected the DFA to match");
-        }
-        System.out.println("SafeRE reference bytes: " + DfaCacheBudget.REFERENCE_BYTES);
-      }
-      case "reject-start-register" -> {
-        Prog prog = Pattern.compile(regex).flatDfaProg();
-        if (StartRegisterSearch.create(prog, null, null) != null) {
-          throw new AssertionError("expected the start-register search to reject the program");
         }
       }
       case "compile" -> Pattern.compile(regex);

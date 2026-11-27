@@ -19,6 +19,9 @@ public final class ReplacementFuzzer {
       List.of("", "lit", "$0", "$1", "${part}", "lit$1");
   private static final List<String> MALFORMED_REPLACEMENT_SUFFIXES =
       List.of("\\", "$", "$9", "$x", "${", "${}", "${nope}", "${part");
+  private static final List<String> MISSING_GROUP_REFERENCES = List.of("$9", "$3", "${nope}");
+  private static final List<String> LATER_REPLACEMENT_ERRORS =
+      List.of("$", "\\", "${", "${}", "$x", "${part", "$9", "${nope}");
 
   @Test
   void terminalEmptyReplacementState() {
@@ -72,6 +75,51 @@ public final class ReplacementFuzzer {
         }
       }
     }
+  }
+
+  @Test
+  void missingGroupBeforeLaterReplacementError() {
+    // The first error in the replacement decides the exception class, as in the JDK: a missing
+    // group must not be masked by a syntax error or another missing group later in the string.
+    for (String regex : PARTIAL_OUTPUT_PATTERNS) {
+      FuzzSupport.CompiledPattern pattern = FuzzSupport.compileOrSkip(regex, 0);
+      assertThat(pattern).isNotNull();
+      for (String prefix : PARTIAL_OUTPUT_PREFIXES) {
+        for (String missing : MISSING_GROUP_REFERENCES) {
+          for (String later : LATER_REPLACEMENT_ERRORS) {
+            for (String input : List.of("axb", "xyax", "")) {
+              compareReplacements(pattern, input, prefix + missing + later, false);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Generates replacements with two errors, a missing group reference followed by a syntax error or
+   * another invalid reference, and compares the exception class with the JDK for {@code
+   * replaceAll}, {@code replaceFirst}, and {@code appendReplacement}.
+   */
+  @FuzzTest(maxDuration = "30s")
+  void competingReplacementErrors(FuzzedDataProvider data) {
+    String regex = data.pickValue(PARTIAL_OUTPUT_PATTERNS);
+    boolean useStringBuffer = data.consumeBoolean();
+    StringBuilder input = new StringBuilder();
+    int length = data.consumeInt(0, 16);
+    for (int i = 0; i < length; i++) {
+      input.append(data.pickValue(List.of("x", "y", "a", "xy")));
+    }
+    String replacement =
+        data.pickValue(PARTIAL_OUTPUT_PREFIXES)
+            + data.pickValue(MISSING_GROUP_REFERENCES)
+            + data.pickValue(List.of("", "lit", "$0"))
+            + data.pickValue(LATER_REPLACEMENT_ERRORS);
+    FuzzSupport.CompiledPattern pattern = FuzzSupport.compileOrSkip(regex, 0);
+    if (pattern == null) {
+      return;
+    }
+    compareReplacements(pattern, input.toString(), replacement, useStringBuffer);
   }
 
   /**
@@ -204,22 +252,20 @@ public final class ReplacementFuzzer {
       String replacement,
       boolean useStringBuffer) {
     FuzzSupport.MatcherPair replaceAllMatcher = pattern.matcher(input);
-    if (!replaceAllMatcher.replaceAll(replacement)) {
-      // A rejected template may still produce partial output before the append loop reaches the
-      // invalid part, so check the destination after rejection on a fresh matcher.
-      appendReplacementLoop(pattern, input, replacement, useStringBuffer);
-      return;
+    if (replaceAllMatcher.replaceAll(replacement)) {
+      replaceAllMatcher.reset();
+      replaceAllMatcher.find();
     }
-    replaceAllMatcher.reset();
-    replaceAllMatcher.find();
 
+    // Run replaceFirst on a fresh matcher even when replaceAll rejects the replacement, so each
+    // operation's exception class is checked against the JDK for the same input.
     FuzzSupport.MatcherPair replaceFirstMatcher = pattern.matcher(input);
-    if (!replaceFirstMatcher.replaceFirst(replacement)) {
-      appendReplacementLoop(pattern, input, replacement, useStringBuffer);
-      return;
+    if (replaceFirstMatcher.replaceFirst(replacement)) {
+      replaceFirstMatcher.hasReplacementMatchState();
     }
-    replaceFirstMatcher.hasReplacementMatchState();
 
+    // A rejected template may still produce partial output before the append loop reaches the
+    // invalid part, so the loop also checks the destination after rejection on a fresh matcher.
     appendReplacementLoop(pattern, input, replacement, useStringBuffer);
   }
 

@@ -1408,6 +1408,8 @@ final class Nfa {
         if (rq.flatStarts != null) {
           capture[0] = rq.flatStarts[threadIndex];
         }
+        // With instruction-only queues the scratch start can be stale. These searches only
+        // return a Boolean result, and the flat program has no grapheme checks.
       } else {
         NfaThread t = rq.threads[threadIndex];
         id = t.id;

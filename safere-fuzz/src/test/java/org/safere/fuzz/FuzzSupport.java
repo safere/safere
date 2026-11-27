@@ -657,7 +657,22 @@ final class FuzzSupport {
         String replacement,
         StringOperation safeReOperation,
         StringOperation jdkOperation) {
-      return replacementOutcome(operation, replacement, safeReOperation, jdkOperation).completed();
+      ReplacementOutcome outcome =
+          replacementOutcome(operation, replacement, safeReOperation, jdkOperation);
+      RuntimeException safeReRejection = outcome.safeReRejection();
+      RuntimeException jdkRejection = outcome.jdkRejection();
+      // Both engines report the first error in a replacement, so a rejection must have the same
+      // exception class, not just any expected one.
+      if (safeReRejection != null
+          && jdkRejection != null
+          && safeReRejection.getClass() != jdkRejection.getClass()) {
+        throw divergence(
+            operation + " exception class",
+            replacement,
+            safeReRejection.getClass().getSimpleName(),
+            jdkRejection.getClass().getSimpleName());
+      }
+      return outcome.completed();
     }
 
     /**
