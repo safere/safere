@@ -239,6 +239,15 @@ class Utf8InputScannerTest {
   }
 
   @Test
+  void asciiTripleScanDoesNotLoadBeyondAnExactSizeShortInput() {
+    for (String scalar : new String[] {"é", "中", "😀"}) {
+      byte[] storage = ("abc" + scalar.repeat(5)).getBytes(UTF_8);
+      Utf8InputScanner scanner = new Utf8InputScanner(storage);
+      assertThat(scanner.indexOfAsciiTriple('X', 'Y', 'Z', 3, storage.length)).isEqualTo(-1);
+    }
+  }
+
+  @Test
   void nonAsciiCandidatesStopTripleScansInsideLongRuns() {
     byte[] bytes = ("_a" + "中".repeat(16) + "é" + "中".repeat(64) + "X").getBytes(UTF_8);
     Utf8InputScanner scanner = new Utf8InputScanner(bytes, 1, bytes.length - 1);

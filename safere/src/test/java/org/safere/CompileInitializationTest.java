@@ -6,7 +6,6 @@
 package org.safere;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -24,7 +23,6 @@ class CompileInitializationTest {
   private static final String INDEX_NAME = "org/safere/UnicodeCaseFolding$UnicodeCaseClosureIndex";
   // Generated crosscheck tests copy this disabled test without its SafeRE-only probe class.
   private static final String PROBE_CLASS_NAME = "org.safere.CompileInitializationProbe";
-  private static final String DFA_CACHE_BUDGET_NAME = "org/safere/DfaCacheBudget";
 
   @ParameterizedTest
   @ValueSource(strings = {"hello", "\\w+", "\\p{L}+", "(foo|bar)+"})
@@ -145,37 +143,16 @@ class CompileInitializationTest {
   }
 
   @Test
-  void compilationDoesNotReadTheDfaCacheReferenceSize()
+  void firstDfaSearchDoesNotInitializeManagement()
       throws IOException, InterruptedException, URISyntaxException {
-    assertThat(runFreshProcess("a[bc]+")).doesNotContain(DFA_CACHE_BUDGET_NAME);
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void firstDfaSearchUsesTheEffectiveHotSpotReferenceSize(boolean compressed)
-      throws IOException, InterruptedException, URISyntaxException {
-    String vm = System.getProperty("java.vm.name");
-    assumeTrue(vm.contains("HotSpot") || vm.startsWith("OpenJDK"), "Requires HotSpot");
-    String option = compressed ? "-XX:+UseCompressedOops" : "-XX:-UseCompressedOops";
-    String expected = "SafeRE reference bytes: " + (compressed ? Integer.BYTES : Long.BYTES);
-
-    assertThat(runFreshProcess("a[bc]+", "", "cache-budget", option))
-        .containsSubsequence(
-            "SafeRE pattern compiled", "Initializing '" + DFA_CACHE_BUDGET_NAME + "'", expected);
+    assertThat(runFreshProcess("a[bc]+", "", "dfa-search"))
+        .doesNotContain("Initializing 'java/lang/management/ManagementFactory'");
   }
 
   @Test
-  void firstDfaSearchUsesConservativeSizeWithoutManagement()
+  void firstDfaSearchWorksWithOnlyJavaBase()
       throws IOException, InterruptedException, URISyntaxException {
-    assertThat(runFreshProcess("a[bc]+", "", "cache-budget", "--limit-modules=java.base"))
-        .contains("SafeRE reference bytes: " + Long.BYTES);
-  }
-
-  @Test
-  void rejectingAStartRegisterProgramDoesNotReadTheCacheReferenceSize()
-      throws IOException, InterruptedException, URISyntaxException {
-    assertThat(runFreshProcess("\\Aa", "", "reject-start-register"))
-        .doesNotContain(DFA_CACHE_BUDGET_NAME);
+    runFreshProcess("a[bc]+", "", "dfa-search", "--limit-modules=java.base");
   }
 
   private static String runFreshProcess(String regex)
