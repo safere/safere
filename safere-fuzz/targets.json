@@ -118,6 +118,7 @@
     "oss_fuzz": false,
     "seeds": null,
     "methods": [
+      "competingReplacementErrors",
       "rejectedReplacementRollback",
       "replacement"
     ]
