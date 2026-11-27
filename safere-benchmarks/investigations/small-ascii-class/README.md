@@ -22,3 +22,11 @@ runner validates and consumes each operation's result. Sizes name UTF-16 units;
 inspect the resolved manifest for UTF-8 byte sizes. These are diagnostic controls,
 not additions to the regular reporting corpus. Keep timing results and profiles
 local.
+
+The `dfaPair` workloads match a DFA loop with two ASCII escapes. The gap sweep
+repeats a run of 6 to 192 `é` characters before each delimiter. Each DFA gap-sweep input
+contains 4096 `:1` escapes and ends with a semicolon. The `pairFindAll` sweep
+counts 4096 `Z` delimiters with `[YZ]`. In `pairFindAll.nonmemberGap12`,
+an ASCII `x` precedes each `Z`, so the scanner must continue past the first
+ASCII byte. The `pairAsciiMiss` and `mixedPairMiss`
+controls cover ASCII text and a non-ASCII target. [Issue #1264](https://github.com/safere/safere/issues/1264)

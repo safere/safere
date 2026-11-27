@@ -23,6 +23,58 @@ import org.junit.jupiter.api.Test;
 @DisabledForCrosscheck("package-private UTF-8 scanner tests exercise SafeRE internals")
 class Utf8InputScannerTest {
   @Test
+  void asciiPairScanResumesAtTheFirstMemberWithinTheViewAndLimit() {
+    // Vary the byte alignment of the view and the first member within a 32-byte block.
+    for (int offset = 0; offset < Long.BYTES; offset++) {
+      for (int repeats = 42; repeats < 74; repeats++) {
+        String prefix = "Z".repeat(offset) + "Y";
+        byte[] storage = (prefix + "中".repeat(repeats) + "_ZY").getBytes(UTF_8);
+        int first = 1 + 3 * repeats;
+        Utf8InputScanner scanner = new Utf8InputScanner(storage, offset, first + 2);
+        assertThat(scanner.indexOfAsciiPair('Y', 'Z', 1, first + 1)).isEqualTo(-1);
+        assertThat(scanner.indexOfAsciiPair('Y', 'Z', 1, storage.length)).isEqualTo(first + 1);
+        assertThat(scanner.indexOfAsciiPair('X', 'Y', 1, storage.length)).isEqualTo(-1);
+      }
+    }
+  }
+
+  @Test
+  void asciiPairFindsNearbyEscapesBeforeLongNonAsciiRuns() {
+    for (int escape = 2; escape <= 4 * Long.BYTES; escape++) {
+      String prefix = multibytePrefix(escape);
+      for (char first : new char[] {'Y', 'Z'}) {
+        byte[] bytes = ("X" + prefix + first + "中".repeat(64) + "Y").getBytes(UTF_8);
+        Utf8InputScanner scanner = new Utf8InputScanner(bytes, 1, bytes.length - 1);
+        assertThat(scanner.indexOfAsciiPair('Y', 'Z', 0, scanner.length())).isEqualTo(escape);
+      }
+    }
+  }
+
+  @Test
+  void asciiPairHonorsTheExclusiveLimitAtTheBlockScanThreshold() {
+    for (int limit : new int[] {127, 128, 129, 135, 136}) {
+      int escape = limit - 1;
+      byte[] bytes = ("X" + multibytePrefix(escape) + "YZ").getBytes(UTF_8);
+      Utf8InputScanner scanner = new Utf8InputScanner(bytes, 1, bytes.length - 1);
+      assertThat(scanner.indexOfAsciiPair('Y', 'Z', 0, limit)).isEqualTo(escape);
+      assertThat(scanner.indexOfAsciiPair('Y', 'Z', 0, escape)).isEqualTo(-1);
+    }
+  }
+
+  private static String multibytePrefix(int bytes) {
+    return (bytes & 1) == 0 ? "é".repeat(bytes / 2) : "中" + "é".repeat((bytes - 3) / 2);
+  }
+
+  @Test
+  void nonAsciiCandidatesStopPairScansInsideLongRuns() {
+    byte[] bytes = ("_a" + "中".repeat(16) + "é" + "中".repeat(64) + "X").getBytes(UTF_8);
+    Utf8InputScanner scanner = new Utf8InputScanner(bytes, 1, bytes.length - 1);
+    int limit = scanner.length();
+    assertThat(scanner.indexOfMixedPair('X', "é".getBytes(UTF_8), 1, limit)).isEqualTo(49);
+    assertThat(scanner.indexOfAsciiPairOrNonAscii('Y', 'Z', 0, limit)).isEqualTo(1);
+  }
+
+  @Test
   void decodesEveryUnicodeScalarInBothDirections() {
     for (int expected = 0; expected <= Character.MAX_CODE_POINT; expected++) {
       if (expected >= Character.MIN_SURROGATE && expected <= Character.MAX_SURROGATE) {

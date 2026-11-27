@@ -98,6 +98,31 @@ class ByteSwarScanTest {
   }
 
   @Test
+  void asciiPairSearchHonorsTheStartAndLimit() {
+    for (int offset = 0; offset < Long.BYTES; offset++) {
+      for (int length : new int[] {128, 129, 159, 160, 161, 255, 1024}) {
+        int start = 5;
+        int limit = start + length;
+        byte[] storage = new byte[offset + limit + Long.BYTES];
+        Arrays.fill(storage, (byte) 'X');
+        Arrays.fill(storage, offset + start, offset + limit, (byte) 0xC3);
+        assertThat(
+                ByteSwarScan.indexOfAsciiPairAfterNonAsciiPrefix(
+                    storage, offset, limit, (byte) 'X', (byte) 'Z', start))
+            .isEqualTo(-1);
+        for (int hit = start; hit < limit; hit++) {
+          storage[offset + hit] = (byte) (hit % 2 == 0 ? 'X' : 'Z');
+          assertThat(
+                  ByteSwarScan.indexOfAsciiPairAfterNonAsciiPrefix(
+                      storage, offset, limit, (byte) 'X', (byte) 'Z', start))
+              .isEqualTo(hit);
+          storage[offset + hit] = (byte) 0xC3;
+        }
+      }
+    }
+  }
+
+  @Test
   void nonAsciiBlockSkipStopsBeforeTheFirstPossibleAsciiMatch() {
     for (int offset = 0; offset < 16; offset++) {
       for (int length : new int[] {128, 129, 255, 1024}) {

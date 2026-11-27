@@ -173,6 +173,21 @@ class ScanDispatchAuditTest {
   }
 
   @Test
+  void nonAsciiPrefixPreservesThePairDispatchWindow() {
+    Utf8InputScanner scanner = new Utf8InputScanner("é".repeat(512).getBytes(UTF_8));
+    int window = 256;
+    ScanPath path =
+        VectorScanProviders.providerForPolicy(ScanKind.PAIR, window) == null
+            ? ScanPath.SWAR
+            : ScanPath.VECTOR;
+
+    assertThat(captureScan(() -> scanner.indexOfAsciiPair('Y', 'Z', 4, 4 + window)))
+        .containsExactly(
+            consulted(ScanKind.PAIR, window),
+            new ScanEvent(ScanKind.PAIR, ScanDirection.FORWARD, window, path));
+  }
+
+  @Test
   void tripleClassRecordsOnlyItsActualTripleScan() {
     VectorScanProvider provider = installedProvider();
     if (provider == null) {

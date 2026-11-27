@@ -3,6 +3,72 @@
   "configuration": {},
   "inputs": [
     {
+      "id": "classScan.dfa.gap6",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9:1",
+        "suffix": ";",
+        "length": 32769
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.gap12",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9:1",
+        "suffix": ";",
+        "length": 57345
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.gap24",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9:1",
+        "suffix": ";",
+        "length": 106497
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.gap48",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9:1",
+        "suffix": ";",
+        "length": 204801
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.gap96",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9:1",
+        "suffix": ";",
+        "length": 401409
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.gap192",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9:1",
+        "suffix": ";",
+        "length": 794625
+      },
+      "shared": true
+    },
+    {
       "id": "classScan.asciiLate.{size}",
       "axes": {
         "size": [
@@ -95,6 +161,83 @@
         "unit": "\u00e9\u4e2d\ud83d\ude00",
         "suffix": "z",
         "length": "{size}"
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.gap6",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9Z",
+        "suffix": "",
+        "length": 28672
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.gap12",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9Z",
+        "suffix": "",
+        "length": 53248
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.nonmemberGap12",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9xZ",
+        "suffix": "",
+        "length": 57344
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.gap24",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9Z",
+        "suffix": "",
+        "length": 102400
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.gap48",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9Z",
+        "suffix": "",
+        "length": 200704
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.gap96",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9Z",
+        "suffix": "",
+        "length": 397312
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.pair.gap192",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9Z",
+        "suffix": "",
+        "length": 790528
       },
       "shared": true
     },
@@ -276,9 +419,242 @@
         "length": 262144
       },
       "shared": true
+    },
+    {
+      "id": "classScan.dfa.long",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u4e2d\ud83d\ude00",
+        "suffix": ";",
+        "length": 262145
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.short",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9\u4e2d\ud83d\ude00",
+        "suffix": ";",
+        "length": 17
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.frequent",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9:1x",
+        "suffix": ";",
+        "length": 4097
+      },
+      "shared": true
+    },
+    {
+      "id": "classScan.dfa.alternating",
+      "recipe": {
+        "kind": "surroundToLength",
+        "prefix": "",
+        "unit": "\u00e9a",
+        "suffix": ";",
+        "length": 262145
+      },
+      "shared": true
     }
   ],
   "workloads": [
+    {
+      "id": "AsciiClassScan.dfaPair.{shape}",
+      "operation": "matches",
+      "patterns": [
+        "(?:[^:;]|:[0-9])*;"
+      ],
+      "inputs": [
+        "classScan.dfa.{shape}"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "shape": [
+          "long",
+          "short",
+          "frequent",
+          "alternating"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string"
+          ],
+          "when": {
+            "shape": [
+              "long",
+              "frequent",
+              "alternating"
+            ]
+          },
+          "reason": "The JDK matcher exceeds its stack on the repeated alternation at these input sizes."
+        }
+      ]
+    },
+    {
+      "id": "AsciiClassScan.dfaPair.gap{gap}",
+      "operation": "matches",
+      "patterns": [
+        "(?:[^:;]|:[0-9])*;"
+      ],
+      "inputs": [
+        "classScan.dfa.gap{gap}"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "gap": [
+          6,
+          12,
+          24,
+          48,
+          96,
+          192
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "trialExclusions": [
+        {
+          "engineIds": [
+            "jdk-string"
+          ],
+          "reason": "The JDK matcher exceeds its stack on the repeated alternation at these input sizes."
+        }
+      ]
+    },
+    {
+      "id": "AsciiClassScan.pairFindAll.gap{gap}",
+      "operation": "findAllCount",
+      "patterns": [
+        "[YZ]"
+      ],
+      "inputs": [
+        "classScan.pair.gap{gap}"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "gap": [
+          6,
+          12,
+          24,
+          48,
+          96,
+          192
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 4096
+      }
+    },
+    {
+      "id": "AsciiClassScan.pairFindAll.nonmemberGap12",
+      "operation": "findAllCount",
+      "patterns": [
+        "[YZ]"
+      ],
+      "inputs": [
+        "classScan.pair.nonmemberGap12"
+      ],
+      "resultConsumption": "integer",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "integer",
+        "value": 4096
+      }
+    },
+    {
+      "id": "AsciiClassScan.pairAsciiMiss.{size}",
+      "operation": "find",
+      "patterns": [
+        "[YZ]"
+      ],
+      "inputs": [
+        "classScan.asciiMiss.{size}"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "axes": {
+        "size": [
+          16,
+          262144
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
+    {
+      "id": "AsciiClassScan.mixedPairMiss",
+      "operation": "find",
+      "patterns": [
+        "X|\u00e4"
+      ],
+      "inputs": [
+        "classScan.otherTriple.262144"
+      ],
+      "resultConsumption": "boolean",
+      "measurement": {
+        "mode": "averageTime",
+        "timingUnit": "nanoseconds",
+        "constraints": [
+          "prematerializedInput"
+        ]
+      },
+      "expected": {
+        "type": "boolean",
+        "value": false
+      }
+    },
     {
       "id": "AsciiClassScan.asciiLate.{size}",
       "operation": "find",

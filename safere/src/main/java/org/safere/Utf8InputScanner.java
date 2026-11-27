@@ -198,6 +198,10 @@ final class Utf8InputScanner extends ByteSwarScan implements InputScanner {
       }
     }
     ScanAudit.record(ScanKind.PAIR, ScanDirection.FORWARD, window, ScanPath.SWAR);
+    if (window >= NON_ASCII_SKIP_MIN_LENGTH && (b0 | b1) >= 0 && bytes[offset + start] < 0) {
+      return ByteSwarScan.indexOfAsciiPairAfterNonAsciiPrefix(
+          bytes, offset, scanLen, b0, b1, start);
+    }
     return ByteSwarScan.indexOfBytePair(bytes, offset, scanLen, b0, b1, start);
   }
 
