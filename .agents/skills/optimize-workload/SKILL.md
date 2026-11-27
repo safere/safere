@@ -32,8 +32,8 @@ benefit on representative variations beyond the motivating example.
   Do not switch a dirty checkout to run comparisons.
 - Reproduce the workload with a repository runner. Create a minimal representative benchmark if
   none exists, in the project's established workload format. Ensure its output is consumed and
-  validated. Plan comparable before/after controls now, including new workloads identified below,
-  so the baseline can measure them before production changes.
+  validated. Plan the paired baseline measurements before editing production code. Add controls
+  as profiling and design choices reveal new risks.
 
 ## Profile and compare approaches
 
@@ -50,6 +50,24 @@ benefit on representative variations beyond the motivating example.
 4. Select the best supported approach and briefly explain the choice in a progress update. Weigh
    target benefit, frequency/coverage, algorithmic guarantees, regression exposure and complexity.
    Proceed with implementation without an approval checkpoint unless a real constraint requires it.
+
+## Design controls before implementation
+
+For each material cost the change adds or moves, identify who pays it, how often, and what must
+happen to recover it. Turn that into a prediction about an input or call sequence that could lose.
+Check the existing input recipes against that prediction. Add a paired workload if none tests it.
+
+When a benefit depends on a quantity, vary that quantity while keeping the affected path active.
+Include intermediate values around the expected crossover. If its location is unknown, try a
+small, widely spaced sweep and narrow it where the result changes. For example, in a repeated
+scan the relevant size can be the distance to the next delimiter on **each call**. Keep the
+multibyte scan start, vary the gap, and exercise callers that restart the search differently.
+For a cache, the relevant quantity might be how often an entry is reused before eviction.
+In either case, a large input can contain many short-lived opportunities to recover setup cost.
+
+Use a trace, counter, or profile when the input recipe alone cannot establish which path ran or
+how often. Prioritize realistic combinations where costs recur. A few cases that isolate the
+predicted loss usually suffice.
 
 ## Implement and verify correctness
 
@@ -76,9 +94,8 @@ is unavailable, report the exact blocker and leave the review step explicitly in
 
 ## Measure regressions and final benefit
 
-Build a control set from the changed mechanism and callers, not just neighboring benchmark names.
-Use existing workloads and add plausible missing ones. Select applicable dimensions rather than
-exhaustively multiplying them:
+Check the control plan against the final implementation. Select the dimensions that could change
+the predicted cost:
 
 - Cases that enter the new path, narrowly miss its gate, and use the fallback; successful and failed
   operations; early/late matches, dense/sparse candidates and false positives.
@@ -89,9 +106,8 @@ exhaustively multiplying them:
 - Features sharing changed helpers, caches or engine-selection logic, including cases the new
   heuristic rejects. Consider patterns outside the original workload family.
 
-Explain why each control could regress. For gaps in the suite, declare new representative workloads
-and measure them on **both** baseline and candidate with identical definitions. Keep one-off
-experiments in the project's investigation area unless they warrant durable suite coverage.
+Measure new representative workloads on **both** baseline and candidate with identical definitions.
+Keep one-off experiments in the project's investigation area unless they warrant durable coverage.
 
 Run the target and controls after the review fixes using the repository's standard runners and
 settings. Run measurements sequentially. Keep production-code revisions comparable: input recipes,
@@ -106,6 +122,9 @@ Distinguish noise from measured regressions; use confirmation measurements as pr
 user constraints permit. Do not hide a regressed control inside an aggregate or substitute
 cross-engine rankings for before/after evidence.
 
+If a result falls outside the expected spread, revisit the prediction before tuning against that
+input. Identify a variable that could explain the result. Measure neighboring values on both versions.
+If a fix moves a threshold or shifts work to another caller, check the newly exposed cases.
 For a material regression, investigate and refine or reject the approach. Do not silently accept a
 tradeoff that conflicts with the user's performance goal. If no supported approach improves the
 target without unacceptable costs, report that result with evidence and any decision needed.
@@ -118,7 +137,8 @@ Avoid repeating unchanged checks without new risk or evidence.
 Provide a concise account of:
 
 - The bottleneck, alternatives considered, selected mechanism and preserved invariant.
-- Before/after target results and existing/new controls, including regressions and uncertainty.
+- Before/after target results and controls, which predicted loss each control tested, and any
+  plausible high-impact case left unmeasured. Include regressions and uncertainty.
 - Correctness verification, final review status and remaining limitations.
 - Revisions/patches, commands and local evidence locations needed to reproduce the comparison.
 

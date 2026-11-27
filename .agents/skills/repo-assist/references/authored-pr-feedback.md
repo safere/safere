@@ -141,10 +141,10 @@ it was published. Keep contributor experiments in their own isolated worktrees.
 
 ## Report And State
 
-Follow [report-format.md](report-format.md). Keep `Your PRs With Review Feedback` in the main
-brief, with concise current actions and grouped routine approvals. Summarize authored branch
-updates there, including PRs without feedback, and preserve reviewer-owned Done cells. Surface
-blocked updates, disagreements, draft holds, and unpublished repairs.
+Follow [report-format.md](report-format.md). Use the `authored` list from `discover` as the
+reporting queue. Include PRs that the feedback collector omits because they have no external
+feedback and no prior feedback record. For each PR, state the feedback outcome and the branch
+update outcome. Surface blocked updates, disagreements, draft holds, and unpublished repairs.
 
 Write complete per-request assessments in the path printed as `authoredFeedbackReportPath` by
 begin-run (`reports/<runId>/authored-feedback.md`). Use stable `authored-pr-N` anchors. Include URLs,
@@ -152,7 +152,7 @@ draft/published/local heads, worktree choice and any blocker, each request’s d
 local or pushed commits and verification, and remaining work. Carry still-valid decisions into this
 current-run record, reading lastDetailReport (or legacy lastReport) only after fresh trust checks
 permit reuse. The main briefing links here instead of repeating request history, exact SHAs,
-worktree errors and approval-only verification paragraphs for every PR.
+worktree errors and detailed verification for approvals and PRs with no feedback to address.
 
 Maintain these fields separately from contributor review state in
 `state.json.authoredPrFeedback["<number>"]`: `fingerprint`, `lastRemoteHeadSha`, `lastLocalHeadSha`,

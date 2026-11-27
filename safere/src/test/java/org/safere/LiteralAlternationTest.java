@@ -241,6 +241,27 @@ class LiteralAlternationTest {
   }
 
   @Test
+  void longLiteralSearchContinuesAfterAFalseEndAnchor() {
+    String literal = "b" + "a".repeat(13);
+    Pattern pattern = Pattern.compile(literal + "|zzz");
+    String text = "b".repeat(10) + "a".repeat(13);
+    Matcher matcher = pattern.matcher(text);
+
+    assertThat(matcher.find()).isTrue();
+    assertThat(matcher.start()).isEqualTo(9);
+    assertThat(matcher.end()).isEqualTo(text.length());
+  }
+
+  @Test
+  void longLiteralSearchDoesNotMatchAcrossTheRegionEnd() {
+    String literal = "b" + "a".repeat(13);
+    Matcher matcher = Pattern.compile(literal + "|zzz").matcher(literal);
+
+    assertThat(matcher.region(0, literal.length() - 1).find()).isFalse();
+    assertThat(matcher.region(0, literal.length()).find()).isTrue();
+  }
+
+  @Test
   void literalAlternationsAdvertiseLiteralCapability() {
     Pattern pattern = Pattern.compile("apple|banana|cherry");
     assertThat(pattern.analysis().capabilities()).contains(PatternCapability.LITERAL_MATCH);

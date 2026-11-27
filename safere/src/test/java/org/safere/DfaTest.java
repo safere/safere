@@ -660,6 +660,8 @@ class DfaTest {
       long bytes = (long) allocated.invoke(bean, thread) - before;
 
       assertThat(matched).isTrue();
+      assertThat(pattern.getOrCreateThreadCache().forwardLongestMatchDfa.lastSearchBailed())
+          .isFalse();
       // Includes old arrays discarded during growth as well as retained storage.
       assertThat(bytes).isLessThan(24L * 1024 * 1024);
     }

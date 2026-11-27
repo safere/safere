@@ -116,7 +116,7 @@ requires all three:
    contributor reviews, integrate current `main` as needed and fix agreed feedback in one
    worktree per PR. Prefer the verified original worktree. Use an isolated worktree at the
    verified published head when the original is unavailable. Verify and push the combined
-   update once per PR. Report disagreements, blockers, and unpublished repairs.
+   update once per PR. Report the outcome for every authored PR in the queue.
 3. Read [references/contributor-pr-review.md](references/contributor-pr-review.md) **in full before
    discovering, triaging, reviewing, repairing, benchmarking, or reporting contributor PRs**. Follow
    its discovery, whole-stack context, delta triage, bounded review/fix loop, benchmark reproduction,

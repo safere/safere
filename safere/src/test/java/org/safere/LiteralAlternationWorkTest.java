@@ -57,7 +57,7 @@ class LiteralAlternationWorkTest {
 
   @Test
   void longLiteralVerificationStaysBoundedAsNeedlesAndInputGrow() {
-    for (int length : new int[] {64, 512, 2_048}) {
+    for (int length : new int[] {64, 512, 2_048, 16_384}) {
       String literal = "a".repeat(length - 2) + "ba";
       Pattern pattern = Pattern.compile(literal + "|middle|end");
       String text = "a".repeat(16 * length);

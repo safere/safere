@@ -31,6 +31,9 @@ final class LiteralAlternation {
   private static final int PROBE_LENGTH = 1_024;
   private static final int MAX_ALTERNATIVES = 8;
   private static final int WINDOW_LENGTH = 256;
+  // With both the literal length and the alternative count capped, String.indexOf on short
+  // literals costs at most a constant times the scanned input. Charge that distance to
+  // WorkCounter. Longer literals use bounded verification and KMP.
   private static final int SHORT_LITERAL_LENGTH = 12;
   private static final int REGION_PROBE_DELAY = 2 * WINDOW_LENGTH;
   // Searches verify first-byte candidates one at a time until they see this many within
