@@ -16,6 +16,13 @@ sealed interface InputScanner
   int asciiAt(int pos);
 
   /**
+   * Returns the code point at {@code pos} if it is below {@link Dfa#LOW_LIMIT} and occupies one
+   * index unit, or {@code -1} otherwise. Scanners that only read ASCII directly may return {@link
+   * #asciiAt}.
+   */
+  int lowAt(int pos);
+
+  /**
    * Returns the code point at {@code pos} when it can be read directly from one index unit, or
    * {@code -1} when full decoding is required.
    */

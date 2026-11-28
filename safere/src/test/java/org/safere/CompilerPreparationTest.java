@@ -249,7 +249,7 @@ class CompilerPreparationTest {
     assertThat(pattern.reverseDfaSetup()).isSameAs(setup);
     Dfa.Setup expected = Dfa.buildSetup(dfa);
     assertThat(setup.boundaries()).containsExactly(expected.boundaries());
-    assertThat(setup.asciiClassMap()).containsExactly(expected.asciiClassMap());
+    assertThat(setup.lowClassMap()).containsExactly(expected.lowClassMap());
     assertThat(setup.numClasses()).isEqualTo(expected.numClasses());
     assertThat(setup.splitUnicodeWordClasses()).isEqualTo(expected.splitUnicodeWordClasses());
   }

@@ -39,6 +39,32 @@ class StartRegisterWorkTest {
   }
 
   @Test
+  void denseNonAsciiStringFindAllScansTheInputOnce() {
+    String cyrillic =
+        "Утром шёл дождь, и улицы были пустыми и тихими. Χθες φτάσαμε στην Πάτρα.\n".repeat(128);
+    for (String regex : new String[] {"\\p{L}+", "[а-яА-ЯёЁ]+", "(?U)\\b\\w+\\b"}) {
+      Pattern pattern = Pattern.compile(regex);
+      long steps = WorkCounter.countWithForwardDfaStepsForTesting(() -> findAll(pattern, cyrillic));
+      assertThat(steps)
+          .as("%s work on non-ASCII prose", regex)
+          .isPositive()
+          .isLessThanOrEqualTo(2L * cyrillic.length());
+    }
+  }
+
+  @Test
+  void nonAsciiDfaNoMatchStaysInLowFastLoop() {
+    // Without the U+0000..U+07FF fast loop, Dfa breaks to generalLoop on the first Cyrillic char
+    // and records one general-loop WorkCounter unit per char (~9,155 units here). With the fast
+    // loop, only cold transition computations / start-accel checks record non-step units.
+    String cyrillic = "Утром шёл дождь, и улицы были пустыми и тихими.\n".repeat(192);
+    Pattern pattern = Pattern.compile("[а-яА-ЯёЁ]{20}");
+    long nonStepUnits =
+        WorkCounter.countForTesting(() -> assertThat(pattern.matcher(cyrillic).find()).isFalse());
+    assertThat(nonStepUnits).isLessThan(500L);
+  }
+
+  @Test
   void denseUtf8FindAllScansTheInputOnce() {
     assertOnePass("\\b\\w+\\b", true);
     assertOnePass("\\b[a-z]+\\b", true);

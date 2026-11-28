@@ -2252,7 +2252,8 @@ public final class Pattern implements Serializable {
             }
             // The reverse DFA executes only the flattened program.
             frp = graph.flattenedCopy();
-            reverseDfaSetup = Dfa.buildSetup(frp);
+            // Share the forward program's class table when the classes are the same.
+            reverseDfaSetup = Dfa.buildSetup(frp, forwardDfaSetup());
             contextFreeReverseLanguage =
                 hasContextFreeLanguage(prog) && hasContextFreeLanguage(frp);
             flatReverseDfaProg = frp;
